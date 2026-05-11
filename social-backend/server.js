@@ -3,10 +3,7 @@ const dotenv = require("dotenv");
 dotenv.config();
 const cors = require("cors");
 
-app.use(cors({
-  origin: "*", 
-  credentials: true
-}));
+
 
 const connectDB = require("./config/db");
 
@@ -26,7 +23,10 @@ connectDB();
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: "*", 
+  credentials: true
+}));
 app.use(express.json());
 
 // TEST ROUTE
