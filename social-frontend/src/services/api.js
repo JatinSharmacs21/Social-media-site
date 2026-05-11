@@ -2,6 +2,6 @@ import axios from "axios";
 
 export default axios.create({
   // baseURL: "http://localhost:5000",
-  baseURL:"https://social-backend-waow.onrender.com",
+  baseURL:import.meta.env.VITE_API_URL,
 
 });
