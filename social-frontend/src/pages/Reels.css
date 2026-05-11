@@ -1,0 +1,10 @@
+.reels-container {
+  text-align: center;
+}
+
+.reel-card {
+  margin-top: 20px;
+  background: white;
+  padding: 40px;
+  border-radius: 15px;
+}
