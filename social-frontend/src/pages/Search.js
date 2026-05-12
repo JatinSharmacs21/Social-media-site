@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import "./Search.css";
+import API from "../services/api";
 
 function Search() {
   const [query, setQuery] = useState("");
@@ -10,8 +11,8 @@ function Search() {
     if (!query) return;
 
     try {
-      const res = await axios.get(
-        `http://localhost:5000/search?name=${query}`
+      const res = await API.get(
+        `/search?name=${query}`
       );
       setUsers(res.data);
     } catch (err) {

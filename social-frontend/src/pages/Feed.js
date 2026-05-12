@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Navbar from "../components/Navbar";
 import "./Feed.css";
+import API from "../services/api";
 
 function Feed() {
   const [posts, setPosts] = useState([]);
@@ -18,8 +19,8 @@ function Feed() {
   // FETCH POSTS
   const fetchPosts = async () => {
     try {
-      const res = await axios.get(
-        "http://localhost:5000/api/posts"
+      const res = await API.get(
+        "/api/posts"
       );
 
       setPosts(res.data);
@@ -62,8 +63,8 @@ function Feed() {
 
         formData.append("file", selectedFile);
 
-        const uploadRes = await axios.post(
-          "http://localhost:5000/api/upload",
+        const uploadRes = await API.post(
+          "/api/upload",
           formData,
           {
             headers: {
@@ -80,8 +81,8 @@ function Feed() {
       }
 
       // CREATE POST
-      const newPost = await axios.post(
-        "http://localhost:5000/api/posts/create",
+      const newPost = await API.post(
+        "/api/posts/create",
         {
           caption,
           media,
@@ -116,8 +117,8 @@ function Feed() {
   const likePost = async (id) => {
     try {
 
-      const res = await axios.put(
-        `http://localhost:5000/api/posts/like/${id}`,
+      const res = await API.put(
+        `/api/posts/like/${id}`,
         {},
         {
           headers: {

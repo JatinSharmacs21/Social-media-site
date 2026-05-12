@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import "./Login.css"; // reuse same CSS
+import API from "../services/api";
 
 function Register() {
   const [name, setName] = useState("");
@@ -17,7 +18,7 @@ function Register() {
 
     setLoading(true);
 
-    axios.post("http://localhost:5000/api/auth/register", {
+    API.post("/api/auth/register", {
       name, email, password
     })
     .then(() => {

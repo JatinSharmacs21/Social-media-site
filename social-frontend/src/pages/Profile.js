@@ -7,6 +7,7 @@ import React, {
 import axios from "axios";
 
 import "./Profile.css";
+import API from "../services/api";
 
 function Profile() {
 
@@ -34,8 +35,8 @@ function Profile() {
 
       try {
 
-        const res = await axios.get(
-          "http://localhost:5000/profile",
+        const res = await API.get(
+          "/profile",
           {
             headers: {
               Authorization:
@@ -64,8 +65,8 @@ function Profile() {
 
       try {
 
-        const res = await axios.get(
-          "http://localhost:5000/api/posts/my-posts",
+        const res = await API.get(
+          "/api/posts/my-posts",
           {
             headers: {
               Authorization:
@@ -105,8 +106,8 @@ function Profile() {
 
       try {
 
-        await axios.put(
-          "http://localhost:5000/profile",
+        await API.put(
+          "/profile",
           {
             name,
             bio,
@@ -139,8 +140,8 @@ function Profile() {
 
       try {
 
-        await axios.put(
-          "http://localhost:5000/profile",
+        await API.put(
+          "/profile",
           {
             profilePic: url,
           },
