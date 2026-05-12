@@ -3,19 +3,10 @@ const User = require("../models/User");
 // GET USER PROFILE
 const getUserProfile = async (req, res) => {
   try {
-
-    const user = await User.findById(
-      req.params.id
-    )
+    const user = await User.findById(req.params.id)
       .select("-password")
-      .populate(
-        "followers",
-        "name profilePic"
-      )
-      .populate(
-        "following",
-        "name profilePic"
-      );
+      .populate("followers", "name email profilePic bio")
+      .populate("following", "name email profilePic bio");
 
     if (!user) {
       return res.status(404).json({
@@ -24,100 +15,92 @@ const getUserProfile = async (req, res) => {
     }
 
     res.json(user);
-
   } catch (error) {
-
     res.status(500).json({
       message: error.message,
     });
+  }
+};
 
+// SEARCH USERS
+const searchUsers = async (req, res) => {
+  try {
+    const { name } = req.query;
+
+    const users = await User.find({
+      name: { $regex: name || "", $options: "i" },
+    })
+      .select("name email profilePic bio followers following")
+      .limit(30);
+
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
 // FOLLOW / UNFOLLOW USER
 const followUser = async (req, res) => {
   try {
+    const targetUserId = req.params.id;
+    const currentUserId = req.user._id.toString();
 
-    // USER TO FOLLOW
-    const userToFollow =
-      await User.findById(req.params.id);
+    if (targetUserId === currentUserId) {
+      return res.status(400).json({
+        message: "You cannot follow yourself",
+      });
+    }
 
-    // CURRENT USER
-    const currentUser =
-      await User.findById(req.user.id);
+    const userToFollow = await User.findById(targetUserId);
+    const currentUser = await User.findById(currentUserId);
 
-    if (!userToFollow) {
+    if (!userToFollow || !currentUser) {
       return res.status(404).json({
         message: "User not found",
       });
     }
 
-    // CANNOT FOLLOW SELF
-    if (
-      userToFollow._id.toString() ===
-      currentUser._id.toString()
-    ) {
-      return res.status(400).json({
-        message:
-          "You cannot follow yourself",
-      });
-    }
+    const isFollowing = currentUser.following.some(
+      (id) => id.toString() === targetUserId
+    );
 
-    // CHECK ALREADY FOLLOWING
-    const isFollowing =
-      currentUser.following.includes(
-        userToFollow._id
-      );
-
-    // UNFOLLOW
     if (isFollowing) {
+      currentUser.following = currentUser.following.filter(
+        (id) => id.toString() !== targetUserId
+      );
 
-      currentUser.following =
-        currentUser.following.filter(
-          (id) =>
-            id.toString() !==
-            userToFollow._id.toString()
-        );
-
-      userToFollow.followers =
-        userToFollow.followers.filter(
-          (id) =>
-            id.toString() !==
-            currentUser._id.toString()
-        );
-
+      userToFollow.followers = userToFollow.followers.filter(
+        (id) => id.toString() !== currentUserId
+      );
     } else {
-
-      // FOLLOW
-      currentUser.following.push(
-        userToFollow._id
-      );
-
-      userToFollow.followers.push(
-        currentUser._id
-      );
-
+      currentUser.following.push(targetUserId);
+      userToFollow.followers.push(currentUserId);
     }
 
     await currentUser.save();
-
     await userToFollow.save();
+
+    const updatedUser = await User.findById(targetUserId)
+      .select("-password")
+      .populate("followers", "name email profilePic bio")
+      .populate("following", "name email profilePic bio");
 
     res.json({
       success: true,
       following: !isFollowing,
+      user: updatedUser,
     });
-
   } catch (error) {
-
     res.status(500).json({
       message: error.message,
     });
-
   }
 };
 
 module.exports = {
   getUserProfile,
+  searchUsers,
   followUser,
 };

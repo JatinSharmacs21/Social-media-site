@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import API from "../services/api";
+import { useNavigate } from "react-router-dom";
 
 function Feed() {
   const [posts, setPosts] = useState([]);
@@ -20,6 +21,7 @@ function Feed() {
 
   const token = localStorage.getItem("token");
   const currentUserId = localStorage.getItem("userId");
+  const navigate = useNavigate();
 
   const authConfig = {
     headers: {
@@ -355,11 +357,16 @@ function Feed() {
                 >
                   {/* HEADER */}
                   <div className="flex items-center justify-between p-4 relative">
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div
+                        onClick={() =>
+                            navigate(`/profile/${post.user?._id}`)
+                        }
+                        className="flex items-center gap-3 min-w-0 cursor-pointer"
+                  >
                       <img
                         src={
                           post.user?.profilePic ||
-                          "https://via.placeholder.com/100"
+                          "https://ui-avatars.com/api/?name=User&background=8b5cf6&color=fff"
                         }
                         alt=""
                         className="w-11 h-11 sm:w-12 sm:h-12 rounded-full object-cover border border-white/10 shrink-0"
@@ -569,7 +576,7 @@ function Feed() {
                                     <img
                                       src={
                                         comment.user?.profilePic ||
-                                        "https://via.placeholder.com/100"
+                                        "https://ui-avatars.com/api/?name=User&background=8b5cf6&color=fff"
                                       }
                                       alt=""
                                       className="w-8 h-8 rounded-full object-cover border border-white/10 shrink-0"
@@ -642,7 +649,7 @@ function Feed() {
                                                   <img
                                                     src={
                                                       reply.user?.profilePic ||
-                                                      "https://via.placeholder.com/100"
+                                                      "https://ui-avatars.com/api/?name=User&background=8b5cf6&color=fff"
                                                     }
                                                     alt=""
                                                     className="w-7 h-7 rounded-full object-cover border border-white/10 shrink-0"

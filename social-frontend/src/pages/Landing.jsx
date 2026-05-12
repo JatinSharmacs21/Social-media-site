@@ -254,7 +254,7 @@ function Landing() {
 
           <div className="w-full bg-white/[0.06] border border-white/10 backdrop-blur-2xl rounded-[40px] p-8 md:p-10 shadow-[0_0_50px_rgba(0,0,0,0.4)]">
 
-            <div className="mb-8">
+            <div className="mb-6">
 
               <h2 className="text-4xl md:text-5xl font-black mb-3">
 

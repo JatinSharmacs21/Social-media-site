@@ -16,14 +16,9 @@ import MainLayout from "./components/MainLayout";
 function App() {
   return (
     <Router>
-
       <Routes>
-
         {/* LANDING + AUTH */}
-        <Route
-          path="/"
-          element={<Landing />}
-        />
+        <Route path="/" element={<Landing />} />
 
         {/* PRIVATE ROUTES */}
         <Route
@@ -37,8 +32,21 @@ function App() {
           }
         />
 
+        {/* OWN PROFILE */}
         <Route
           path="/profile"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Profile />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* OTHER USER PROFILE */}
+        <Route
+          path="/profile/:userId"
           element={
             <ProtectedRoute>
               <MainLayout>
@@ -69,9 +77,7 @@ function App() {
             </ProtectedRoute>
           }
         />
-
       </Routes>
-
     </Router>
   );
 }

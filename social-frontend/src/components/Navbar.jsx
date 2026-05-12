@@ -32,7 +32,7 @@ function Navbar() {
 
           {/* LOGO */}
           <div
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/feed")}
             className="flex items-center gap-3 cursor-pointer"
           >
 
