@@ -1,8 +1,10 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+} from "react-router-dom";
 
 import Landing from "./pages/Landing";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
 import Feed from "./pages/Feed";
 import Profile from "./pages/Profile";
 import Search from "./pages/Search";
@@ -14,14 +16,16 @@ import MainLayout from "./components/MainLayout";
 function App() {
   return (
     <Router>
+
       <Routes>
 
-        {/* PUBLIC */}
-        <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        {/* LANDING + AUTH */}
+        <Route
+          path="/"
+          element={<Landing />}
+        />
 
-        {/* PRIVATE */}
+        {/* PRIVATE ROUTES */}
         <Route
           path="/feed"
           element={
@@ -67,6 +71,7 @@ function App() {
         />
 
       </Routes>
+
     </Router>
   );
 }
