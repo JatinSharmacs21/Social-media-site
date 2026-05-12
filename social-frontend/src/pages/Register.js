@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import axios from "axios";
-import "./Login.css"; // reuse same CSS
 import API from "../services/api";
+import "./Login.css"; // reuse same CSS
+
 
 function Register() {
   const [name, setName] = useState("");

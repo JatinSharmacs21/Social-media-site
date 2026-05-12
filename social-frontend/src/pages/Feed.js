@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import API from "../services/api";
 import Navbar from "../components/Navbar";
 import "./Feed.css";
-import API from "../services/api";
+
 
 function Feed() {
   const [posts, setPosts] = useState([]);

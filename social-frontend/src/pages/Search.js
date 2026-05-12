@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import axios from "axios";
-import "./Search.css";
 import API from "../services/api";
+import "./Search.css";
+
 
 function Search() {
   const [query, setQuery] = useState("");
