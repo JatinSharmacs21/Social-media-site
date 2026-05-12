@@ -74,7 +74,7 @@ function Profile() {
     } catch (err) {
       console.log(err.response?.data || err);
     }
-  }, [token, userId, isOwnProfile]);
+  }, [authConfig, userId, isOwnProfile]);
 
   const fetchPosts = useCallback(async () => {
     try {
@@ -87,7 +87,7 @@ function Profile() {
     } catch (err) {
       console.log(err.response?.data || err);
     }
-  }, [token, userId, isOwnProfile]);
+  }, [authConfig, userId, isOwnProfile]);
 
   useEffect(() => {
     fetchProfile();

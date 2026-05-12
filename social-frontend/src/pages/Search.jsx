@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../services/api";
 
@@ -29,7 +29,7 @@ function Search() {
     );
   };
 
-  const searchUsers = async (searchText = "") => {
+  const searchUsers = useCallback(async (searchText = "") => {
     try {
       setLoading(true);
 
@@ -53,19 +53,19 @@ function Search() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUserId]);
 
   useEffect(() => {
-    searchUsers("");
-  }, []);
+  searchUsers("");
+}, [searchUsers]);
 
   useEffect(() => {
-    const delay = setTimeout(() => {
-      searchUsers(query.trim());
-    }, 400);
+  const delay = setTimeout(() => {
+    searchUsers(query.trim());
+  }, 400);
 
-    return () => clearTimeout(delay);
-  }, [query]);
+  return () => clearTimeout(delay);
+}, [query, searchUsers]);
 
   const followUser = async (userId) => {
     try {
