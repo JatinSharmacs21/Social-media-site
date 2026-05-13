@@ -32,7 +32,8 @@ function Notifications() {
     };
 
     fetchNotifications();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
 
   const deleteNotification = async (id) => {
     try {
