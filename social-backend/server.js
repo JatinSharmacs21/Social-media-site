@@ -2,6 +2,7 @@ const express = require("express");
 const dotenv = require("dotenv");
 dotenv.config();
 const cors = require("cors");
+const notificationRoutes = require("./routes/notificationRoutes");
 
 
 
@@ -34,11 +35,13 @@ app.get("/", (req, res) => {
   res.send("API running");
 });
 
+
 // AUTH ROUTES
 app.use("/api/auth", authRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 
 

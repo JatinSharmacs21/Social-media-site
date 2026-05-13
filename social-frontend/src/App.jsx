@@ -9,6 +9,7 @@ import Feed from "./pages/Feed";
 import Profile from "./pages/Profile";
 import Search from "./pages/Search";
 import Reels from "./pages/Reels";
+import Notifications from "./pages/Notifications";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import MainLayout from "./components/MainLayout";
@@ -17,10 +18,8 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* LANDING + AUTH */}
         <Route path="/" element={<Landing />} />
 
-        {/* PRIVATE ROUTES */}
         <Route
           path="/feed"
           element={
@@ -32,7 +31,17 @@ function App() {
           }
         />
 
-        {/* OWN PROFILE */}
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Notifications />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/profile"
           element={
@@ -44,7 +53,6 @@ function App() {
           }
         />
 
-        {/* OTHER USER PROFILE */}
         <Route
           path="/profile/:userId"
           element={

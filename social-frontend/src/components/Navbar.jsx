@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import API from "../services/api";
 
 function Navbar() {
   const navigate = useNavigate();
@@ -7,10 +8,35 @@ function Navbar() {
 
   const token = localStorage.getItem("token");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        if (!token) return;
+
+        const res = await API.get("/api/notifications/unread-count", {
+          headers: {
+            Authorization: "Bearer " + token,
+          },
+        });
+
+        setUnreadCount(res.data.count || 0);
+      } catch (error) {
+        console.log(error.response?.data || error);
+      }
+    };
+
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000);
+
+    return () => clearInterval(interval);
+  }, [token, location.pathname]);
 
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("userId");
+    localStorage.removeItem("user");
     navigate("/");
   };
 
@@ -19,6 +45,10 @@ function Navbar() {
   const go = (path) => {
     navigate(path);
     setSidebarOpen(false);
+
+    if (path === "/notifications") {
+      setUnreadCount(0);
+    }
   };
 
   const navItems = [
@@ -54,6 +84,25 @@ function Navbar() {
           <path d="M4 10h16" />
           <path d="M10 14.5v3l3-1.5-3-1.5z" fill="currentColor" stroke="none" />
         </svg>
+      ),
+    },
+    {
+      label: "Notifications",
+      path: "/notifications",
+      badge: unreadCount,
+      icon: (
+        <svg
+  viewBox="0 0 24 24"
+  className="w-6 h-6"
+  fill="none"
+  stroke="currentColor"
+  strokeWidth="2"
+  strokeLinecap="round"
+  strokeLinejoin="round"
+>
+  <path d="M6 8a6 6 0 1 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9" />
+  <path d="M10.5 21a1.5 1.5 0 0 0 3 0" />
+</svg>
       ),
     },
     {
@@ -98,12 +147,13 @@ function Navbar() {
 
   const NavButton = ({ item, expanded = false, mobile = false }) => {
     const active = isActive(item.path);
+    const showBadge = item.badge && item.badge > 0;
 
     if (mobile) {
       return (
         <button
           onClick={() => go(item.path)}
-          className={`flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-2xl text-xs transition-all ${
+          className={`relative flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-2xl text-[11px] transition-all ${
             active
               ? "text-white bg-white/[0.06]"
               : "text-gray-500 hover:text-white"
@@ -111,6 +161,12 @@ function Navbar() {
         >
           <span className={active ? "text-pink-300" : ""}>{item.icon}</span>
           <span>{item.label}</span>
+
+          {showBadge && (
+            <span className="absolute top-1 right-4 min-w-[18px] h-[18px] px-1 rounded-full bg-pink-500 text-white text-[10px] flex items-center justify-center font-bold">
+              {item.badge > 9 ? "9+" : item.badge}
+            </span>
+          )}
         </button>
       );
     }
@@ -132,17 +188,23 @@ function Navbar() {
         )}
 
         <span
-          className={`shrink-0 transition-all duration-300 ${
+          className={`relative shrink-0 transition-all duration-300 ${
             active ? "text-pink-300" : "group-hover:text-cyan-300"
           }`}
         >
           {item.icon}
+
+          {showBadge && (
+            <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-pink-500 text-white text-[10px] flex items-center justify-center font-bold">
+              {item.badge > 9 ? "9+" : item.badge}
+            </span>
+          )}
         </span>
 
         <span
           className={`font-semibold tracking-wide whitespace-nowrap transition-all duration-300 ${
             expanded
-              ? "opacity-100 translate-x-0 max-w-[120px]"
+              ? "opacity-100 translate-x-0 max-w-[150px]"
               : "opacity-0 -translate-x-2 max-w-0"
           }`}
         >
@@ -166,14 +228,14 @@ function Navbar() {
 
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate("/login")}
+              onClick={() => navigate("/")}
               className="px-4 sm:px-5 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all"
             >
               Login
             </button>
 
             <button
-              onClick={() => navigate("/register")}
+              onClick={() => navigate("/")}
               className="px-4 sm:px-5 py-2 rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 hover:scale-105 transition-all font-semibold"
             >
               Register
@@ -186,7 +248,6 @@ function Navbar() {
 
   return (
     <>
-      {/* MOBILE TOP HEADER */}
       <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-[76px] backdrop-blur-2xl bg-black/75 border-b border-white/10">
         <div className="h-full px-4 flex items-center justify-between">
           <Logo />
@@ -200,7 +261,6 @@ function Navbar() {
         </div>
       </header>
 
-      {/* DESKTOP HOVER SIDEBAR */}
       <aside
         onMouseEnter={() => setSidebarOpen(true)}
         onMouseLeave={() => setSidebarOpen(false)}
@@ -219,31 +279,6 @@ function Navbar() {
             {navItems.map((item) => (
               <NavButton key={item.path} item={item} expanded={sidebarOpen} />
             ))}
-          </div>
-
-          <div className="mt-6 border-t border-white/10 pt-4">
-            <button
-              onClick={() => go("/feed")}
-              className={`group relative flex items-center rounded-2xl transition-all duration-300 overflow-hidden ${
-                sidebarOpen ? "w-full px-4 py-3 gap-4" : "w-12 h-12 justify-center"
-              } text-gray-400 hover:text-white hover:bg-white/[0.06]`}
-              title="Create"
-            >
-              <svg viewBox="0 0 24 24" className="w-6 h-6 group-hover:text-pink-300 transition-colors" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <path d="M12 5v14" />
-                <path d="M5 12h14" />
-              </svg>
-
-              <span
-                className={`font-semibold tracking-wide whitespace-nowrap transition-all duration-300 ${
-                  sidebarOpen
-                    ? "opacity-100 translate-x-0 max-w-[120px]"
-                    : "opacity-0 -translate-x-2 max-w-0"
-                }`}
-              >
-                Create
-              </span>
-            </button>
           </div>
 
           <div className="mt-auto">
@@ -274,9 +309,8 @@ function Navbar() {
         </div>
       </aside>
 
-      {/* MOBILE BOTTOM NAV */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-2xl border-t border-white/10">
-        <div className="grid grid-cols-4 px-2 py-2">
+        <div className="grid grid-cols-5 px-1 py-2">
           {navItems.map((item) => (
             <NavButton key={item.path} item={item} mobile />
           ))}

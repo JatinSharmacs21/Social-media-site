@@ -1,5 +1,7 @@
 const Post = require("../models/Post");
 
+const Notification = require("../models/Notification");
+
 // helper: updated populated post return karne ke liye
 const getPopulatedPost = async (postId) => {
   return await Post.findById(postId)
@@ -70,8 +72,18 @@ const toggleLikePost = async (req, res) => {
         (like) => like.toString() !== req.user.id.toString()
       );
     } else {
-      post.likes.push(req.user.id);
-    }
+  post.likes.push(req.user.id);
+
+  if (post.user.toString() !== req.user.id.toString()) {
+    await Notification.create({
+      recipient: post.user,
+      sender: req.user.id,
+      type: "like",
+      post: post._id,
+      message: "liked your post",
+    });
+  }
+}
 
     await post.save();
 
@@ -179,6 +191,15 @@ const addComment = async (req, res) => {
     });
 
     await post.save();
+    if (post.user.toString() !== req.user.id.toString()) {
+  await Notification.create({
+    recipient: post.user,
+    sender: req.user.id,
+    type: "comment",
+    post: post._id,
+    message: "commented on your post",
+  });
+}
 
     const updatedPost = await getPopulatedPost(post._id);
 
@@ -313,6 +334,15 @@ const addReply = async (req, res) => {
     });
 
     await post.save();
+    if (comment.user.toString() !== req.user.id.toString()) {
+  await Notification.create({
+    recipient: comment.user,
+    sender: req.user.id,
+    type: "reply",
+    post: post._id,
+    message: "replied to your comment",
+  });
+}
 
     const updatedPost = await getPopulatedPost(post._id);
 
