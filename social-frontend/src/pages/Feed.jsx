@@ -60,7 +60,11 @@ function Feed() {
     }
   };
 
-  const fetchCurrentUser = async () => {
+
+useEffect(() => {
+  fetchPosts();
+
+  const loadCurrentUser = async () => {
     try {
       if (!currentUserId) return;
 
@@ -80,10 +84,8 @@ function Feed() {
     }
   };
 
-  useEffect(() => {
-    fetchPosts();
-    fetchCurrentUser();
-  }, []);
+  loadCurrentUser();
+}, [currentUserId]);
 
   const updatePostInState = (updatedPost) => {
     setPosts((prevPosts) =>

@@ -26,88 +26,89 @@ function Reels() {
     },
   };
 
-  const getMediaUrl = (item) => {
-    let rawUrl = "";
+  useEffect(() => {
+    const getMediaUrl = (item) => {
+      let rawUrl = "";
 
-    if (typeof item === "string") {
-      rawUrl = item;
-    } else {
-      rawUrl =
-        item?.url ||
-        item?.secure_url ||
-        item?.mediaUrl ||
-        item?.fileUrl ||
-        item?.path ||
-        item?.filePath ||
-        item?.src ||
-        "";
-    }
+      if (typeof item === "string") {
+        rawUrl = item;
+      } else {
+        rawUrl =
+          item?.url ||
+          item?.secure_url ||
+          item?.mediaUrl ||
+          item?.fileUrl ||
+          item?.path ||
+          item?.filePath ||
+          item?.src ||
+          "";
+      }
 
-    if (!rawUrl) return "";
+      if (!rawUrl) return "";
 
-    if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
-      return rawUrl;
-    }
+      if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
+        return rawUrl;
+      }
 
-    const baseUrl = API.defaults?.baseURL || "";
-    return `${baseUrl}${rawUrl.startsWith("/") ? rawUrl : "/" + rawUrl}`;
-  };
+      const baseUrl = API.defaults?.baseURL || "";
+      return `${baseUrl}${rawUrl.startsWith("/") ? rawUrl : "/" + rawUrl}`;
+    };
 
-  const isVideoMedia = (item) => {
-    const type = (item?.type || item?.resource_type || item?.mimetype || "").toLowerCase();
-    const url = getMediaUrl(item).toLowerCase();
+    const isVideoMedia = (item) => {
+      const type = (
+        item?.type ||
+        item?.resource_type ||
+        item?.mimetype ||
+        ""
+      ).toLowerCase();
 
-    return (
-      type.includes("video") ||
-      url.includes("/video/") ||
-      url.includes("video/upload") ||
-      url.endsWith(".mp4") ||
-      url.endsWith(".mov") ||
-      url.endsWith(".webm") ||
-      url.endsWith(".mkv")
-    );
-  };
+      const url = getMediaUrl(item).toLowerCase();
 
-  const isReelLikedByMe = (reel) => {
-    return reel.likes?.some((like) => {
-      if (typeof like === "string") return like === currentUserId;
-      return like?._id === currentUserId;
-    });
-  };
+      return (
+        type.includes("video") ||
+        url.includes("/video/") ||
+        url.includes("video/upload") ||
+        url.endsWith(".mp4") ||
+        url.endsWith(".mov") ||
+        url.endsWith(".webm") ||
+        url.endsWith(".mkv")
+      );
+    };
 
-  const fetchReels = async () => {
-    try {
-      setLoading(true);
-      const res = await API.get("/api/posts");
+    const fetchReels = async () => {
+      try {
+        setLoading(true);
+        const res = await API.get("/api/posts");
 
-      const videoPosts = [];
+        const videoPosts = [];
 
-      res.data.forEach((post) => {
-        const videos =
-          post.media?.filter((item) => isVideoMedia(item) && getMediaUrl(item)) ||
-          [];
+        res.data.forEach((post) => {
+          const videos =
+            post.media?.filter(
+              (item) => isVideoMedia(item) && getMediaUrl(item)
+            ) || [];
 
-        videos.forEach((video, index) => {
-          videoPosts.push({
-            ...post,
-            reelId: `${post._id}-${index}`,
-            videoUrl: getMediaUrl(video),
+          videos.forEach((video, index) => {
+            videoPosts.push({
+              ...post,
+              reelId: `${post._id}-${index}`,
+              videoUrl: getMediaUrl(video),
+            });
           });
         });
-      });
 
-      setReels(videoPosts);
-      if (videoPosts.length > 0) {
-        setActiveReelId(videoPosts[0].reelId);
+        setReels(videoPosts);
+
+        if (videoPosts.length > 0) {
+          setActiveReelId(videoPosts[0].reelId);
+        }
+      } catch (error) {
+        console.log(error.response?.data || error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.log(error.response?.data || error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  useEffect(() => {
     fetchReels();
   }, []);
 
@@ -146,6 +147,13 @@ function Reels() {
       if (video) video.muted = muted;
     });
   }, [muted]);
+
+  const isReelLikedByMe = (reel) => {
+    return reel.likes?.some((like) => {
+      if (typeof like === "string") return like === currentUserId;
+      return like?._id === currentUserId;
+    });
+  };
 
   const updateReelPostInState = (updatedPost) => {
     setReels((prev) =>
@@ -247,19 +255,37 @@ function Reels() {
   };
 
   const HeartIcon = ({ filled = true }) => (
-    <svg viewBox="0 0 24 24" className="w-7 h-7" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.2">
+    <svg
+      viewBox="0 0 24 24"
+      className="w-7 h-7"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="2.2"
+    >
       <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z" />
     </svg>
   );
 
   const CommentIcon = () => (
-    <svg viewBox="0 0 24 24" className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg
+      viewBox="0 0 24 24"
+      className="w-7 h-7"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+    >
       <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
     </svg>
   );
 
   const ShareIcon = () => (
-    <svg viewBox="0 0 24 24" className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg
+      viewBox="0 0 24 24"
+      className="w-7 h-7"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+    >
       <path d="M4 12v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8" />
       <path d="M16 6l-4-4-4 4" />
       <path d="M12 2v14" />
@@ -332,8 +358,12 @@ function Reels() {
 
                 <div className="absolute top-0 left-0 right-0 z-20 px-4 pt-5 pb-3 flex items-center justify-between">
                   <div>
-                    <h2 className="text-xl font-extrabold tracking-tight">Reels</h2>
-                    {isActive && <p className="text-xs text-pink-200/80">Watching now</p>}
+                    <h2 className="text-xl font-extrabold tracking-tight">
+                      Reels
+                    </h2>
+                    {isActive && (
+                      <p className="text-xs text-pink-200/80">Watching now</p>
+                    )}
                   </div>
 
                   <button
@@ -356,7 +386,9 @@ function Reels() {
                   >
                     <HeartIcon filled={isLiked} />
                   </button>
-                  <span className="-mt-4 text-xs font-semibold">{reel.likes?.length || 0}</span>
+                  <span className="-mt-4 text-xs font-semibold">
+                    {reel.likes?.length || 0}
+                  </span>
 
                   <button
                     onClick={() =>
@@ -369,7 +401,9 @@ function Reels() {
                   >
                     <CommentIcon />
                   </button>
-                  <span className="-mt-4 text-xs font-semibold">{reel.comments?.length || 0}</span>
+                  <span className="-mt-4 text-xs font-semibold">
+                    {reel.comments?.length || 0}
+                  </span>
 
                   <button
                     onClick={() => setShareReel(reel)}
@@ -380,15 +414,23 @@ function Reels() {
                 </div>
 
                 <div className="absolute left-0 right-16 bottom-0 z-20 p-4 pb-8">
-                  <div onClick={() => openUserProfile(reel.user?._id)} className="inline-flex items-center gap-3 cursor-pointer mb-3">
+                  <div
+                    onClick={() => openUserProfile(reel.user?._id)}
+                    className="inline-flex items-center gap-3 cursor-pointer mb-3"
+                  >
                     <img
-                      src={reel.user?.profilePic || "https://ui-avatars.com/api/?name=User&background=8b5cf6&color=fff"}
+                      src={
+                        reel.user?.profilePic ||
+                        "https://ui-avatars.com/api/?name=User&background=8b5cf6&color=fff"
+                      }
                       alt=""
                       className="w-10 h-10 rounded-full object-cover border border-white/20"
                     />
 
                     <div>
-                      <p className="font-bold leading-tight">{reel.user?.name || "Unknown User"}</p>
+                      <p className="font-bold leading-tight">
+                        {reel.user?.name || "Unknown User"}
+                      </p>
                       <p className="text-xs text-gray-300">Original reel</p>
                     </div>
                   </div>
@@ -402,12 +444,16 @@ function Reels() {
 
                 <div
                   className={`absolute left-0 right-0 bottom-0 z-40 bg-zinc-950/95 backdrop-blur-xl border-t border-white/10 rounded-t-3xl transition-all duration-300 ${
-                    commentsOpen ? "translate-y-0 opacity-100" : "translate-y-full opacity-0"
+                    commentsOpen
+                      ? "translate-y-0 opacity-100"
+                      : "translate-y-full opacity-0"
                   }`}
                 >
                   <div className="p-4 max-h-[70vh] overflow-y-auto">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-bold">Comments ({reel.comments?.length || 0})</h3>
+                      <h3 className="font-bold">
+                        Comments ({reel.comments?.length || 0})
+                      </h3>
 
                       <button
                         onClick={() =>
@@ -450,23 +496,37 @@ function Reels() {
                     {reel.comments && reel.comments.length > 0 ? (
                       <div className="space-y-3">
                         {reel.comments.map((comment) => (
-                          <div key={comment._id} className="flex items-start gap-3 bg-white/[0.04] border border-white/5 rounded-2xl p-3">
+                          <div
+                            key={comment._id}
+                            className="flex items-start gap-3 bg-white/[0.04] border border-white/5 rounded-2xl p-3"
+                          >
                             <img
-                              onClick={() => openUserProfile(comment.user?._id)}
-                              src={comment.user?.profilePic || "https://ui-avatars.com/api/?name=User&background=8b5cf6&color=fff"}
+                              onClick={() =>
+                                openUserProfile(comment.user?._id)
+                              }
+                              src={
+                                comment.user?.profilePic ||
+                                "https://ui-avatars.com/api/?name=User&background=8b5cf6&color=fff"
+                              }
                               alt=""
                               className="w-8 h-8 rounded-full object-cover cursor-pointer"
                             />
 
                             <div className="min-w-0">
-                              <p className="text-sm font-semibold">{comment.user?.name || "User"}</p>
-                              <p className="text-sm text-gray-300 break-words">{comment.text}</p>
+                              <p className="text-sm font-semibold">
+                                {comment.user?.name || "User"}
+                              </p>
+                              <p className="text-sm text-gray-300 break-words">
+                                {comment.text}
+                              </p>
                             </div>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-center text-gray-500 py-8">No comments yet</p>
+                      <p className="text-center text-gray-500 py-8">
+                        No comments yet
+                      </p>
                     )}
                   </div>
                 </div>
@@ -477,12 +537,21 @@ function Reels() {
       </div>
 
       {shareReel && (
-        <div onClick={() => setShareReel(null)} className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-3">
-          <div onClick={(e) => e.stopPropagation()} className="w-full sm:max-w-md bg-zinc-950 border border-white/10 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl">
+        <div
+          onClick={() => setShareReel(null)}
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-3"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full sm:max-w-md bg-zinc-950 border border-white/10 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl"
+          >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold">Share reel</h3>
 
-              <button onClick={() => setShareReel(null)} className="text-gray-400 hover:text-white text-xl">
+              <button
+                onClick={() => setShareReel(null)}
+                className="text-gray-400 hover:text-white text-xl"
+              >
                 ×
               </button>
             </div>
@@ -491,15 +560,23 @@ function Reels() {
               <p className="text-sm text-gray-300 line-clamp-2">
                 {shareReel.caption || shareReel.content || "Vybeo reel"}
               </p>
-              <p className="text-xs text-gray-500 mt-2 truncate">{getShareUrl(shareReel._id)}</p>
+              <p className="text-xs text-gray-500 mt-2 truncate">
+                {getShareUrl(shareReel._id)}
+              </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button onClick={copyShareLink} className="px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 transition-all font-medium">
+              <button
+                onClick={copyShareLink}
+                className="px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 transition-all font-medium"
+              >
                 {copiedShare ? "Copied ✅" : "Copy link"}
               </button>
 
-              <button onClick={nativeShare} className="px-4 py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-indigo-500 hover:scale-[1.02] transition-all font-medium">
+              <button
+                onClick={nativeShare}
+                className="px-4 py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-indigo-500 hover:scale-[1.02] transition-all font-medium"
+              >
                 Share now
               </button>
             </div>
