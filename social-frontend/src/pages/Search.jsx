@@ -167,7 +167,7 @@ function Search() {
         </div>
 
         {/* SEARCH BOX */}
-        <div className="bg-zinc-950 border border-white/10 rounded-[28px] p-4 mb-7 shadow-xl max-w-3xl">
+        <div className="bg-zinc-950 border border-white/10 rounded-[28px] p-4 mb-7 shadow-xl w-full max-w-full sm:max-w-[540px] md:max-w-[620px] lg:max-w-[640px] mx-auto">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-r from-pink-500 to-indigo-500 flex items-center justify-center shrink-0 shadow-lg">
               🔎
