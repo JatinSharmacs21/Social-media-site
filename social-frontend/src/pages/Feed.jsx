@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import API from "../services/api";
 import { useNavigate } from "react-router-dom";
 
@@ -9,6 +9,7 @@ function Feed() {
   const currentUserId = localStorage.getItem("userId");
 
   const [posts, setPosts] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [caption, setCaption] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [preview, setPreview] = useState("");
@@ -39,6 +40,7 @@ function Feed() {
   const [copiedShare, setCopiedShare] = useState(false);
 
   const [likesModalPost, setLikesModalPost] = useState(null);
+  const [followingUsers, setFollowingUsers] = useState({});
 
   const authConfig = {
     headers: {
@@ -58,8 +60,29 @@ function Feed() {
     }
   };
 
+  const fetchCurrentUser = async () => {
+    try {
+      if (!currentUserId) return;
+
+      const res = await API.get(`/api/users/${currentUserId}`);
+      setCurrentUser(res.data);
+    } catch (error) {
+      console.log(error.response?.data || error);
+
+      const localUser = localStorage.getItem("user");
+      if (localUser) {
+        try {
+          setCurrentUser(JSON.parse(localUser));
+        } catch {
+          setCurrentUser(null);
+        }
+      }
+    }
+  };
+
   useEffect(() => {
     fetchPosts();
+    fetchCurrentUser();
   }, []);
 
   const updatePostInState = (updatedPost) => {
@@ -130,6 +153,63 @@ function Feed() {
       if (typeof like === "string") return like === currentUserId;
       return like?._id === currentUserId;
     });
+  };
+
+  const isFollowingUser = (user) => {
+    if (!user?._id) return false;
+
+    if (followingUsers[user._id] !== undefined) {
+      return followingUsers[user._id];
+    }
+
+    return user.followers?.some((follower) => {
+      if (typeof follower === "string") return follower === currentUserId;
+      return follower?._id === currentUserId;
+    });
+  };
+
+  const toggleFollowUser = async (user) => {
+    if (!user?._id || user._id.startsWith("demo")) {
+      setFollowingUsers((prev) => ({
+        ...prev,
+        [user?._id || "demo"]: !prev[user?._id || "demo"],
+      }));
+      return;
+    }
+
+    try {
+      const res = await API.put(`/api/users/follow/${user._id}`, {}, authConfig);
+
+      setFollowingUsers((prev) => ({
+        ...prev,
+        [user._id]: res.data?.following ?? !prev[user._id],
+      }));
+    } catch (error) {
+      console.log(error.response?.data || error);
+
+      setFollowingUsers((prev) => ({
+        ...prev,
+        [user._id]: !prev[user._id],
+      }));
+    }
+  };
+
+  const getMediaUrl = (item) => {
+    return item?.url || item?.secure_url || item?.mediaUrl || item?.src || "";
+  };
+
+  const isImageMedia = (item) => {
+    const type = (item?.type || item?.resource_type || "").toLowerCase();
+    const url = getMediaUrl(item).toLowerCase();
+
+    return (
+      type.includes("image") ||
+      url.endsWith(".jpg") ||
+      url.endsWith(".jpeg") ||
+      url.endsWith(".png") ||
+      url.endsWith(".webp") ||
+      url.endsWith(".gif")
+    );
   };
 
   const handleFileChange = (e) => {
@@ -359,7 +439,7 @@ function Feed() {
   const HeartIcon = ({ filled = true }) => (
     <svg
       viewBox="0 0 24 24"
-      className="w-[22px] h-[22px]"
+      className="w-[28px] h-[28px]"
       fill={filled ? "currentColor" : "none"}
       stroke="currentColor"
       strokeWidth="2.2"
@@ -371,7 +451,7 @@ function Feed() {
   const CommentIcon = () => (
     <svg
       viewBox="0 0 24 24"
-      className="w-[22px] h-[22px]"
+      className="w-[28px] h-[28px]"
       fill="none"
       stroke="currentColor"
       strokeWidth="2.2"
@@ -383,7 +463,7 @@ function Feed() {
   const ShareIcon = () => (
     <svg
       viewBox="0 0 24 24"
-      className="w-[22px] h-[22px]"
+      className="w-[28px] h-[28px]"
       fill="none"
       stroke="currentColor"
       strokeWidth="2.2"
@@ -397,18 +477,53 @@ function Feed() {
   const BookmarkIcon = ({ saved }) => (
     <svg
       viewBox="0 0 24 24"
-      className="w-[22px] h-[22px]"
+      className="w-[28px] h-[28px]"
       fill={saved ? "currentColor" : "none"}
       stroke="currentColor"
-      strokeWidth="2.2"
+      strokeWidth="2"
     >
       <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
     </svg>
   );
 
+  const fallbackUsers = useMemo(
+    () =>
+      [
+        { _id: "demo1", name: "Aman Dev", profilePic: "", bio: "Frontend lover" },
+        { _id: "demo2", name: "Rahul Vibes", profilePic: "", bio: "MERN developer" },
+        { _id: "demo3", name: "Sneha UI", profilePic: "", bio: "UI designer" },
+        { _id: "demo4", name: "Karan Reels", profilePic: "", bio: "Video creator" },
+        { _id: "demo5", name: "Priya Codes", profilePic: "", bio: "Full stack dev" },
+      ].sort(() => Math.random() - 0.5),
+    []
+  );
+
+  const suggestedUsers = useMemo(() => {
+    const users = posts
+      .map((post) => post.user)
+      .filter(Boolean)
+      .filter((user) => user._id !== currentUserId)
+      .filter((user, index, arr) => {
+        return arr.findIndex((item) => item?._id === user?._id) === index;
+      })
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 5);
+
+    return users.length > 0 ? users : fallbackUsers.slice(0, 5);
+  }, [posts, currentUserId, fallbackUsers]);
+
+  const trendingTags = useMemo(
+    () =>
+      ["#Vybeo", "#Reels", "#Coding", "#MERN", "#Developers", "#Vibes"]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 4),
+    []
+  );
+
   return (
-    <div className="min-h-screen bg-black text-white px-2 sm:px-4 pt-20 sm:pt-6 pb-24 sm:pb-6">
-      <div className="w-full max-w-full sm:max-w-[540px] md:max-w-[620px] lg:max-w-[640px] mx-auto">
+    <div className="min-h-screen bg-black text-white px-2 sm:px-4 md:px-6 pt-20 md:pt-8 pb-24 md:pb-10">
+      <div className="w-full max-w-[1080px] mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,590px)_300px] xl:grid-cols-[minmax(0,600px)_320px] gap-8 xl:gap-10 justify-center items-start">
+        <div className="w-full max-w-[600px] mx-auto lg:mx-0">
         {/* CREATE POST */}
         <form
           onSubmit={(e) => {
@@ -438,7 +553,7 @@ function Feed() {
                   src={preview}
                   alt="preview"
                   loading="lazy"
-                  className="w-full h-full object-contain bg-black"
+                  className="w-full h-full object-cover"
                 />
               ) : (
                 <video
@@ -636,47 +751,61 @@ function Feed() {
                         }
                         className="relative w-full aspect-[4/5] max-h-[78vh] bg-black flex items-center justify-center cursor-pointer select-none overflow-hidden"
                       >
-                        {item.type === "image" ? (
+                        {isImageMedia(item) ? (
                           <img
-                            src={item.url}
+                            src={getMediaUrl(item)}
                             alt=""
                             loading="lazy"
-                            className="w-full h-full object-contain bg-black"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                              const fallback = e.currentTarget.nextElementSibling;
+                              if (fallback) fallback.style.display = "flex";
+                            }}
+                            className="w-full h-full object-cover"
                           />
                         ) : (
                           <video
-                            src={item.url}
+                            src={getMediaUrl(item)}
                             controls
                             playsInline
                             className="w-full h-full object-contain bg-black"
                           />
                         )}
+
+                        <div className="hidden absolute inset-0 items-center justify-center bg-zinc-950 text-center px-6">
+                          <div>
+                            <p className="text-3xl mb-2">🖼️</p>
+                            <p className="text-sm text-gray-400">
+                              Media could not be loaded
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     ))}
 
                   {/* ACTIONS */}
-                  <div className="p-4">
+                  <div className="px-4 pt-4 pb-4">
                     <div className="flex items-center justify-between gap-4 mb-3">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-5">
                         <button
                           onClick={() => handlePostLikeWithAnimation(post._id)}
-                          className={`group flex items-center gap-2 rounded-full px-3 py-2 border transition-all active:scale-90 ${
+                          className={`flex items-center gap-2 active:scale-90 transition-all ${
                             isPostLikedByMe(post)
-                              ? "border-pink-500/30 bg-pink-500/15 text-pink-400"
-                              : "border-white/10 bg-white/[0.04] text-gray-200 hover:border-pink-500/30 hover:bg-pink-500/10 hover:text-pink-400"
+                              ? "text-pink-400"
+                              : "text-gray-100 hover:text-pink-400"
                           }`}
                           title="Like"
                         >
                           <HeartIcon filled={isPostLikedByMe(post)} />
-                          <button
+                          <span
                             onClick={(e) => {
                               e.stopPropagation();
                               setLikesModalPost(post);
                             }}
-                            className="text-sm font-medium hover:underline"
+                            className="text-[15px] font-semibold hover:underline cursor-pointer"
                           >
                             {post.likes?.length || 0}
-                          </button>
+                          </span>
                         </button>
 
                         <button
@@ -686,17 +815,18 @@ function Feed() {
                               [post._id]: !prev[post._id],
                             }))
                           }
-                          className="group flex items-center gap-2 rounded-full px-3 py-2 border border-white/10 bg-white/[0.04] text-gray-200 hover:border-indigo-500/30 hover:bg-indigo-500/10 hover:text-indigo-300 active:scale-90 transition-all"
+                          className="flex items-center gap-2 text-gray-100 hover:text-indigo-300 active:scale-90 transition-all"
+                          title="Comments"
                         >
                           <CommentIcon />
-                          <span className="text-sm font-medium">
+                          <span className="text-[15px] font-semibold">
                             {post.comments?.length || 0}
                           </span>
                         </button>
 
                         <button
                           onClick={() => setSharePost(post)}
-                          className="rounded-full p-2 border border-white/10 bg-white/[0.04] text-gray-200 hover:border-cyan-500/30 hover:bg-cyan-500/10 hover:text-cyan-300 active:scale-90 transition-all"
+                          className="text-gray-100 hover:text-cyan-300 active:scale-90 transition-all"
                           title="Share"
                         >
                           <ShareIcon />
@@ -705,10 +835,10 @@ function Feed() {
 
                       <button
                         onClick={() => toggleSavePost(post._id)}
-                        className={`rounded-full p-2 border active:scale-90 transition-all ${
+                        className={`active:scale-90 transition-all ${
                           isSaved
-                            ? "border-yellow-500/30 bg-yellow-500/15 text-yellow-400"
-                            : "border-white/10 bg-white/[0.04] text-gray-200 hover:border-yellow-500/30 hover:bg-yellow-500/10 hover:text-yellow-300"
+                            ? "text-yellow-400"
+                            : "text-gray-100 hover:text-yellow-300"
                         }`}
                         title={isSaved ? "Saved" : "Save"}
                       >
@@ -993,6 +1123,129 @@ function Feed() {
             })
           )}
         </div>
+        </div>
+
+        <aside className="hidden lg:block w-full max-w-[320px]">
+          <div className="sticky top-8 space-y-6">
+            <div className="flex items-center justify-between gap-4 px-1">
+              <div className="flex items-center gap-3 min-w-0">
+                <img
+                  onClick={() => navigate("/profile")}
+                  src={
+                    currentUser?.profilePic ||
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                      currentUser?.name || "User"
+                    )}&background=8b5cf6&color=fff`
+                  }
+                  alt=""
+                  className="w-14 h-14 rounded-full object-cover border border-white/10 shadow-lg shadow-purple-500/20 cursor-pointer hover:scale-105 transition-all"
+                />
+
+                <div
+                  onClick={() => navigate("/profile")}
+                  className="min-w-0 cursor-pointer"
+                >
+                  <h3 className="font-bold truncate hover:text-pink-300 transition-all">
+                    {currentUser?.name || "User"}
+                  </h3>
+                  <p className="text-sm text-gray-400 truncate">
+                    @{currentUser?.email?.split("@")[0] || currentUserId?.slice(-8) || "user"}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => navigate("/profile")}
+                className="text-sm text-cyan-300 hover:text-cyan-200 font-semibold"
+              >
+                Profile
+              </button>
+            </div>
+
+            <div className="bg-zinc-950/40 border border-white/5 rounded-3xl p-5">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="font-bold text-gray-200">Suggested for you</h3>
+                <span className="text-xs text-gray-500">Fresh</span>
+              </div>
+
+              <div className="space-y-4">
+                {suggestedUsers.map((user, index) => {
+                  const following = isFollowingUser(user);
+
+                  return (
+                    <div
+                      key={user._id || index}
+                      className="flex items-center justify-between gap-3"
+                    >
+                      <div
+                        onClick={() =>
+                          user._id && !user._id.startsWith("demo")
+                            ? openUserProfile(user._id)
+                            : null
+                        }
+                        className="flex items-center gap-3 min-w-0 cursor-pointer"
+                      >
+                        <img
+                          src={
+                            user.profilePic ||
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                              user.name || "User"
+                            )}&background=8b5cf6&color=fff`
+                          }
+                          alt=""
+                          className="w-11 h-11 rounded-full object-cover border border-white/10 hover:scale-105 transition-all"
+                        />
+
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm truncate hover:text-pink-300 transition-all">
+                            {user.name || "User"}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {user.bio || "Suggested for you"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => toggleFollowUser(user)}
+                        className={`text-xs font-semibold transition-all ${
+                          following
+                            ? "text-gray-400 hover:text-red-300"
+                            : "text-cyan-300 hover:text-cyan-200"
+                        }`}
+                      >
+                        {following ? "Following" : "Follow"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="bg-zinc-950/40 border border-white/5 rounded-3xl p-5">
+              <h3 className="font-bold text-gray-200 mb-4">Trending now</h3>
+
+              <div className="space-y-3">
+                {trendingTags.map((tag) => (
+                  <div
+                    key={tag}
+                    className="flex items-center justify-between cursor-pointer group"
+                  >
+                    <span className="text-sm text-gray-300 group-hover:text-cyan-300 transition-all">
+                      {tag}
+                    </span>
+                    <span className="text-xs text-gray-600">trending</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="text-xs text-gray-600 leading-6 px-1">
+              About · Help · Privacy · Terms <br />
+              Vybeo © 2026
+            </div>
+          </div>
+        </aside>
       </div>
 
 
