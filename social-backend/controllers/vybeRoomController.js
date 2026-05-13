@@ -62,7 +62,13 @@ const createMessage = async (req, res) => {
       text: text.trim(),
     });
 
-    res.status(201).json(message);
+    const io = req.app.get("io");
+
+if (io) {
+  io.to(`vybe-room-${message.room}`).emit("vybe-message-created", message);
+}
+
+res.status(201).json(message);
   } catch (error) {
     res.status(500).json({
       message: error.message,
@@ -103,7 +109,13 @@ const addReply = async (req, res) => {
 
     await message.save();
 
-    res.json(message);
+    const io = req.app.get("io");
+
+if (io) {
+  io.to(`vybe-room-${message.room}`).emit("vybe-message-updated", message);
+}
+
+res.json(message);
   } catch (error) {
     res.status(500).json({
       message: error.message,
@@ -142,7 +154,13 @@ const reactToMessage = async (req, res) => {
 
     await message.save();
 
-    res.json(message);
+    const io = req.app.get("io");
+
+if (io) {
+  io.to(`vybe-room-${message.room}`).emit("vybe-message-updated", message);
+}
+
+res.json(message);
   } catch (error) {
     res.status(500).json({
       message: error.message,

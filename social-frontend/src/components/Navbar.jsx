@@ -90,6 +90,25 @@ function Navbar() {
   label: "Vybe Room",
   path: "/vybe-room",
   icon: (
+  <svg
+    viewBox="0 0 24 24"
+    className="w-6 h-6"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M12 3l2.5 5L20 10l-5.5 2L12 17l-2.5-5L4 10l5.5-2L12 3z" />
+  </svg>
+),
+},
+
+{
+  label: "Notifications",
+  path: "/notifications",
+  badge: unreadCount,
+  icon: (
     <svg
       viewBox="0 0 24 24"
       className="w-6 h-6"
@@ -99,46 +118,12 @@ function Navbar() {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M4 12c0-4.4 3.8-8 8.5-8s8.5 3.6 8.5 8-3.8 8-8.5 8c-1.1 0-2.1-.2-3.1-.5L4 21l1.7-4.2C4.6 15.5 4 13.8 4 12z" />
-
-      <path d="M9 10h7" />
-
-      <path d="M9 14h4" />
-
-      <circle
-        cx="18"
-        cy="6"
-        r="2"
-        fill="currentColor"
-        stroke="none"
-      />
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+      <path d="M10 21h4" />
     </svg>
   ),
 },
-    {
-  label: "Notifications",
-  path: "/notifications",
-  badge: unreadCount,
-  icon: (
-    <div className="relative w-6 h-6 flex items-center justify-center">
-      <svg
-        viewBox="0 0 24 24"
-        className="w-6 h-6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M20.8 4.6c-1.7-1.7-4.6-1.7-6.3 0L12 7.1 9.5 4.6c-1.7-1.7-4.6-1.7-6.3 0-1.8 1.8-1.8 4.7 0 6.5L12 20l8.8-8.9c1.8-1.8 1.8-4.7 0-6.5z" />
-      </svg>
 
-      {Number(unreadCount) > 0 && (
-        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 border border-black" />
-      )}
-    </div>
-  ),
-},
     {
       label: "Profile",
       path: "/profile",
@@ -277,15 +262,37 @@ function Navbar() {
     <>
       <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-[76px] backdrop-blur-2xl bg-black/75 border-b border-white/10">
         <div className="h-full px-4 flex items-center justify-between">
-          <Logo />
+  <Logo />
 
-          <button
-            onClick={logout}
-            className="px-4 py-2 rounded-xl border border-red-500/20 text-red-300 bg-red-500/5 hover:bg-red-500/10 transition-all"
-          >
-            Logout
-          </button>
-        </div>
+  <div className="flex items-center gap-3">
+    <button
+      onClick={() => go("/notifications")}
+      className="relative w-11 h-11 rounded-2xl border border-white/10 bg-white/[0.04] flex items-center justify-center hover:bg-white/[0.08] transition-all"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        className="w-6 h-6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+      >
+        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+        <path d="M10 21h4" />
+      </svg>
+
+      {unreadCount > 0 && (
+        <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.9)]" />
+      )}
+    </button>
+
+    <button
+      onClick={logout}
+      className="px-4 py-2 rounded-xl border border-red-500/20 text-red-300 bg-red-500/5 hover:bg-red-500/10 transition-all"
+    >
+      Logout
+    </button>
+  </div>
+</div>
       </header>
 
       <aside
@@ -338,7 +345,9 @@ function Navbar() {
 
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-2xl border-t border-white/10">
         <div className="grid grid-cols-5 items-center px-2 py-2">
-          {navItems.map((item) => (
+          {navItems
+            .filter((item) => item.path !== "/notifications")
+            .map((item) => (
             <NavButton key={item.path} item={item} mobile />
           ))}
         </div>

@@ -5,7 +5,8 @@ const cors = require("cors");
 const notificationRoutes = require("./routes/notificationRoutes");
 const vybeRoomRoutes = require("./routes/vybeRoomRoutes");
 
-
+const http = require("http");
+const { Server } = require("socket.io");
 
 const connectDB = require("./config/db");
 
@@ -24,6 +25,59 @@ const userRoutes = require("./routes/userRoutes");
 connectDB();
 
 const app = express();
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+  },
+});
+
+app.set("io", io);
+
+const onlineUsers = new Set();
+
+io.on("connection", (socket) => {
+  console.log("Socket connected:", socket.id);
+
+  socket.on("join-vybe-room", ({ room = "general", userId }) => {
+    socket.join(`vybe-room-${room}`);
+
+    if (userId) {
+      onlineUsers.add(userId);
+    }
+
+    io.to(`vybe-room-${room}`).emit(
+      "vybe-online-users",
+      onlineUsers.size
+    );
+  });
+
+  socket.on("vybe-typing", ({ room, typing }) => {
+    socket.to(`vybe-room-${room}`).emit(
+      "vybe-user-typing",
+      typing
+    );
+  });
+
+  socket.on("leave-vybe-room", ({ room = "general", userId }) => {
+    socket.leave(`vybe-room-${room}`);
+
+    if (userId) {
+      onlineUsers.delete(userId);
+    }
+
+    io.to(`vybe-room-${room}`).emit(
+      "vybe-online-users",
+      onlineUsers.size
+    );
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Socket disconnected:", socket.id);
+  });
+});
 
 app.use(cors({
   origin: "*", 
@@ -155,7 +209,7 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
