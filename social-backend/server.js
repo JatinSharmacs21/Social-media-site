@@ -3,6 +3,7 @@ const dotenv = require("dotenv");
 dotenv.config();
 const cors = require("cors");
 const notificationRoutes = require("./routes/notificationRoutes");
+const vybeRoomRoutes = require("./routes/vybeRoomRoutes");
 
 
 
@@ -42,6 +43,7 @@ app.use("/api/posts", postRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/vybe-room", vybeRoomRoutes);
 
 
 

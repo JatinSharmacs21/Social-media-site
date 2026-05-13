@@ -13,6 +13,7 @@ import Notifications from "./pages/Notifications";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import MainLayout from "./components/MainLayout";
+import VybeRoom from "./pages/VybeRoom";
 
 function App() {
   return (
@@ -39,6 +40,16 @@ function App() {
                 <Notifications />
               </MainLayout>
             </ProtectedRoute>
+          }
+        />
+        <Route
+            path="/vybe-room"
+            element={
+           <ProtectedRoute>
+           <MainLayout>
+           <VybeRoom />
+          </MainLayout>
+        </ProtectedRoute>
           }
         />
 

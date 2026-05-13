@@ -87,24 +87,58 @@ function Navbar() {
       ),
     },
     {
-      label: "Notifications",
-      path: "/notifications",
-      badge: unreadCount,
-      icon: (
-        <svg
-  viewBox="0 0 24 24"
-  className="w-6 h-6"
-  fill="none"
-  stroke="currentColor"
-  strokeWidth="2"
-  strokeLinecap="round"
-  strokeLinejoin="round"
->
-  <path d="M6 8a6 6 0 1 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9" />
-  <path d="M10.5 21a1.5 1.5 0 0 0 3 0" />
-</svg>
-      ),
-    },
+  label: "Vybe Room",
+  path: "/vybe-room",
+  icon: (
+    <svg
+      viewBox="0 0 24 24"
+      className="w-6 h-6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 12c0-4.4 3.8-8 8.5-8s8.5 3.6 8.5 8-3.8 8-8.5 8c-1.1 0-2.1-.2-3.1-.5L4 21l1.7-4.2C4.6 15.5 4 13.8 4 12z" />
+
+      <path d="M9 10h7" />
+
+      <path d="M9 14h4" />
+
+      <circle
+        cx="18"
+        cy="6"
+        r="2"
+        fill="currentColor"
+        stroke="none"
+      />
+    </svg>
+  ),
+},
+    {
+  label: "Notifications",
+  path: "/notifications",
+  badge: unreadCount,
+  icon: (
+    <div className="relative w-6 h-6 flex items-center justify-center">
+      <svg
+        viewBox="0 0 24 24"
+        className="w-6 h-6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M20.8 4.6c-1.7-1.7-4.6-1.7-6.3 0L12 7.1 9.5 4.6c-1.7-1.7-4.6-1.7-6.3 0-1.8 1.8-1.8 4.7 0 6.5L12 20l8.8-8.9c1.8-1.8 1.8-4.7 0-6.5z" />
+      </svg>
+
+      {Number(unreadCount) > 0 && (
+        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 border border-black" />
+      )}
+    </div>
+  ),
+},
     {
       label: "Profile",
       path: "/profile",
@@ -147,26 +181,19 @@ function Navbar() {
 
   const NavButton = ({ item, expanded = false, mobile = false }) => {
     const active = isActive(item.path);
-    const showBadge = item.badge && item.badge > 0;
+    const showBadge = item.label === "Notifications" && Number(item.badge) > 0;
 
     if (mobile) {
       return (
         <button
           onClick={() => go(item.path)}
-          className={`relative flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-2xl text-[11px] transition-all ${
+          className={`relative flex items-center justify-center h-14 rounded-2xl transition-all ${
             active
               ? "text-white bg-white/[0.06]"
               : "text-gray-500 hover:text-white"
           }`}
         >
           <span className={active ? "text-pink-300" : ""}>{item.icon}</span>
-          <span>{item.label}</span>
-
-          {showBadge && (
-            <span className="absolute top-1 right-4 min-w-[18px] h-[18px] px-1 rounded-full bg-pink-500 text-white text-[10px] flex items-center justify-center font-bold">
-              {item.badge > 9 ? "9+" : item.badge}
-            </span>
-          )}
         </button>
       );
     }
@@ -310,7 +337,7 @@ function Navbar() {
       </aside>
 
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-2xl border-t border-white/10">
-        <div className="grid grid-cols-5 px-1 py-2">
+        <div className="grid grid-cols-5 items-center px-2 py-2">
           {navItems.map((item) => (
             <NavButton key={item.path} item={item} mobile />
           ))}
