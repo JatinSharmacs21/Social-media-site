@@ -94,10 +94,22 @@ const updateMyProfile = async (req, res) => {
   }
 };
 
-// GET USER PROFILE
+// GET USER PROFILE BY ID OR USERNAME
 const getUserProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id)
+    const identifier = (req.params.identifier || req.params.id || "").trim();
+
+    if (!identifier) {
+      return res.status(400).json({ message: "Profile identifier is required" });
+    }
+
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(identifier);
+
+    const user = await User.findOne(
+      isObjectId
+        ? { _id: identifier }
+        : { username: normalizeUsername(identifier.replace(/^@/, "")) }
+    )
       .select("-password")
       .populate("followers", populatedUserFields)
       .populate("following", populatedUserFields);

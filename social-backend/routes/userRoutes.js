@@ -22,6 +22,6 @@ router.put("/me", protect, updateMyProfile);
 router.put("/follow/:id", protect, followUser);
 
 // GET USER PROFILE
-router.get("/:id", getUserProfile);
+router.get("/:identifier", getUserProfile);
 
 module.exports = router;

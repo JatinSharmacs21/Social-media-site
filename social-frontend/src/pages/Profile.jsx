@@ -1,14 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import API from "../services/api";
 
 function Profile() {
-  const { userId } = useParams();
+  const { userId: profileIdentifier } = useParams();
   const navigate = useNavigate();
 
   const token = localStorage.getItem("token");
   const currentUserId = localStorage.getItem("userId");
-  const isOwnProfile = !userId || userId === currentUserId;
+  const isOwnProfile = !profileIdentifier || profileIdentifier === currentUserId;
 
   const [user, setUser] = useState(null);
   const [posts, setPosts] = useState([]);
@@ -30,6 +30,10 @@ function Profile() {
   const [profilePicOpen, setProfilePicOpen] = useState(false);
   const [animateLike, setAnimateLike] = useState(false);
   const [commentText, setCommentText] = useState("");
+  const [shareCopied, setShareCopied] = useState(false);
+
+  const isViewingOwnProfile =
+    !profileIdentifier || profileIdentifier === currentUserId || user?._id === currentUserId;
 
   const authConfig = useMemo(
     () => ({ headers: { Authorization: `Bearer ${token}` } }),
@@ -46,36 +50,42 @@ function Profile() {
   const videoPosts = posts.filter((post) => post.media?.[0]?.type === "video");
   const thoughtPosts = posts.filter((post) => !post.media || post.media.length === 0);
 
-  const fetchProfile = useCallback(async () => {
+  const fetchProfileAndPosts = useCallback(async () => {
     try {
-      const endpoint = isOwnProfile ? "/api/users/me" : `/api/users/${userId}`;
-      const res = await API.get(endpoint, authConfig);
-
-      setUser(res.data);
-      setName(res.data.name || "");
-      setUsername(res.data.username || "");
-      setBio(res.data.bio || "");
-      setPreviewPic(res.data.profilePic || "");
       setError("");
+
+      const cleanIdentifier = profileIdentifier
+        ? profileIdentifier.replace(/^@/, "").trim().toLowerCase()
+        : "";
+
+      const profileEndpoint = isOwnProfile
+        ? "/api/users/me"
+        : `/api/users/${encodeURIComponent(cleanIdentifier)}`;
+
+      const profileRes = await API.get(profileEndpoint, authConfig);
+      const loadedUser = profileRes.data;
+
+      setUser(loadedUser);
+      setName(loadedUser.name || "");
+      setUsername(loadedUser.username || "");
+      setBio(loadedUser.bio || "");
+      setPreviewPic(loadedUser.profilePic || "");
+
+      const postsEndpoint = isOwnProfile
+        ? "/api/posts/my-posts"
+        : `/api/posts/user/${loadedUser._id}`;
+
+      const postsRes = await API.get(postsEndpoint, authConfig);
+      setPosts(Array.isArray(postsRes.data) ? postsRes.data : []);
     } catch (err) {
+      setPosts([]);
       setError(err.response?.data?.message || "Profile load nahi ho payi");
     }
-  }, [authConfig, isOwnProfile, userId]);
-
-  const fetchPosts = useCallback(async () => {
-    try {
-      const endpoint = isOwnProfile ? "/api/posts/my-posts" : `/api/posts/user/${userId}`;
-      const res = await API.get(endpoint, authConfig);
-      setPosts(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.log(err.response?.data || err);
-    }
-  }, [authConfig, isOwnProfile, userId]);
+  }, [authConfig, isOwnProfile, profileIdentifier]);
 
   useEffect(() => {
-    fetchProfile();
-    fetchPosts();
-  }, [fetchProfile, fetchPosts]);
+    fetchProfileAndPosts();
+  }, [fetchProfileAndPosts]);
 
   const updatePostInState = (updatedPost) => {
     setPosts((prev) => prev.map((post) => (post._id === updatedPost._id ? updatedPost : post)));
@@ -87,7 +97,7 @@ function Profile() {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      setError("Profile photo ke liye sirf image select karo");
+      setError("Please select a valid image file for your profile photo.");
       return;
     }
 
@@ -141,6 +151,10 @@ function Profile() {
       setUser(res.data);
       setProfileFile(null);
       setEdit(false);
+
+      if (res.data.username && window.location.pathname !== `/profile/${res.data.username}`) {
+        navigate(`/profile/${res.data.username}`, { replace: true });
+      }
     } catch (err) {
       setError(err.response?.data?.message || "Profile update nahi ho payi");
     } finally {
@@ -214,7 +228,34 @@ function Profile() {
     setListModal(null);
     setListSearch("");
     setSelectedPost(null);
-    navigate(id === currentUserId ? "/profile" : `/profile/${id}`);
+    const targetUser = [...(user?.followers || []), ...(user?.following || []), selectedPost?.user].find(
+      (person) => person?._id === id
+    );
+    const slug = targetUser?.username || id;
+    navigate(id === currentUserId ? (user?.username ? `/profile/${user.username}` : "/profile") : `/profile/${slug}`);
+  };
+
+  const handleShareProfile = async () => {
+    try {
+      const slug = user?.username || user?._id || "";
+      const profileUrl = `${window.location.origin}/profile/${slug}`;
+
+      if (navigator.share) {
+        await navigator.share({
+          title: `${user?.name || "Vybeo user"} on Vybeo`,
+          text: `Check out ${user?.name || "this profile"} on Vybeo`,
+          url: profileUrl,
+        });
+        return;
+      }
+
+      await navigator.clipboard.writeText(profileUrl);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 1800);
+    } catch (err) {
+      if (err?.name === "AbortError") return;
+      setError("Profile link copy nahi ho paya");
+    }
   };
 
   const renderUserRow = (person) => (
@@ -235,16 +276,12 @@ function Profile() {
     <div
       key={post._id}
       onClick={() => setSelectedPost(post)}
-      className="bg-zinc-950 border border-white/10 rounded-2xl sm:rounded-3xl overflow-hidden group active:scale-[0.98] hover:scale-[1.02] hover:border-pink-400/40 transition-all duration-300 cursor-pointer shadow-xl"
+      className="bg-zinc-950 border border-white/10 rounded-[24px] sm:rounded-[30px] overflow-hidden group active:scale-[0.98] hover:scale-[1.015] hover:border-pink-400/40 transition-all duration-300 cursor-pointer shadow-xl shadow-black/30"
     >
-      {post.media[0].type === "image" ? (
-        <img src={post.media[0].url} alt="" className="w-full aspect-square sm:h-[320px] object-cover" />
-      ) : (
-        <div className="relative">
-          <video src={post.media[0].url} className="w-full aspect-square sm:h-[320px] object-cover" />
-          <div className="absolute top-4 right-4 bg-black/60 px-3 py-1 rounded-full text-sm">🎬</div>
-        </div>
-      )}
+      <div className="relative overflow-hidden">
+        <img src={post.media[0].url} alt="" className="w-full aspect-square sm:h-[320px] object-cover group-hover:scale-105 transition-transform duration-500" />
+        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+      </div>
 
       <div className="p-3 sm:p-4">
         <p className="text-gray-200 line-clamp-2 text-sm sm:text-base">{post.caption || post.content || "No caption"}</p>
@@ -256,18 +293,53 @@ function Profile() {
     </div>
   );
 
+  const renderReelCard = (post) => (
+    <div
+      key={post._id}
+      onClick={() => setSelectedPost(post)}
+      className="relative bg-zinc-950 border border-white/10 rounded-[26px] overflow-hidden group active:scale-[0.98] hover:scale-[1.015] hover:border-cyan-300/40 transition-all duration-300 cursor-pointer shadow-xl shadow-black/30"
+    >
+      <video
+        src={post.media[0].url}
+        muted
+        playsInline
+        preload="metadata"
+        className="w-full aspect-[9/16] max-h-[520px] object-cover bg-black group-hover:scale-105 transition-transform duration-500"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/5 to-black/25" />
+      <div className="absolute top-3 right-3 bg-black/55 backdrop-blur-md border border-white/10 px-3 py-1 rounded-full text-xs font-bold">
+        Reel
+      </div>
+      <div className="absolute left-3 right-3 bottom-3">
+        <p className="text-white font-semibold line-clamp-2 text-sm sm:text-base drop-shadow">
+          {post.caption || post.content || "Vybeo Reel"}
+        </p>
+        <div className="flex items-center gap-4 mt-3 text-xs sm:text-sm text-gray-200">
+          <span>❤️ {post.likes?.length || 0}</span>
+          <span>💬 {post.comments?.length || 0}</span>
+        </div>
+      </div>
+    </div>
+  );
+
   const renderThoughtCard = (post) => (
     <div
       key={post._id}
       onClick={() => setSelectedPost(post)}
-      className="bg-zinc-950/90 border border-white/10 rounded-3xl p-6 hover:border-pink-500/30 hover:bg-white/[0.03] transition-all cursor-pointer"
+      className="relative overflow-hidden bg-gradient-to-br from-zinc-950 via-zinc-950 to-purple-950/35 border border-white/10 rounded-[28px] p-5 sm:p-7 hover:border-pink-500/35 hover:bg-white/[0.03] transition-all cursor-pointer shadow-xl shadow-black/25 active:scale-[0.99]"
     >
-      <p className="text-xl md:text-2xl font-semibold leading-relaxed text-white break-words">
-        {post.caption || post.content || "Text Post"}
-      </p>
-      <div className="flex items-center justify-between mt-6 text-sm text-gray-400">
-        <span>❤️ {post.likes?.length || 0}</span>
-        <span>💬 {post.comments?.length || 0}</span>
+      <div className="absolute -top-20 -right-16 w-44 h-44 bg-pink-500/10 blur-3xl rounded-full" />
+      <div className="relative">
+        <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-3 py-1 text-xs text-pink-200 mb-4">
+          ✦ Thought
+        </div>
+        <p className="text-lg sm:text-xl md:text-2xl font-semibold leading-relaxed text-white break-words whitespace-pre-wrap">
+          {post.caption || post.content || "Text Post"}
+        </p>
+        <div className="flex items-center justify-between mt-6 text-sm text-gray-400">
+          <span>❤️ {post.likes?.length || 0}</span>
+          <span>💬 {post.comments?.length || 0}</span>
+        </div>
       </div>
     </div>
   );
@@ -383,25 +455,34 @@ function Profile() {
                       </p>
                     </div>
 
-                    {isOwnProfile ? (
+                    <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto md:min-w-[320px]">
+                      {isViewingOwnProfile ? (
+                        <button
+                          onClick={() => setEdit(true)}
+                          className="group relative overflow-hidden bg-white/[0.07] hover:bg-white/[0.11] border border-white/10 hover:border-pink-300/35 px-6 py-3.5 rounded-2xl font-bold transition-all shadow-lg shadow-black/20 active:scale-[0.98]"
+                        >
+                          <span className="relative z-10">✦ Edit Profile</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={followUser}
+                          className={`px-7 py-3 rounded-2xl font-semibold transition-all ${
+                            isFollowing
+                              ? "bg-white/10 hover:bg-white/20"
+                              : "bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 shadow-lg hover:scale-105"
+                          }`}
+                        >
+                          {isFollowing ? "Following" : "Follow"}
+                        </button>
+                      )}
+
                       <button
-                        onClick={() => setEdit(true)}
-                        className="bg-white/10 hover:bg-white/20 px-6 py-3 rounded-2xl font-semibold"
+                        onClick={handleShareProfile}
+                        className="group relative overflow-hidden bg-gradient-to-r from-white/[0.1] to-white/[0.06] hover:from-pink-500/20 hover:to-indigo-500/20 border border-white/10 hover:border-indigo-300/35 px-6 py-3.5 rounded-2xl font-bold transition-all shadow-lg shadow-black/20 active:scale-[0.98]"
                       >
-                        Edit Profile
+                        <span className="relative z-10">{shareCopied ? "✓ Link Copied" : "↗ Share Profile"}</span>
                       </button>
-                    ) : (
-                      <button
-                        onClick={followUser}
-                        className={`px-7 py-3 rounded-2xl font-semibold transition-all ${
-                          isFollowing
-                            ? "bg-white/10 hover:bg-white/20"
-                            : "bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 shadow-lg hover:scale-105"
-                        }`}
-                      >
-                        {isFollowing ? "Following" : "Follow"}
-                      </button>
-                    )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-8 mt-8 sm:mt-10">
@@ -474,8 +555,8 @@ function Profile() {
             videoPosts.length === 0 ? (
               <EmptyState text="No reels/videos yet 🎬" />
             ) : (
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
-                {videoPosts.map(renderMediaCard)}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
+                {videoPosts.map(renderReelCard)}
               </div>
             )
           ) : thoughtPosts.length === 0 ? (
@@ -652,6 +733,10 @@ function PostModal({
   openUserProfile,
 }) {
   const liked = selectedPost.likes?.some((like) => like._id === currentUserId || like === currentUserId);
+  const isReel = selectedPost.media?.[0]?.type === "video";
+  const isImage = selectedPost.media?.[0]?.type === "image";
+  const [muted, setMuted] = useState(true);
+  const tapTimer = useRef(null);
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -665,29 +750,53 @@ function PostModal({
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
+      if (tapTimer.current) clearTimeout(tapTimer.current);
     };
   }, [setSelectedPost]);
 
+  const handleMediaClick = () => {
+    if (!isReel) return;
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+    tapTimer.current = setTimeout(() => {
+      setMuted((prev) => !prev);
+      tapTimer.current = null;
+    }, 220);
+  };
+
+  const handleMediaDoubleClick = () => {
+    if (tapTimer.current) {
+      clearTimeout(tapTimer.current);
+      tapTimer.current = null;
+    }
+    handleDoubleLike(selectedPost);
+  };
+
+  const headerTitle = isReel ? "Reel" : isImage ? "Post" : "Thought";
+
   return (
     <div
-      className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-end sm:items-center justify-center sm:p-4"
+      className="fixed inset-0 bg-black/92 backdrop-blur-md z-[100] flex items-end sm:items-center justify-center sm:p-4"
       onClick={() => setSelectedPost(null)}
     >
       <div
-        className="w-full max-w-5xl bg-zinc-950 border border-white/10 rounded-t-[30px] sm:rounded-[32px] overflow-hidden relative h-[94dvh] sm:h-auto sm:max-h-[92vh] shadow-2xl"
+        className={`w-full bg-zinc-950 border border-white/10 overflow-hidden relative shadow-2xl ${
+          isReel
+            ? "max-w-6xl rounded-t-[30px] sm:rounded-[34px] h-[96dvh] sm:h-[92vh]"
+            : "max-w-5xl rounded-t-[30px] sm:rounded-[32px] h-[94dvh] sm:h-auto sm:max-h-[92vh]"
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 z-50 flex items-center justify-between px-4 py-3 bg-zinc-950/95 border-b border-white/10 lg:hidden">
           <button
             onClick={() => setSelectedPost(null)}
-            className="flex items-center gap-2 text-sm font-semibold text-gray-200 bg-white/10 active:scale-95 px-4 py-2 rounded-full"
+            className="flex items-center gap-2 text-sm font-bold text-gray-100 bg-white/10 border border-white/10 active:scale-95 px-4 py-2 rounded-full"
           >
             ← Back
           </button>
-          <span className="text-sm text-gray-400">Post</span>
+          <span className="text-sm text-gray-300 font-semibold">{headerTitle}</span>
           <button
             onClick={() => setSelectedPost(null)}
-            className="w-10 h-10 rounded-full bg-white/10 text-xl leading-none active:scale-95"
+            className="w-10 h-10 rounded-full bg-white/10 border border-white/10 text-xl leading-none active:scale-95"
             aria-label="Close post"
           >
             ×
@@ -696,16 +805,21 @@ function PostModal({
 
         <button
           onClick={() => setSelectedPost(null)}
-          className="hidden lg:flex absolute top-4 right-4 z-50 bg-black/70 hover:bg-white/10 w-11 h-11 rounded-full items-center justify-center text-2xl leading-none"
+          className="hidden lg:flex absolute top-4 right-4 z-50 bg-black/70 hover:bg-white/10 border border-white/10 w-11 h-11 rounded-full items-center justify-center text-2xl leading-none"
           aria-label="Close post"
         >
           ×
         </button>
 
-        <div className="grid lg:grid-cols-2 h-[calc(94dvh-65px)] sm:h-full">
+        <div className={`${isReel ? "grid lg:grid-cols-[minmax(320px,460px)_1fr]" : "grid lg:grid-cols-2"} h-[calc(96dvh-65px)] sm:h-full`}>
           <div
-            onDoubleClick={() => handleDoubleLike(selectedPost)}
-            className="relative bg-black flex items-center justify-center h-[38dvh] sm:min-h-[360px] lg:h-auto lg:min-h-[560px] lg:max-h-[85vh] cursor-pointer"
+            onClick={handleMediaClick}
+            onDoubleClick={handleMediaDoubleClick}
+            className={`relative bg-black flex items-center justify-center cursor-pointer select-none ${
+              isReel
+                ? "h-[58dvh] sm:h-[92vh] lg:h-[92vh]"
+                : "h-[38dvh] sm:min-h-[360px] lg:h-auto lg:min-h-[560px] lg:max-h-[85vh]"
+            }`}
           >
             {animateLike && (
               <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
@@ -715,23 +829,57 @@ function PostModal({
               </div>
             )}
 
-            {selectedPost.media?.[0]?.type === "image" ? (
+            {isImage ? (
               <img src={selectedPost.media[0].url} alt="" className="w-full h-full lg:max-h-[85vh] object-contain" />
-            ) : selectedPost.media?.[0]?.type === "video" ? (
-              <video src={selectedPost.media[0].url} controls className="w-full h-full lg:max-h-[85vh] object-contain" />
+            ) : isReel ? (
+              <>
+                <video
+                  src={selectedPost.media[0].url}
+                  autoPlay
+                  loop
+                  playsInline
+                  muted={muted}
+                  className="h-full w-full object-contain sm:object-cover bg-black"
+                />
+                <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
+                <div className="absolute left-4 right-4 bottom-5 flex items-end justify-between gap-4 lg:hidden">
+                  <div className="min-w-0">
+                    <p className="font-bold line-clamp-2">{selectedPost.caption || selectedPost.content || "Vybeo Reel"}</p>
+                    <p className="text-xs text-gray-300 mt-1">Single tap mute/unmute • Double tap like</p>
+                  </div>
+                  <div className="shrink-0 bg-black/55 border border-white/10 backdrop-blur-md px-3 py-2 rounded-full text-sm">
+                    {muted ? "🔇" : "🔊"}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMuted((prev) => !prev);
+                  }}
+                  className="hidden lg:block absolute bottom-5 right-5 bg-black/60 hover:bg-black/80 border border-white/10 backdrop-blur-md px-4 py-2 rounded-full text-sm font-bold"
+                >
+                  {muted ? "🔇 Muted" : "🔊 Sound on"}
+                </button>
+              </>
             ) : (
-              <div className="p-8 text-center text-gray-200 text-2xl sm:text-3xl font-bold leading-relaxed break-words">
-                {selectedPost.caption || selectedPost.content}
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-950 via-purple-950/25 to-zinc-950 p-6 sm:p-10">
+                <div className="max-w-xl bg-white/[0.04] border border-white/10 rounded-[30px] p-6 sm:p-8 shadow-2xl">
+                  <div className="text-xs text-pink-200 mb-4 bg-white/5 border border-white/10 rounded-full px-3 py-1 inline-block">✦ Thought</div>
+                  <p className="text-xl sm:text-3xl font-bold leading-relaxed break-words whitespace-pre-wrap">
+                    {selectedPost.caption || selectedPost.content}
+                  </p>
+                </div>
               </div>
             )}
           </div>
 
-          <div className="flex flex-col h-[calc(56dvh-65px)] lg:h-[85vh] min-h-0">
+          <div className={`flex flex-col min-h-0 ${isReel ? "h-[calc(38dvh-65px)] lg:h-[92vh]" : "h-[calc(56dvh-65px)] lg:h-[85vh]"}`}>
             <div className="p-4 sm:p-5 border-b border-white/10 flex items-center gap-3 bg-zinc-950/95">
               <button onClick={() => selectedPost.user?._id && openUserProfile(selectedPost.user._id)}>
                 <img src={avatarUrl(selectedPost.user || user)} alt="" className="w-12 h-12 rounded-full object-cover" />
               </button>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <button
                   onClick={() => selectedPost.user?._id && openUserProfile(selectedPost.user._id)}
                   className="font-bold hover:underline truncate block"
@@ -743,11 +891,12 @@ function PostModal({
                   {selectedPost.createdAt ? new Date(selectedPost.createdAt).toLocaleString() : ""}
                 </p>
               </div>
+              {isReel && <span className="hidden sm:inline-flex bg-cyan-400/10 text-cyan-200 border border-cyan-300/20 px-3 py-1 rounded-full text-xs font-bold">Reel</span>}
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 sm:p-5 min-h-0">
-              {(selectedPost.caption || selectedPost.content) && (
-                <p className="text-gray-200 leading-relaxed mb-6 break-words">
+              {(selectedPost.caption || selectedPost.content) && !(!isImage && !isReel) && (
+                <p className="text-gray-200 leading-relaxed mb-6 break-words whitespace-pre-wrap">
                   {selectedPost.caption || selectedPost.content}
                 </p>
               )}
@@ -800,7 +949,7 @@ function PostModal({
               <div className="flex items-center gap-5 mb-4">
                 <button
                   onClick={() => likePost(selectedPost._id)}
-                  className="text-2xl hover:scale-110 transition-all"
+                  className="text-2xl hover:scale-110 active:scale-95 transition-all"
                   title="Like/unlike"
                 >
                   {liked ? "❤️" : "🤍"}
@@ -824,7 +973,9 @@ function PostModal({
                   Send
                 </button>
               </div>
-              <p className="text-xs text-gray-500 mt-3">Double tap media or use the heart button to like/unlike.</p>
+              <p className="text-xs text-gray-500 mt-3">
+                {isReel ? "Single tap reel to mute/unmute. Double tap to like/unlike." : "Double tap media or use the heart button to like/unlike."}
+              </p>
             </div>
           </div>
         </div>
