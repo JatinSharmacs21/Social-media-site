@@ -8,23 +8,29 @@ const usernameRegex = /^[a-z0-9_]{3,20}$/;
 const strongPasswordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
 
 const cleanEmail = (email = "") => email.toLowerCase().trim();
-const cleanUsername = (username = "") => username.toLowerCase().trim().replace(/^@/, "");
+const cleanUsername = (username = "") =>
+  username.toLowerCase().trim().replace(/^@/, "");
 
 const sendResetEmail = async ({ to, resetUrl }) => {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    throw new Error("Email service is not configured. Add EMAIL_USER and EMAIL_PASS in backend .env");
+    throw new Error("EMAIL_USER or EMAIL_PASS missing in backend env");
   }
 
   const transporter = nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE || "gmail",
+    host: process.env.EMAIL_HOST || "smtp.gmail.com",
+    port: Number(process.env.EMAIL_PORT) || 465,
+    secure: String(process.env.EMAIL_SECURE || "true") === "true",
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 15000,
   });
 
   await transporter.sendMail({
-    from: `Vybeo <${process.env.EMAIL_USER}>`,
+    from: `"Vybeo" <${process.env.EMAIL_USER}>`,
     to,
     subject: "Reset your Vybeo password",
     html: `
@@ -32,7 +38,9 @@ const sendResetEmail = async ({ to, resetUrl }) => {
         <h2>Reset your password</h2>
         <p>You requested a password reset for your Vybeo account.</p>
         <p>This link will expire in 15 minutes.</p>
-        <a href="${resetUrl}" style="display:inline-block;background:#ec4899;color:#fff;padding:12px 18px;border-radius:10px;text-decoration:none">Reset Password</a>
+        <a href="${resetUrl}" style="display:inline-block;background:#ec4899;color:#fff;padding:12px 18px;border-radius:10px;text-decoration:none">
+          Reset Password
+        </a>
         <p>If the button does not work, copy this link:</p>
         <p>${resetUrl}</p>
       </div>
@@ -54,13 +62,15 @@ const registerUser = async (req, res) => {
 
     if (!usernameRegex.test(username)) {
       return res.status(400).json({
-        message: "Username must be 3-20 characters. Use lowercase letters, numbers, or underscore only.",
+        message:
+          "Username must be 3-20 characters. Use lowercase letters, numbers, or underscore only.",
       });
     }
 
     if (!strongPasswordRegex.test(password)) {
       return res.status(400).json({
-        message: "Password must be at least 8 characters and include alphabet, number, and special character.",
+        message:
+          "Password must be at least 8 characters and include alphabet, number, and special character.",
       });
     }
 
@@ -70,7 +80,10 @@ const registerUser = async (req, res) => {
 
     if (userExists) {
       return res.status(400).json({
-        message: userExists.email === email ? "Email already exists" : "Username already taken",
+        message:
+          userExists.email === email
+            ? "Email already exists"
+            : "Username already taken",
       });
     }
 
@@ -102,7 +115,9 @@ const loginUser = async (req, res) => {
     const password = req.body.password || "";
 
     if (!username || !password) {
-      return res.status(400).json({ message: "Please enter username and password" });
+      return res
+        .status(400)
+        .json({ message: "Please enter username and password" });
     }
 
     const user = await User.findOne({ username });
@@ -135,30 +150,37 @@ const forgotPassword = async (req, res) => {
     const email = cleanEmail(req.body.email);
 
     if (!email) {
-      return res.status(400).json({ message: "Please enter your registered email" });
+      return res
+        .status(400)
+        .json({ message: "Please enter your registered email" });
     }
 
     const user = await User.findOne({ email });
 
-    // Security: same response even if email does not exist
     if (!user) {
-      return res.json({ message: "If this email exists, password reset link has been sent." });
+      return res.json({
+        message: "If this email exists, password reset link has been sent.",
+      });
     }
 
     const resetToken = crypto.randomBytes(32).toString("hex");
-    const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
 
     user.resetPasswordToken = hashedToken;
     user.resetPasswordExpire = Date.now() + 15 * 60 * 1000;
     await user.save({ validateBeforeSave: false });
 
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-    const resetUrl = `${frontendUrl}/?resetToken=${resetToken}`;
+    const resetUrl = `${frontendUrl.replace(/\/$/, "")}/reset-password/${resetToken}`;
 
     await sendResetEmail({ to: user.email, resetUrl });
 
     res.json({ message: "Password reset link sent to your email." });
   } catch (error) {
+    console.error("Forgot password error:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -175,11 +197,15 @@ const resetPassword = async (req, res) => {
 
     if (!strongPasswordRegex.test(password || "")) {
       return res.status(400).json({
-        message: "Password must be at least 8 characters and include alphabet, number, and special character.",
+        message:
+          "Password must be at least 8 characters and include alphabet, number, and special character.",
       });
     }
 
-    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
 
     const user = await User.findOne({
       resetPasswordToken: hashedToken,
