@@ -1,8 +1,9 @@
 const express = require("express");
-
 const router = express.Router();
 
 const {
+  getMyProfile,
+  updateMyProfile,
   getUserProfile,
   searchUsers,
   followUser,
@@ -13,10 +14,14 @@ const { protect } = require("../middleware/authMiddleware");
 // SEARCH USERS
 router.get("/search", searchUsers);
 
-// GET USER PROFILE
-router.get("/:id", getUserProfile);
+// MY PROFILE
+router.get("/me", protect, getMyProfile);
+router.put("/me", protect, updateMyProfile);
 
 // FOLLOW / UNFOLLOW
 router.put("/follow/:id", protect, followUser);
+
+// GET USER PROFILE
+router.get("/:id", getUserProfile);
 
 module.exports = router;

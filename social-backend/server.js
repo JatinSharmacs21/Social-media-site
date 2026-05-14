@@ -131,26 +131,55 @@ app.use("/api/vybe-room", vybeRoomRoutes);
 
 
 
-// GET PROFILE
+// GET PROFILE - old frontend compatibility
 app.get("/profile", protect, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("-password");
+    const user = await User.findById(req.user.id)
+      .select("-password")
+      .populate("followers", "name username email profilePic bio")
+      .populate("following", "name username email profilePic bio");
+
     res.send(user);
   } catch (err) {
     res.status(500).send({ error: err.message });
   }
 });
 
-// UPDATE PROFILE
+// UPDATE PROFILE - old frontend compatibility
 app.put("/profile", protect, async (req, res) => {
   try {
-    const { name, bio, profilePic } = req.body;
+    const { name, bio, profilePic, username } = req.body;
+    const update = {};
 
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      { name, bio, profilePic },
-      { new: true }
-    );
+    if (name !== undefined) update.name = name.toString().trim().slice(0, 40);
+    if (bio !== undefined) update.bio = bio.toString().trim().slice(0, 160);
+    if (profilePic !== undefined) update.profilePic = profilePic;
+
+    if (username !== undefined) {
+      const cleanUsername = username.toString().trim().toLowerCase();
+
+      if (!/^[a-z0-9_]{3,20}$/.test(cleanUsername)) {
+        return res.status(400).json({
+          message: "Username must be 3-20 characters and can contain only lowercase letters, numbers and underscore",
+        });
+      }
+
+      const existingUser = await User.findOne({
+        username: cleanUsername,
+        _id: { $ne: req.user.id },
+      });
+
+      if (existingUser) {
+        return res.status(409).json({ message: "Username already taken" });
+      }
+
+      update.username = cleanUsername;
+    }
+
+    const user = await User.findByIdAndUpdate(req.user.id, update, { new: true })
+      .select("-password")
+      .populate("followers", "name username email profilePic bio")
+      .populate("following", "name username email profilePic bio");
 
     res.send(user);
   } catch (err) {

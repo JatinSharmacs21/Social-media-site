@@ -22,11 +22,11 @@ const emitRealtimeNotification = async (req, recipientId, data) => {
 // helper: updated populated post return karne ke liye
 const getPopulatedPost = async (postId) => {
   return await Post.findById(postId)
-    .populate("user", "name email profilePic")
-    .populate("likes", "name profilePic")
-    .populate("comments.user", "name profilePic")
-    .populate("comments.likes", "name profilePic")
-    .populate("comments.replies.user", "name profilePic");
+    .populate("user", "name username email profilePic")
+    .populate("likes", "name username profilePic")
+    .populate("comments.user", "name username profilePic")
+    .populate("comments.likes", "name username profilePic")
+    .populate("comments.replies.user", "name username profilePic");
 };
 
 // CREATE POST
@@ -54,11 +54,11 @@ const createPost = async (req, res) => {
 const getPosts = async (req, res) => {
   try {
     const posts = await Post.find()
-      .populate("user", "name email profilePic")
-      .populate("likes", "name profilePic")
-      .populate("comments.user", "name profilePic")
-      .populate("comments.likes", "name profilePic")
-      .populate("comments.replies.user", "name profilePic")
+      .populate("user", "name username email profilePic")
+      .populate("likes", "name username profilePic")
+      .populate("comments.user", "name username profilePic")
+      .populate("comments.likes", "name username profilePic")
+      .populate("comments.replies.user", "name username profilePic")
       .sort({ createdAt: -1 });
 
     res.json(posts);
@@ -480,11 +480,11 @@ const getMyPosts = async (req, res) => {
     const posts = await Post.find({
       user: req.user.id,
     })
-      .populate("user", "name email profilePic")
-      .populate("likes", "name profilePic")
-      .populate("comments.user", "name profilePic")
-      .populate("comments.likes", "name profilePic")
-      .populate("comments.replies.user", "name profilePic")
+      .populate("user", "name username email profilePic")
+      .populate("likes", "name username profilePic")
+      .populate("comments.user", "name username profilePic")
+      .populate("comments.likes", "name username profilePic")
+      .populate("comments.replies.user", "name username profilePic")
       .sort({ createdAt: -1 });
 
     res.json(posts);
@@ -501,11 +501,11 @@ const getUserPosts = async (req, res) => {
     const posts = await Post.find({
       user: req.params.userId,
     })
-      .populate("user", "name email profilePic")
-      .populate("likes", "name profilePic")
-      .populate("comments.user", "name profilePic")
-      .populate("comments.likes", "name profilePic")
-      .populate("comments.replies.user", "name profilePic")
+      .populate("user", "name username email profilePic")
+      .populate("likes", "name username profilePic")
+      .populate("comments.user", "name username profilePic")
+      .populate("comments.likes", "name username profilePic")
+      .populate("comments.replies.user", "name username profilePic")
       .sort({ createdAt: -1 });
 
     res.json(posts);
