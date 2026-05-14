@@ -21,6 +21,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
 
+        <Route path="/reset-password/:token" element={<Landing />} />
+
         <Route
           path="/feed"
           element={
