@@ -273,7 +273,7 @@ function Profile() {
   );
 
   if (!user && !error) {
-    return <div className="min-h-screen bg-black text-white p-6">Loading profile...</div>;
+    return <ProfileSkeleton />;
   }
 
   return (
@@ -339,9 +339,9 @@ function Profile() {
 
                   <label className="block bg-white/5 border border-dashed border-white/20 rounded-2xl px-5 py-5 mb-5 cursor-pointer hover:bg-white/10">
                     <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
-                    <span className="font-semibold">Upload profile photo</span>
+                    <span className="font-semibold">Choose a profile photo</span>
                     <p className="text-sm text-gray-400 mt-1">
-                      Image select karo, link paste karne ki zarurat nahi.
+                      Upload a clear JPG, PNG, or WebP image from your device.
                     </p>
                   </label>
 
@@ -567,6 +567,67 @@ function Profile() {
   );
 }
 
+function ProfileSkeleton() {
+  return (
+    <div className="min-h-screen bg-black text-white px-3 sm:px-4 py-5 sm:py-6">
+      <div className="max-w-5xl mx-auto animate-pulse">
+        <div className="bg-zinc-950 border border-white/10 rounded-[28px] sm:rounded-[32px] overflow-hidden shadow-2xl">
+          <div className="h-40 sm:h-52 bg-gradient-to-r from-white/[0.06] via-white/[0.1] to-white/[0.06]" />
+          <div className="px-4 sm:px-6 md:px-10 pb-6 sm:pb-8 -mt-14 sm:-mt-16">
+            <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6">
+              <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-full bg-zinc-800 border-4 border-black shadow-2xl" />
+              <div className="flex-1 pb-1">
+                <div className="h-8 sm:h-10 w-52 sm:w-72 bg-zinc-800 rounded-xl" />
+                <div className="h-4 w-36 bg-zinc-800 rounded-lg mt-3" />
+              </div>
+              <div className="hidden sm:block h-12 w-36 bg-zinc-800 rounded-2xl" />
+            </div>
+
+            <div className="space-y-3 mt-6 max-w-2xl">
+              <div className="h-4 bg-zinc-800 rounded-xl" />
+              <div className="h-4 bg-zinc-800 rounded-xl w-4/5" />
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-7">
+              {[1, 2, 3].map((item) => (
+                <div key={item} className="bg-white/[0.04] border border-white/10 rounded-2xl px-3 py-4 text-center">
+                  <div className="h-7 w-10 bg-zinc-800 rounded-xl mx-auto" />
+                  <div className="h-3 w-16 bg-zinc-800 rounded-xl mx-auto mt-3" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-8 sm:mt-10">
+          <div className="flex items-center justify-between gap-4 mb-6">
+            <div>
+              <div className="h-8 w-48 bg-zinc-900 rounded-2xl" />
+              <div className="h-4 w-64 max-w-full bg-zinc-900 rounded-xl mt-3" />
+            </div>
+            <div className="hidden sm:block h-12 w-72 bg-zinc-900 rounded-2xl" />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+            {[1, 2, 3, 4, 5, 6].map((item) => (
+              <div key={item} className="bg-zinc-950 border border-white/10 rounded-3xl overflow-hidden">
+                <div className="p-5 flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-zinc-800" />
+                  <div className="flex-1">
+                    <div className="h-5 w-44 max-w-full bg-zinc-800 rounded-lg" />
+                    <div className="h-4 w-32 bg-zinc-800 rounded-lg mt-3" />
+                  </div>
+                </div>
+                <div className="aspect-square bg-zinc-900" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EmptyState({ text }) {
   return (
     <div className="bg-zinc-950 border border-white/10 rounded-3xl py-20 text-center text-gray-400">
@@ -592,20 +653,59 @@ function PostModal({
 }) {
   const liked = selectedPost.likes?.some((like) => like._id === currentUserId || like === currentUserId);
 
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") setSelectedPost(null);
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [setSelectedPost]);
+
   return (
-    <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-end sm:items-center justify-center sm:p-4">
-      <div className="w-full max-w-5xl bg-zinc-950 border border-white/10 rounded-t-[30px] sm:rounded-[32px] overflow-hidden relative h-[96vh] sm:h-auto sm:max-h-[92vh] shadow-2xl">
+    <div
+      className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-end sm:items-center justify-center sm:p-4"
+      onClick={() => setSelectedPost(null)}
+    >
+      <div
+        className="w-full max-w-5xl bg-zinc-950 border border-white/10 rounded-t-[30px] sm:rounded-[32px] overflow-hidden relative h-[94dvh] sm:h-auto sm:max-h-[92vh] shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sticky top-0 z-50 flex items-center justify-between px-4 py-3 bg-zinc-950/95 border-b border-white/10 lg:hidden">
+          <button
+            onClick={() => setSelectedPost(null)}
+            className="flex items-center gap-2 text-sm font-semibold text-gray-200 bg-white/10 active:scale-95 px-4 py-2 rounded-full"
+          >
+            ← Back
+          </button>
+          <span className="text-sm text-gray-400">Post</span>
+          <button
+            onClick={() => setSelectedPost(null)}
+            className="w-10 h-10 rounded-full bg-white/10 text-xl leading-none active:scale-95"
+            aria-label="Close post"
+          >
+            ×
+          </button>
+        </div>
+
         <button
           onClick={() => setSelectedPost(null)}
-          className="absolute top-3 right-3 sm:top-4 sm:right-4 z-50 bg-black/70 hover:bg-white/10 w-10 h-10 rounded-full"
+          className="hidden lg:flex absolute top-4 right-4 z-50 bg-black/70 hover:bg-white/10 w-11 h-11 rounded-full items-center justify-center text-2xl leading-none"
+          aria-label="Close post"
         >
-          ✕
+          ×
         </button>
 
-        <div className="grid lg:grid-cols-2 h-full">
+        <div className="grid lg:grid-cols-2 h-[calc(94dvh-65px)] sm:h-full">
           <div
             onDoubleClick={() => handleDoubleLike(selectedPost)}
-            className="relative bg-black flex items-center justify-center h-[42vh] sm:min-h-[360px] lg:h-auto lg:min-h-[560px] lg:max-h-[85vh] cursor-pointer"
+            className="relative bg-black flex items-center justify-center h-[38dvh] sm:min-h-[360px] lg:h-auto lg:min-h-[560px] lg:max-h-[85vh] cursor-pointer"
           >
             {animateLike && (
               <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
@@ -626,7 +726,7 @@ function PostModal({
             )}
           </div>
 
-          <div className="flex flex-col h-[54vh] lg:h-[85vh] min-h-0">
+          <div className="flex flex-col h-[calc(56dvh-65px)] lg:h-[85vh] min-h-0">
             <div className="p-4 sm:p-5 border-b border-white/10 flex items-center gap-3 bg-zinc-950/95">
               <button onClick={() => selectedPost.user?._id && openUserProfile(selectedPost.user._id)}>
                 <img src={avatarUrl(selectedPost.user || user)} alt="" className="w-12 h-12 rounded-full object-cover" />
@@ -715,7 +815,7 @@ function PostModal({
                   onChange={(e) => setCommentText(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addComment()}
                   placeholder="Add a comment..."
-                  className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-2xl px-4 sm:px-5 py-3 sm:py-4 outline-none"
+                  className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-2xl px-4 sm:px-5 py-3 sm:py-4 outline-none focus:border-pink-400/50"
                 />
                 <button
                   onClick={addComment}
@@ -724,7 +824,7 @@ function PostModal({
                   Send
                 </button>
               </div>
-              <p className="text-xs text-gray-500 mt-3">Double click media ya heart se like/unlike hoga.</p>
+              <p className="text-xs text-gray-500 mt-3">Double tap media or use the heart button to like/unlike.</p>
             </div>
           </div>
         </div>
