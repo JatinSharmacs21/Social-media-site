@@ -17,10 +17,12 @@ const sendResetEmail = async ({ to, resetUrl }) => {
   }
 
   const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
+  host: process.env.EMAIL_HOST,
+  port: Number(process.env.EMAIL_PORT),
+
   secure: false,
   requireTLS: true,
+
   family: 4,
 
   auth: {
@@ -28,11 +30,15 @@ const sendResetEmail = async ({ to, resetUrl }) => {
     pass: process.env.EMAIL_PASS,
   },
 
+  tls: {
+    rejectUnauthorized: false,
+  },
+
   connectionTimeout: 20000,
   greetingTimeout: 20000,
   socketTimeout: 20000,
 });
-
+console.log("Trying to send email...");
   await transporter.sendMail({
     from: `"Vybeo" <${process.env.EMAIL_USER}>`,
     to,
@@ -50,6 +56,7 @@ const sendResetEmail = async ({ to, resetUrl }) => {
       </div>
     `,
   });
+  console.log("Email sent successfully");
 };
 
 // REGISTER USER
@@ -184,9 +191,9 @@ const forgotPassword = async (req, res) => {
 
     res.json({ message: "Password reset link sent to your email." });
   } catch (error) {
-    console.error("Forgot password error:", error);
-    res.status(500).json({ message: error.message });
-  }
+  console.error(error);
+  res.status(500).json({ message: error.message });
+}
 };
 
 // RESET PASSWORD
