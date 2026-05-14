@@ -2,6 +2,23 @@ const Post = require("../models/Post");
 
 const Notification = require("../models/Notification");
 
+const emitRealtimeNotification = async (req, recipientId, data) => {
+  try {
+    const io = req.app.get("io");
+    const onlineUsers = req.app.get("onlineUsers");
+
+    if (!io || !onlineUsers || !recipientId) return;
+
+    const receiverSocketId = onlineUsers.get(recipientId.toString());
+
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("new-notification", data);
+    }
+  } catch (error) {
+    console.log("Socket notification error:", error.message);
+  }
+};
+
 // helper: updated populated post return karne ke liye
 const getPopulatedPost = async (postId) => {
   return await Post.findById(postId)
@@ -75,12 +92,28 @@ const toggleLikePost = async (req, res) => {
   post.likes.push(req.user.id);
 
   if (post.user.toString() !== req.user.id.toString()) {
-    await Notification.create({
+    const notification = await Notification.create({
       recipient: post.user,
       sender: req.user.id,
       type: "like",
       post: post._id,
       message: "liked your post",
+    });
+
+    await emitRealtimeNotification(req, post.user, {
+      _id: notification._id,
+      recipient: post.user,
+      sender: {
+        _id: req.user._id || req.user.id,
+        name: req.user.name,
+        username: req.user.username,
+        profilePic: req.user.profilePic,
+      },
+      type: "like",
+      post: post._id,
+      message: `${req.user.name || "Someone"} liked your post`,
+      createdAt: notification.createdAt,
+      isRead: false,
     });
   }
 }
@@ -192,12 +225,28 @@ const addComment = async (req, res) => {
 
     await post.save();
     if (post.user.toString() !== req.user.id.toString()) {
-  await Notification.create({
+  const notification = await Notification.create({
     recipient: post.user,
     sender: req.user.id,
     type: "comment",
     post: post._id,
     message: "commented on your post",
+  });
+
+  await emitRealtimeNotification(req, post.user, {
+    _id: notification._id,
+    recipient: post.user,
+    sender: {
+      _id: req.user._id || req.user.id,
+      name: req.user.name,
+      username: req.user.username,
+      profilePic: req.user.profilePic,
+    },
+    type: "comment",
+    post: post._id,
+    message: `${req.user.name || "Someone"} commented on your post`,
+    createdAt: notification.createdAt,
+    isRead: false,
   });
 }
 
@@ -335,12 +384,28 @@ const addReply = async (req, res) => {
 
     await post.save();
     if (comment.user.toString() !== req.user.id.toString()) {
-  await Notification.create({
+  const notification = await Notification.create({
     recipient: comment.user,
     sender: req.user.id,
     type: "reply",
     post: post._id,
     message: "replied to your comment",
+  });
+
+  await emitRealtimeNotification(req, comment.user, {
+    _id: notification._id,
+    recipient: comment.user,
+    sender: {
+      _id: req.user._id || req.user.id,
+      name: req.user.name,
+      username: req.user.username,
+      profilePic: req.user.profilePic,
+    },
+    type: "reply",
+    post: post._id,
+    message: `${req.user.name || "Someone"} replied to your comment`,
+    createdAt: notification.createdAt,
+    isRead: false,
   });
 }
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { io } from "socket.io-client";
 import { useNavigate, useLocation } from "react-router-dom";
 import API from "../services/api";
 
@@ -9,6 +10,7 @@ function Navbar() {
   const token = localStorage.getItem("token");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
     const fetchUnreadCount = async () => {
@@ -33,10 +35,51 @@ function Navbar() {
     return () => clearInterval(interval);
   }, [token, location.pathname]);
 
+  useEffect(() => {
+    if (!token) return;
+
+    const userId = localStorage.getItem("userId");
+    if (!userId) return;
+
+    const socketUrl =
+      process.env.REACT_APP_SOCKET_URL ||
+      process.env.REACT_APP_API_URL ||
+      "https://social-backend-waow.onrender.com";
+
+    const socket = io(socketUrl, {
+      transports: ["websocket", "polling"],
+    });
+
+    socket.on("connect", () => {
+      socket.emit("register-user", userId);
+    });
+
+    socket.on("new-notification", (data) => {
+      if (location.pathname === "/notifications") return;
+
+      setUnreadCount((prev) => Number(prev || 0) + 1);
+
+      setToast({
+        message: data?.message || "You have a new notification",
+        type: data?.type || "notification",
+      });
+
+      setTimeout(() => {
+        setToast(null);
+      }, 4000);
+    });
+
+    return () => {
+      socket.off("new-notification");
+      socket.disconnect();
+    };
+  }, [token, location.pathname]);
+
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("userId");
     localStorage.removeItem("user");
+    localStorage.removeItem("username");
     navigate("/");
   };
 
@@ -87,43 +130,41 @@ function Navbar() {
       ),
     },
     {
-  label: "Vybe Room",
-  path: "/vybe-room",
-  icon: (
-  <svg
-    viewBox="0 0 24 24"
-    className="w-6 h-6"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2.2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M12 3l2.5 5L20 10l-5.5 2L12 17l-2.5-5L4 10l5.5-2L12 3z" />
-  </svg>
-),
-},
-
-{
-  label: "Notifications",
-  path: "/notifications",
-  badge: unreadCount,
-  icon: (
-    <svg
-      viewBox="0 0 24 24"
-      className="w-6 h-6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-      <path d="M10 21h4" />
-    </svg>
-  ),
-},
-
+      label: "Vybe Room",
+      path: "/vybe-room",
+      icon: (
+        <svg
+          viewBox="0 0 24 24"
+          className="w-6 h-6"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M12 3l2.5 5L20 10l-5.5 2L12 17l-2.5-5L4 10l5.5-2L12 3z" />
+        </svg>
+      ),
+    },
+    {
+      label: "Notifications",
+      path: "/notifications",
+      badge: unreadCount,
+      icon: (
+        <svg
+          viewBox="0 0 24 24"
+          className="w-6 h-6"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+          <path d="M10 21h4" />
+        </svg>
+      ),
+    },
     {
       label: "Profile",
       path: "/profile",
@@ -179,6 +220,12 @@ function Navbar() {
           }`}
         >
           <span className={active ? "text-pink-300" : ""}>{item.icon}</span>
+
+          {showBadge && (
+            <span className="absolute top-2 right-3 min-w-[18px] h-[18px] px-1 rounded-full bg-pink-500 text-white text-[10px] flex items-center justify-center font-bold">
+              {item.badge > 9 ? "9+" : item.badge}
+            </span>
+          )}
         </button>
       );
     }
@@ -232,67 +279,117 @@ function Navbar() {
     );
   };
 
-  if (!token) {
+  const NotificationToast = () => {
+    if (!toast) return null;
+
     return (
-      <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-2xl bg-black/70 border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-          <Logo />
+      <div className="fixed top-24 right-4 z-[9999] animate-[slideIn_.3s_ease]">
+        <div className="min-w-[280px] max-w-[360px] rounded-2xl border border-white/10 bg-black/90 backdrop-blur-2xl shadow-2xl shadow-cyan-500/10 overflow-hidden">
+          <div className="h-1 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500" />
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate("/")}
-              className="px-4 sm:px-5 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all"
-            >
-              Login
-            </button>
+          <div className="p-4 flex items-start gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-pink-500/20 to-cyan-500/20 flex items-center justify-center shrink-0">
+              <svg
+                viewBox="0 0 24 24"
+                className="w-5 h-5 text-pink-300"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+              >
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                <path d="M10 21h4" />
+              </svg>
+            </div>
+
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-white">
+                New Notification
+              </p>
+
+              <p className="text-sm text-gray-300 mt-1 leading-relaxed">
+                {toast.message}
+              </p>
+            </div>
 
             <button
-              onClick={() => navigate("/")}
-              className="px-4 sm:px-5 py-2 rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 hover:scale-105 transition-all font-semibold"
+              onClick={() => setToast(null)}
+              className="text-gray-500 hover:text-white transition-colors"
             >
-              Register
+              ✕
             </button>
           </div>
         </div>
-      </nav>
+      </div>
+    );
+  };
+
+  if (!token) {
+    return (
+      <>
+        <NotificationToast />
+
+        <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-2xl bg-black/70 border-b border-white/10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+            <Logo />
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate("/")}
+                className="px-4 sm:px-5 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all"
+              >
+                Login
+              </button>
+
+              <button
+                onClick={() => navigate("/")}
+                className="px-4 sm:px-5 py-2 rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 hover:scale-105 transition-all font-semibold"
+              >
+                Register
+              </button>
+            </div>
+          </div>
+        </nav>
+      </>
     );
   }
 
   return (
     <>
+      <NotificationToast />
+
       <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-[76px] backdrop-blur-2xl bg-black/75 border-b border-white/10">
         <div className="h-full px-4 flex items-center justify-between">
-  <Logo />
+          <Logo />
 
-  <div className="flex items-center gap-3">
-    <button
-      onClick={() => go("/notifications")}
-      className="relative w-11 h-11 rounded-2xl border border-white/10 bg-white/[0.04] flex items-center justify-center hover:bg-white/[0.08] transition-all"
-    >
-      <svg
-        viewBox="0 0 24 24"
-        className="w-6 h-6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.2"
-      >
-        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-        <path d="M10 21h4" />
-      </svg>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => go("/notifications")}
+              className="relative w-11 h-11 rounded-2xl border border-white/10 bg-white/[0.04] flex items-center justify-center hover:bg-white/[0.08] transition-all"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+              >
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                <path d="M10 21h4" />
+              </svg>
 
-      {unreadCount > 0 && (
-        <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.9)]" />
-      )}
-    </button>
+              {unreadCount > 0 && (
+                <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.9)]" />
+              )}
+            </button>
 
-    <button
-      onClick={logout}
-      className="px-4 py-2 rounded-xl border border-red-500/20 text-red-300 bg-red-500/5 hover:bg-red-500/10 transition-all"
-    >
-      Logout
-    </button>
-  </div>
-</div>
+            <button
+              onClick={logout}
+              className="px-4 py-2 rounded-xl border border-red-500/20 text-red-300 bg-red-500/5 hover:bg-red-500/10 transition-all"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
       </header>
 
       <aside
@@ -348,8 +445,8 @@ function Navbar() {
           {navItems
             .filter((item) => item.path !== "/notifications")
             .map((item) => (
-            <NavButton key={item.path} item={item} mobile />
-          ))}
+              <NavButton key={item.path} item={item} mobile />
+            ))}
         </div>
       </nav>
     </>

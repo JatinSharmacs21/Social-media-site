@@ -23,7 +23,7 @@ const sendResetEmail = async ({ to, resetUrl }) => {
   console.log("Trying to send email with Resend...");
 
   const response = await resend.emails.send({
-    from: "Jatin Kumar Sharma <jatinsharmacs21@gmail.com>",
+    from: "Vybeo <onboarding@resend.dev>",
     to,
 
     subject: "Reset your Vybeo password",

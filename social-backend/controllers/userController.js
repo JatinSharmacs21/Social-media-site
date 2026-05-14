@@ -1,6 +1,23 @@
 const User = require("../models/User");
 const Notification = require("../models/Notification");
 
+const emitRealtimeNotification = async (req, recipientId, data) => {
+  try {
+    const io = req.app.get("io");
+    const onlineUsers = req.app.get("onlineUsers");
+
+    if (!io || !onlineUsers || !recipientId) return;
+
+    const receiverSocketId = onlineUsers.get(recipientId.toString());
+
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("new-notification", data);
+    }
+  } catch (error) {
+    console.log("Socket notification error:", error.message);
+  }
+};
+
 // GET USER PROFILE
 const getUserProfile = async (req, res) => {
   try {
@@ -79,11 +96,26 @@ const followUser = async (req, res) => {
   currentUser.following.push(targetUserId);
   userToFollow.followers.push(currentUserId);
 
-  await Notification.create({
+  const notification = await Notification.create({
     recipient: targetUserId,
     sender: currentUserId,
     type: "follow",
     message: "started following you",
+  });
+
+  await emitRealtimeNotification(req, targetUserId, {
+    _id: notification._id,
+    recipient: targetUserId,
+    sender: {
+      _id: currentUser._id,
+      name: currentUser.name,
+      username: currentUser.username,
+      profilePic: currentUser.profilePic,
+    },
+    type: "follow",
+    message: `${currentUser.name || "Someone"} started following you`,
+    createdAt: notification.createdAt,
+    isRead: false,
   });
 }
 

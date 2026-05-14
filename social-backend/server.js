@@ -36,21 +36,39 @@ const io = new Server(server, {
 
 app.set("io", io);
 
-const onlineUsers = new Set();
+// Realtime notification users: userId -> socket.id
+const onlineUsers = new Map();
+
+// Vybe room users count
+const vybeOnlineUsers = new Set();
+
+app.set("onlineUsers", onlineUsers);
 
 io.on("connection", (socket) => {
   console.log("Socket connected:", socket.id);
+
+  // Frontend Navbar emits this after login.
+  // This helps backend send realtime notification to one specific user.
+  socket.on("register-user", (userId) => {
+    if (!userId) return;
+
+    const id = userId.toString();
+    socket.userId = id;
+    onlineUsers.set(id, socket.id);
+
+    console.log("Realtime user registered:", id);
+  });
 
   socket.on("join-vybe-room", ({ room = "general", userId }) => {
     socket.join(`vybe-room-${room}`);
 
     if (userId) {
-      onlineUsers.add(userId);
+      vybeOnlineUsers.add(userId);
     }
 
     io.to(`vybe-room-${room}`).emit(
       "vybe-online-users",
-      onlineUsers.size
+      vybeOnlineUsers.size
     );
   });
 
@@ -65,16 +83,28 @@ io.on("connection", (socket) => {
     socket.leave(`vybe-room-${room}`);
 
     if (userId) {
-      onlineUsers.delete(userId);
+      vybeOnlineUsers.delete(userId);
     }
 
     io.to(`vybe-room-${room}`).emit(
       "vybe-online-users",
-      onlineUsers.size
+      vybeOnlineUsers.size
     );
   });
 
   socket.on("disconnect", () => {
+    if (socket.userId) {
+      onlineUsers.delete(socket.userId);
+      vybeOnlineUsers.delete(socket.userId);
+    } else {
+      for (const [userId, socketId] of onlineUsers.entries()) {
+        if (socketId === socket.id) {
+          onlineUsers.delete(userId);
+          break;
+        }
+      }
+    }
+
     console.log("Socket disconnected:", socket.id);
   });
 });
