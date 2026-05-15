@@ -14,6 +14,7 @@ import Notifications from "./pages/Notifications";
 import ProtectedRoute from "./components/ProtectedRoute";
 import MainLayout from "./components/MainLayout";
 import VybeRoom from "./pages/VybeRoom";
+import VybeDrops from "./pages/VybeDrops";
 
 function App() {
   return (
@@ -96,6 +97,16 @@ function App() {
                 <Reels />
               </MainLayout>
             </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/vybe-drops"
+          element={
+          <ProtectedRoute>
+          <MainLayout>
+          <VybeDrops />
+          </MainLayout>
+          </ProtectedRoute>
           }
         />
       </Routes>

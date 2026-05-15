@@ -1,6 +1,7 @@
 const Post = require("../models/Post");
-
 const Notification = require("../models/Notification");
+
+const getUserId = (req) => req.user?._id || req.user?.id;
 
 const emitRealtimeNotification = async (req, recipientId, data) => {
   try {
@@ -19,7 +20,6 @@ const emitRealtimeNotification = async (req, recipientId, data) => {
   }
 };
 
-// helper: updated populated post return karne ke liye
 const getPopulatedPost = async (postId) => {
   return await Post.findById(postId)
     .populate("user", "name username email profilePic")
@@ -29,31 +29,30 @@ const getPopulatedPost = async (postId) => {
     .populate("comments.replies.user", "name username profilePic");
 };
 
-// CREATE POST
 const createPost = async (req, res) => {
   try {
+    const userId = getUserId(req);
     const { caption, media } = req.body;
 
     const post = await Post.create({
-      user: req.user.id,
+      user: userId,
       caption,
       media,
+      postType: "normal",
     });
 
     const populatedPost = await getPopulatedPost(post._id);
-
     res.status(201).json(populatedPost);
   } catch (error) {
-    res.status(500).json({
-      message: error.message,
-    });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// GET ALL POSTS
 const getPosts = async (req, res) => {
   try {
-    const posts = await Post.find()
+    const posts = await Post.find({
+      postType: { $in: ["normal", null] },
+    })
       .populate("user", "name username email profilePic")
       .populate("likes", "name username profilePic")
       .populate("comments.user", "name username profilePic")
@@ -63,89 +62,239 @@ const getPosts = async (req, res) => {
 
     res.json(posts);
   } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getVybeDrops = async (req, res) => {
+  try {
+    const drops = await Post.aggregate([
+      { $match: { postType: "drop" } },
+      {
+        $lookup: {
+          from: "posts",
+          localField: "_id",
+          foreignField: "drop",
+          as: "replies",
+        },
+      },
+      {
+        $addFields: {
+          replyCount: { $size: "$replies" },
+          reactionCount: { $size: { $ifNull: ["$vybeReactions", []] } },
+        },
+      },
+      { $sort: { createdAt: -1 } },
+    ]);
+
+    await Post.populate(drops, {
+      path: "user",
+      select: "name username profilePic",
+    });
+
+    res.json(drops);
+  } catch (error) {
+    console.log("Get Vybe Drops error:", error);
+    res.status(500).json({ message: "Failed to fetch Vybe Drops" });
+  }
+};
+
+const getDropReplies = async (req, res) => {
+  try {
+    const replies = await Post.find({
+      postType: "dropReply",
+      drop: req.params.dropId,
+    })
+      .populate("user", "name username profilePic")
+      .sort({ createdAt: -1 });
+
+    res.json(replies);
+  } catch (error) {
+    console.log("Get Drop Replies error:", error);
+    res.status(500).json({ message: "Failed to fetch replies" });
+  }
+};
+
+const replyToVybeDrop = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const { caption, isAnonymous } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    if (!caption || !caption.trim()) {
+      return res.status(400).json({ message: "Reply is required" });
+    }
+
+    const drop = await Post.findById(req.params.dropId);
+
+    if (!drop || drop.postType !== "drop") {
+      return res.status(404).json({ message: "Drop not found" });
+    }
+
+    const reply = await Post.create({
+      user: userId,
+      caption: caption.trim(),
+      postType: "dropReply",
+      drop: drop._id,
+      vybeTag: drop.vybeTag,
+      isAnonymous: Boolean(isAnonymous),
+    });
+
+    const populatedReply = await Post.findById(reply._id).populate(
+      "user",
+      "name username profilePic"
+    );
+
+    const io = req.app.get("io");
+
+    if (io) {
+      io.to(`drop-${drop._id}`).emit("drop-reply-created", {
+        dropId: drop._id.toString(),
+        reply: populatedReply,
+      });
+
+      io.emit("drop-count-updated", {
+        dropId: drop._id.toString(),
+        type: "reply",
+      });
+    }
+
+    res.status(201).json(populatedReply);
+  } catch (error) {
+    console.log("Vybe reply error:", error);
     res.status(500).json({
-      message: error.message,
+      message: error.message || "Failed to reply to drop",
     });
   }
 };
 
-// LIKE / UNLIKE POST
-const toggleLikePost = async (req, res) => {
+const reactToVybeReply = async (req, res) => {
   try {
-    const post = await Post.findById(req.params.postId);
+    const userId = getUserId(req);
+    const { type } = req.body;
 
-    if (!post) {
-      return res.status(404).json({
-        message: "Post not found",
+    if (!userId) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    const allowed = ["felt", "deep", "funny", "chaos", "relatable"];
+
+    if (!allowed.includes(type)) {
+      return res.status(400).json({ message: "Invalid reaction" });
+    }
+
+    const reply = await Post.findById(req.params.replyId);
+
+    if (!reply || reply.postType !== "dropReply") {
+      return res.status(404).json({ message: "Reply not found" });
+    }
+
+    reply.vybeReactions = (reply.vybeReactions || []).filter(
+      (reaction) => reaction.user.toString() !== userId.toString()
+    );
+
+    reply.vybeReactions.push({
+      user: userId,
+      type,
+    });
+
+    await reply.save();
+
+    const updatedReply = await Post.findById(reply._id).populate(
+      "user",
+      "name username profilePic"
+    );
+
+    const io = req.app.get("io");
+
+    if (io) {
+      io.to(`drop-${reply.drop}`).emit("drop-reply-reacted", {
+        dropId: reply.drop.toString(),
+        reply: updatedReply,
       });
     }
 
+    res.json(updatedReply);
+  } catch (error) {
+    console.log("Vybe reaction error:", error);
+    res.status(500).json({
+      message: error.message || "Failed to react",
+    });
+  }
+};
+
+const toggleLikePost = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const post = await Post.findById(req.params.postId);
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
     const userLiked = post.likes.some(
-      (like) => like.toString() === req.user.id.toString()
+      (like) => like.toString() === userId.toString()
     );
 
     if (userLiked) {
       post.likes = post.likes.filter(
-        (like) => like.toString() !== req.user.id.toString()
+        (like) => like.toString() !== userId.toString()
       );
     } else {
-  post.likes.push(req.user.id);
+      post.likes.push(userId);
 
-  if (post.user.toString() !== req.user.id.toString()) {
-    const notification = await Notification.create({
-      recipient: post.user,
-      sender: req.user.id,
-      type: "like",
-      post: post._id,
-      message: "liked your post",
-    });
+      if (post.user.toString() !== userId.toString()) {
+        const notification = await Notification.create({
+          recipient: post.user,
+          sender: userId,
+          type: "like",
+          post: post._id,
+          message: "liked your post",
+        });
 
-    await emitRealtimeNotification(req, post.user, {
-      _id: notification._id,
-      recipient: post.user,
-      sender: {
-        _id: req.user._id || req.user.id,
-        name: req.user.name,
-        username: req.user.username,
-        profilePic: req.user.profilePic,
-      },
-      type: "like",
-      post: post._id,
-      message: `${req.user.name || "Someone"} liked your post`,
-      createdAt: notification.createdAt,
-      isRead: false,
-    });
-  }
-}
+        await emitRealtimeNotification(req, post.user, {
+          _id: notification._id,
+          recipient: post.user,
+          sender: {
+            _id: userId,
+            name: req.user.name,
+            username: req.user.username,
+            profilePic: req.user.profilePic,
+          },
+          type: "like",
+          post: post._id,
+          message: `${req.user.name || "Someone"} liked your post`,
+          createdAt: notification.createdAt,
+          isRead: false,
+        });
+      }
+    }
 
     await post.save();
 
     const updatedPost = await getPopulatedPost(post._id);
-
     res.json(updatedPost);
   } catch (error) {
     console.log(error);
-
-    res.status(500).json({
-      message: error.message,
-    });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// UPDATE POST CAPTION
 const updatePost = async (req, res) => {
   try {
+    const userId = getUserId(req);
     const { caption } = req.body;
 
     const post = await Post.findById(req.params.postId);
 
     if (!post) {
-      return res.status(404).json({
-        message: "Post not found",
-      });
+      return res.status(404).json({ message: "Post not found" });
     }
 
-    if (post.user.toString() !== req.user.id.toString()) {
+    if (post.user.toString() !== userId.toString()) {
       return res.status(403).json({
         message: "You can edit only your own post",
       });
@@ -160,27 +309,22 @@ const updatePost = async (req, res) => {
     await post.save();
 
     const updatedPost = await getPopulatedPost(post._id);
-
     res.json(updatedPost);
   } catch (error) {
-    res.status(500).json({
-      message: error.message,
-    });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// DELETE POST
 const deletePost = async (req, res) => {
   try {
+    const userId = getUserId(req);
     const post = await Post.findById(req.params.postId);
 
     if (!post) {
-      return res.status(404).json({
-        message: "Post not found",
-      });
+      return res.status(404).json({ message: "Post not found" });
     }
 
-    if (post.user.toString() !== req.user.id.toString()) {
+    if (post.user.toString() !== userId.toString()) {
       return res.status(403).json({
         message: "You can delete only your own post",
       });
@@ -193,15 +337,13 @@ const deletePost = async (req, res) => {
       postId: req.params.postId,
     });
   } catch (error) {
-    res.status(500).json({
-      message: error.message,
-    });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// ADD COMMENT
 const addComment = async (req, res) => {
   try {
+    const userId = getUserId(req);
     const { text } = req.body;
 
     if (!text || !text.trim()) {
@@ -213,77 +355,66 @@ const addComment = async (req, res) => {
     const post = await Post.findById(req.params.postId);
 
     if (!post) {
-      return res.status(404).json({
-        message: "Post not found",
-      });
+      return res.status(404).json({ message: "Post not found" });
     }
 
     post.comments.push({
-      user: req.user.id,
+      user: userId,
       text: text.trim(),
     });
 
     await post.save();
-    if (post.user.toString() !== req.user.id.toString()) {
-  const notification = await Notification.create({
-    recipient: post.user,
-    sender: req.user.id,
-    type: "comment",
-    post: post._id,
-    message: "commented on your post",
-  });
 
-  await emitRealtimeNotification(req, post.user, {
-    _id: notification._id,
-    recipient: post.user,
-    sender: {
-      _id: req.user._id || req.user.id,
-      name: req.user.name,
-      username: req.user.username,
-      profilePic: req.user.profilePic,
-    },
-    type: "comment",
-    post: post._id,
-    message: `${req.user.name || "Someone"} commented on your post`,
-    createdAt: notification.createdAt,
-    isRead: false,
-  });
-}
+    if (post.user.toString() !== userId.toString()) {
+      const notification = await Notification.create({
+        recipient: post.user,
+        sender: userId,
+        type: "comment",
+        post: post._id,
+        message: "commented on your post",
+      });
+
+      await emitRealtimeNotification(req, post.user, {
+        _id: notification._id,
+        recipient: post.user,
+        sender: {
+          _id: userId,
+          name: req.user.name,
+          username: req.user.username,
+          profilePic: req.user.profilePic,
+        },
+        type: "comment",
+        post: post._id,
+        message: `${req.user.name || "Someone"} commented on your post`,
+        createdAt: notification.createdAt,
+        isRead: false,
+      });
+    }
 
     const updatedPost = await getPopulatedPost(post._id);
-
     res.json(updatedPost);
   } catch (error) {
-    res.status(500).json({
-      message: error.message,
-    });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// DELETE COMMENT
 const deleteComment = async (req, res) => {
   try {
+    const userId = getUserId(req);
     const post = await Post.findById(req.params.postId);
 
     if (!post) {
-      return res.status(404).json({
-        message: "Post not found",
-      });
+      return res.status(404).json({ message: "Post not found" });
     }
 
     const comment = post.comments.id(req.params.commentId);
 
     if (!comment) {
-      return res.status(404).json({
-        message: "Comment not found",
-      });
+      return res.status(404).json({ message: "Comment not found" });
     }
 
-    const isCommentOwner =
-      comment.user.toString() === req.user.id.toString();
-
-    const isPostOwner =
-      post.user.toString() === req.user.id.toString();
+    const isCommentOwner = comment.user.toString() === userId.toString();
+    const isPostOwner = post.user.toString() === userId.toString();
 
     if (!isCommentOwner && !isPostOwner) {
       return res.status(403).json({
@@ -298,61 +429,51 @@ const deleteComment = async (req, res) => {
     await post.save();
 
     const updatedPost = await getPopulatedPost(post._id);
-
     res.json(updatedPost);
   } catch (error) {
-    res.status(500).json({
-      message: error.message,
-    });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// LIKE / UNLIKE COMMENT
 const toggleCommentLike = async (req, res) => {
   try {
+    const userId = getUserId(req);
     const post = await Post.findById(req.params.postId);
 
     if (!post) {
-      return res.status(404).json({
-        message: "Post not found",
-      });
+      return res.status(404).json({ message: "Post not found" });
     }
 
     const comment = post.comments.id(req.params.commentId);
 
     if (!comment) {
-      return res.status(404).json({
-        message: "Comment not found",
-      });
+      return res.status(404).json({ message: "Comment not found" });
     }
 
     const alreadyLiked = comment.likes.some(
-      (like) => like.toString() === req.user.id.toString()
+      (like) => like.toString() === userId.toString()
     );
 
     if (alreadyLiked) {
       comment.likes = comment.likes.filter(
-        (like) => like.toString() !== req.user.id.toString()
+        (like) => like.toString() !== userId.toString()
       );
     } else {
-      comment.likes.push(req.user.id);
+      comment.likes.push(userId);
     }
 
     await post.save();
 
     const updatedPost = await getPopulatedPost(post._id);
-
     res.json(updatedPost);
   } catch (error) {
-    res.status(500).json({
-      message: error.message,
-    });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// ADD REPLY
 const addReply = async (req, res) => {
   try {
+    const userId = getUserId(req);
     const { text } = req.body;
 
     if (!text || !text.trim()) {
@@ -364,93 +485,78 @@ const addReply = async (req, res) => {
     const post = await Post.findById(req.params.postId);
 
     if (!post) {
-      return res.status(404).json({
-        message: "Post not found",
-      });
+      return res.status(404).json({ message: "Post not found" });
     }
 
     const comment = post.comments.id(req.params.commentId);
 
     if (!comment) {
-      return res.status(404).json({
-        message: "Comment not found",
-      });
+      return res.status(404).json({ message: "Comment not found" });
     }
 
     comment.replies.push({
-      user: req.user.id,
+      user: userId,
       text: text.trim(),
     });
 
     await post.save();
-    if (comment.user.toString() !== req.user.id.toString()) {
-  const notification = await Notification.create({
-    recipient: comment.user,
-    sender: req.user.id,
-    type: "reply",
-    post: post._id,
-    message: "replied to your comment",
-  });
 
-  await emitRealtimeNotification(req, comment.user, {
-    _id: notification._id,
-    recipient: comment.user,
-    sender: {
-      _id: req.user._id || req.user.id,
-      name: req.user.name,
-      username: req.user.username,
-      profilePic: req.user.profilePic,
-    },
-    type: "reply",
-    post: post._id,
-    message: `${req.user.name || "Someone"} replied to your comment`,
-    createdAt: notification.createdAt,
-    isRead: false,
-  });
-}
+    if (comment.user.toString() !== userId.toString()) {
+      const notification = await Notification.create({
+        recipient: comment.user,
+        sender: userId,
+        type: "reply",
+        post: post._id,
+        message: "replied to your comment",
+      });
+
+      await emitRealtimeNotification(req, comment.user, {
+        _id: notification._id,
+        recipient: comment.user,
+        sender: {
+          _id: userId,
+          name: req.user.name,
+          username: req.user.username,
+          profilePic: req.user.profilePic,
+        },
+        type: "reply",
+        post: post._id,
+        message: `${req.user.name || "Someone"} replied to your comment`,
+        createdAt: notification.createdAt,
+        isRead: false,
+      });
+    }
 
     const updatedPost = await getPopulatedPost(post._id);
-
     res.json(updatedPost);
   } catch (error) {
-    res.status(500).json({
-      message: error.message,
-    });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// DELETE REPLY
 const deleteReply = async (req, res) => {
   try {
+    const userId = getUserId(req);
     const post = await Post.findById(req.params.postId);
 
     if (!post) {
-      return res.status(404).json({
-        message: "Post not found",
-      });
+      return res.status(404).json({ message: "Post not found" });
     }
 
     const comment = post.comments.id(req.params.commentId);
 
     if (!comment) {
-      return res.status(404).json({
-        message: "Comment not found",
-      });
+      return res.status(404).json({ message: "Comment not found" });
     }
 
     const reply = comment.replies.id(req.params.replyId);
 
     if (!reply) {
-      return res.status(404).json({
-        message: "Reply not found",
-      });
+      return res.status(404).json({ message: "Reply not found" });
     }
 
-    const isReplyOwner =
-      reply.user.toString() === req.user.id.toString();
-
-    const isPostOwner =
-      post.user.toString() === req.user.id.toString();
+    const isReplyOwner = reply.user.toString() === userId.toString();
+    const isPostOwner = post.user.toString() === userId.toString();
 
     if (!isReplyOwner && !isPostOwner) {
       return res.status(403).json({
@@ -465,20 +571,19 @@ const deleteReply = async (req, res) => {
     await post.save();
 
     const updatedPost = await getPopulatedPost(post._id);
-
     res.json(updatedPost);
   } catch (error) {
-    res.status(500).json({
-      message: error.message,
-    });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// GET MY POSTS
 const getMyPosts = async (req, res) => {
   try {
+    const userId = getUserId(req);
+
     const posts = await Post.find({
-      user: req.user.id,
+      user: userId,
+      postType: { $in: ["normal", null] },
     })
       .populate("user", "name username email profilePic")
       .populate("likes", "name username profilePic")
@@ -489,17 +594,15 @@ const getMyPosts = async (req, res) => {
 
     res.json(posts);
   } catch (error) {
-    res.status(500).json({
-      message: error.message,
-    });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// GET USER POSTS
 const getUserPosts = async (req, res) => {
   try {
     const posts = await Post.find({
       user: req.params.userId,
+      postType: { $in: ["normal", null] },
     })
       .populate("user", "name username email profilePic")
       .populate("likes", "name username profilePic")
@@ -510,9 +613,7 @@ const getUserPosts = async (req, res) => {
 
     res.json(posts);
   } catch (error) {
-    res.status(500).json({
-      message: error.message,
-    });
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -529,4 +630,8 @@ module.exports = {
   deleteReply,
   getMyPosts,
   getUserPosts,
+  getVybeDrops,
+  getDropReplies,
+  replyToVybeDrop,
+  reactToVybeReply,
 };

@@ -11,18 +11,13 @@ function Navbar() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [toast, setToast] = useState(null);
+  const [mobileDropOpen, setMobileDropOpen] = useState(false);
 
   useEffect(() => {
     const fetchUnreadCount = async () => {
       try {
         if (!token) return;
-
-        const res = await API.get("/api/notifications/unread-count", {
-          headers: {
-            Authorization: "Bearer " + token,
-          },
-        });
-
+        const res = await API.get("/api/notifications/unread-count");
         setUnreadCount(res.data.count || 0);
       } catch (error) {
         console.log(error.response?.data || error);
@@ -31,7 +26,6 @@ function Navbar() {
 
     fetchUnreadCount();
     const interval = setInterval(fetchUnreadCount, 30000);
-
     return () => clearInterval(interval);
   }, [token, location.pathname]);
 
@@ -58,15 +52,12 @@ function Navbar() {
       if (location.pathname === "/notifications") return;
 
       setUnreadCount((prev) => Number(prev || 0) + 1);
-
       setToast({
         message: data?.message || "You have a new notification",
         type: data?.type || "notification",
       });
 
-      setTimeout(() => {
-        setToast(null);
-      }, 4000);
+      setTimeout(() => setToast(null), 4000);
     });
 
     return () => {
@@ -88,6 +79,7 @@ function Navbar() {
   const go = (path) => {
     navigate(path);
     setSidebarOpen(false);
+    setMobileDropOpen(false);
 
     if (path === "/notifications") {
       setUnreadCount(0);
@@ -130,18 +122,21 @@ function Navbar() {
       ),
     },
     {
+      label: "Drops",
+      path: "/vybe-drops",
+      special: true,
+      icon: (
+        <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 3l2.3 5.1L20 10.4l-5.1 2.3L12.6 18 10.3 13 5 10.6l5.1-2.3L12 3z" />
+          <path d="M19 17l.8 1.8L22 20l-2.2 1.2L19 23l-.8-1.8L16 20l2.2-1.2L19 17z" />
+        </svg>
+      ),
+    },
+    {
       label: "Vybe Room",
       path: "/vybe-room",
       icon: (
-        <svg
-          viewBox="0 0 24 24"
-          className="w-6 h-6"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
+        <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 3l2.5 5L20 10l-5.5 2L12 17l-2.5-5L4 10l5.5-2L12 3z" />
         </svg>
       ),
@@ -151,15 +146,7 @@ function Navbar() {
       path: "/notifications",
       badge: unreadCount,
       icon: (
-        <svg
-          viewBox="0 0 24 24"
-          className="w-6 h-6"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
+        <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
           <path d="M10 21h4" />
         </svg>
@@ -177,11 +164,17 @@ function Navbar() {
     },
   ];
 
+  const mobileItems = navItems.filter(
+    (item) =>
+      item.path !== "/notifications" &&
+      item.path !== "/vybe-drops" &&
+      item.path !== "/vybe-room"
+  );
+
+
+
   const Logo = ({ compact = false }) => (
-    <div
-      onClick={() => go(token ? "/feed" : "/")}
-      className="flex items-center gap-3 cursor-pointer select-none"
-    >
+    <div onClick={() => go(token ? "/feed" : "/")} className="flex items-center gap-3 cursor-pointer select-none">
       <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-fuchsia-500 via-purple-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-fuchsia-500/25 overflow-hidden shrink-0">
         <div className="absolute inset-0 bg-white/10 backdrop-blur-xl" />
         <div className="relative z-10">
@@ -195,9 +188,7 @@ function Navbar() {
 
       <h1
         className={`text-2xl font-black tracking-tight bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 bg-clip-text text-transparent transition-all duration-500 ${
-          compact
-            ? "opacity-0 translate-x-[-8px] w-0 overflow-hidden"
-            : "opacity-100 translate-x-0 w-auto"
+          compact ? "opacity-0 translate-x-[-8px] w-0 overflow-hidden" : "opacity-100 translate-x-0 w-auto"
         }`}
       >
         Vybeo
@@ -213,10 +204,8 @@ function Navbar() {
       return (
         <button
           onClick={() => go(item.path)}
-          className={`relative flex items-center justify-center h-14 rounded-2xl transition-all ${
-            active
-              ? "text-white bg-white/[0.06]"
-              : "text-gray-500 hover:text-white"
+          className={`relative flex flex-col items-center justify-center h-14 rounded-2xl transition-all ${
+            active ? "text-white bg-white/[0.06]" : "text-gray-500 hover:text-white"
           }`}
         >
           <span className={active ? "text-pink-300" : ""}>{item.icon}</span>
@@ -238,6 +227,8 @@ function Navbar() {
         } ${
           active
             ? "bg-gradient-to-r from-pink-500/20 via-purple-500/10 to-cyan-500/20 border border-cyan-500/20 text-white shadow-lg shadow-cyan-500/10"
+            : item.special
+            ? "border border-pink-500/20 text-pink-200 bg-pink-500/5 hover:bg-pink-500/10"
             : "border border-transparent text-gray-400 hover:text-white hover:bg-white/[0.06]"
         }`}
         title={item.label}
@@ -246,11 +237,7 @@ function Navbar() {
           <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-pink-400 to-cyan-400" />
         )}
 
-        <span
-          className={`relative shrink-0 transition-all duration-300 ${
-            active ? "text-pink-300" : "group-hover:text-cyan-300"
-          }`}
-        >
+        <span className={`relative shrink-0 transition-all duration-300 ${active ? "text-pink-300" : "group-hover:text-cyan-300"}`}>
           {item.icon}
 
           {showBadge && (
@@ -262,9 +249,7 @@ function Navbar() {
 
         <span
           className={`font-semibold tracking-wide whitespace-nowrap transition-all duration-300 ${
-            expanded
-              ? "opacity-100 translate-x-0 max-w-[150px]"
-              : "opacity-0 -translate-x-2 max-w-0"
+            expanded ? "opacity-100 translate-x-0 max-w-[150px]" : "opacity-0 -translate-x-2 max-w-0"
           }`}
         >
           {item.label}
@@ -286,35 +271,17 @@ function Navbar() {
       <div className="fixed top-24 right-4 z-[9999] animate-[slideIn_.3s_ease]">
         <div className="min-w-[280px] max-w-[360px] rounded-2xl border border-white/10 bg-black/90 backdrop-blur-2xl shadow-2xl shadow-cyan-500/10 overflow-hidden">
           <div className="h-1 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500" />
-
           <div className="p-4 flex items-start gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-pink-500/20 to-cyan-500/20 flex items-center justify-center shrink-0">
-              <svg
-                viewBox="0 0 24 24"
-                className="w-5 h-5 text-pink-300"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-              >
-                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-                <path d="M10 21h4" />
-              </svg>
+              🔔
             </div>
 
             <div className="flex-1">
-              <p className="text-sm font-semibold text-white">
-                New Notification
-              </p>
-
-              <p className="text-sm text-gray-300 mt-1 leading-relaxed">
-                {toast.message}
-              </p>
+              <p className="text-sm font-semibold text-white">New Notification</p>
+              <p className="text-sm text-gray-300 mt-1 leading-relaxed">{toast.message}</p>
             </div>
 
-            <button
-              onClick={() => setToast(null)}
-              className="text-gray-500 hover:text-white transition-colors"
-            >
+            <button onClick={() => setToast(null)} className="text-gray-500 hover:text-white transition-colors">
               ✕
             </button>
           </div>
@@ -323,27 +290,84 @@ function Navbar() {
     );
   };
 
+  const MobileDropsLauncher = () => {
+    if (!token) return null;
+
+    return (
+      <>
+        {mobileDropOpen && (
+          <div
+            onClick={() => setMobileDropOpen(false)}
+            className="md:hidden fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]"
+          />
+        )}
+
+        <div className="md:hidden fixed right-4 bottom-[92px] z-50">
+          <div
+            className={`absolute right-0 bottom-[70px] w-[245px] rounded-3xl border border-white/10 bg-zinc-950/95 backdrop-blur-2xl shadow-2xl shadow-pink-500/20 overflow-hidden transition-all duration-300 origin-bottom-right ${
+              mobileDropOpen
+                ? "opacity-100 scale-100 translate-y-0 pointer-events-auto"
+                : "opacity-0 scale-95 translate-y-4 pointer-events-none"
+            }`}
+          >
+            <div className="relative p-3.5">
+              <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full bg-pink-500/20 blur-3xl" />
+              <div className="relative">
+                <p className="text-xs text-pink-400 font-black mb-1">VYBEO SPECIAL</p>
+                <h3 className="text-xl font-black text-white">Vybe Drops</h3>
+                <p className="text-sm text-gray-400 mt-1 leading-relaxed">
+  Pick your space — answer a Drop or jump into live Vybe conversations.
+</p>
+
+<button
+  onClick={() => go("/vybe-drops")}
+  className="mt-4 w-full rounded-2xl bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 px-4 py-3 font-black text-white shadow-lg shadow-pink-500/20 active:scale-95 hover:scale-[1.02] transition-all duration-300"
+>
+  🔥 Drops
+</button>
+
+<button
+  onClick={() => go("/vybe-room")}
+  className="mt-2 w-full rounded-2xl bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-pink-500/20 border border-cyan-400/20 px-4 py-3 font-black text-white shadow-lg shadow-cyan-500/10 active:scale-95 hover:scale-[1.02] transition-all duration-300"
+>
+  ✨ Vybe Room
+</button>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setMobileDropOpen((prev) => !prev)}
+            className={`relative w-16 h-16 rounded-3xl bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 flex items-center justify-center shadow-2xl shadow-pink-500/30 border border-white/20 transition-all duration-300 active:scale-95 ${
+              mobileDropOpen ? "rotate-45 scale-105" : "rotate-0"
+            }`}
+            aria-label="Open Vybe Drops"
+          >
+            <span className="absolute inset-0 rounded-3xl bg-white/10 backdrop-blur-xl" />
+            <span className="relative text-3xl">{mobileDropOpen ? "×" : "🔥"}</span>
+            {!mobileDropOpen && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-cyan-300 shadow-[0_0_14px_rgba(103,232,249,0.9)]" />
+            )}
+          </button>
+        </div>
+      </>
+    );
+  };
+
   if (!token) {
     return (
       <>
         <NotificationToast />
-
         <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-2xl bg-black/70 border-b border-white/10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
             <Logo />
 
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => navigate("/")}
-                className="px-4 sm:px-5 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all"
-              >
+              <button onClick={() => navigate("/")} className="px-4 sm:px-5 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all">
                 Login
               </button>
 
-              <button
-                onClick={() => navigate("/")}
-                className="px-4 sm:px-5 py-2 rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 hover:scale-105 transition-all font-semibold"
-              >
+              <button onClick={() => navigate("/")} className="px-4 sm:px-5 py-2 rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 hover:scale-105 transition-all font-semibold">
                 Register
               </button>
             </div>
@@ -356,6 +380,7 @@ function Navbar() {
   return (
     <>
       <NotificationToast />
+      <MobileDropsLauncher />
 
       <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-[76px] backdrop-blur-2xl bg-black/75 border-b border-white/10">
         <div className="h-full px-4 flex items-center justify-between">
@@ -366,13 +391,7 @@ function Navbar() {
               onClick={() => go("/notifications")}
               className="relative w-11 h-11 rounded-2xl border border-white/10 bg-white/[0.04] flex items-center justify-center hover:bg-white/[0.08] transition-all"
             >
-              <svg
-                viewBox="0 0 24 24"
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-              >
+              <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2">
                 <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
                 <path d="M10 21h4" />
               </svg>
@@ -382,10 +401,7 @@ function Navbar() {
               )}
             </button>
 
-            <button
-              onClick={logout}
-              className="px-4 py-2 rounded-xl border border-red-500/20 text-red-300 bg-red-500/5 hover:bg-red-500/10 transition-all"
-            >
+            <button onClick={logout} className="px-4 py-2 rounded-xl border border-red-500/20 text-red-300 bg-red-500/5 hover:bg-red-500/10 transition-all">
               Logout
             </button>
           </div>
@@ -396,9 +412,7 @@ function Navbar() {
         onMouseEnter={() => setSidebarOpen(true)}
         onMouseLeave={() => setSidebarOpen(false)}
         className={`hidden md:flex fixed left-0 top-0 bottom-0 z-50 border-r border-white/10 bg-black/85 backdrop-blur-2xl transition-[width,box-shadow] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-          sidebarOpen
-            ? "w-[250px] shadow-2xl shadow-purple-500/10"
-            : "w-[84px]"
+          sidebarOpen ? "w-[250px] shadow-2xl shadow-purple-500/10" : "w-[84px]"
         }`}
       >
         <div className="flex h-full w-full flex-col px-4 py-5 overflow-hidden">
@@ -428,9 +442,7 @@ function Navbar() {
 
               <span
                 className={`font-semibold tracking-wide whitespace-nowrap transition-all duration-300 ${
-                  sidebarOpen
-                    ? "opacity-100 translate-x-0 max-w-[120px]"
-                    : "opacity-0 -translate-x-2 max-w-0"
+                  sidebarOpen ? "opacity-100 translate-x-0 max-w-[120px]" : "opacity-0 -translate-x-2 max-w-0"
                 }`}
               >
                 Logout
@@ -441,12 +453,10 @@ function Navbar() {
       </aside>
 
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-2xl border-t border-white/10">
-        <div className="grid grid-cols-5 items-center px-2 py-2">
-          {navItems
-            .filter((item) => item.path !== "/notifications")
-            .map((item) => (
-              <NavButton key={item.path} item={item} mobile />
-            ))}
+        <div className="grid grid-cols-4 items-center px-2 py-2">
+          {mobileItems.map((item) => (
+            <NavButton key={item.path} item={item} mobile />
+          ))}
         </div>
       </nav>
     </>

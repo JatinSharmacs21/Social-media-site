@@ -59,6 +59,16 @@ io.on("connection", (socket) => {
     console.log("Realtime user registered:", id);
   });
 
+  socket.on("join-drop", (dropId) => {
+  if (!dropId) return;
+  socket.join(`drop-${dropId}`);
+});
+
+socket.on("leave-drop", (dropId) => {
+  if (!dropId) return;
+  socket.leave(`drop-${dropId}`);
+});
+
   socket.on("join-vybe-room", ({ room = "general", userId }) => {
     socket.join(`vybe-room-${room}`);
 
