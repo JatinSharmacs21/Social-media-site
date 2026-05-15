@@ -31,47 +31,6 @@ const commentSchema = new mongoose.Schema(
       required: true,
     },
 
-    postType: {
-  type: String,
-  enum: ["normal", "drop", "dropReply"],
-  default: "normal",
-},
-
-vybeTag: {
-  type: String,
-  enum: ["deep", "funny", "chaos", "chill", "creative", "lateNight"],
-  default: "chill",
-},
-
-drop: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: "Post",
-  default: null,
-},
-
-isAnonymous: {
-  type: Boolean,
-  default: false,
-},
-
-isSeeded: {
-  type: Boolean,
-  default: false,
-},
-
-vybeReactions: [
-  {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    },
-    type: {
-      type: String,
-      enum: ["felt", "deep", "funny", "chaos", "relatable"],
-    },
-  },
-],
-
     likes: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -84,7 +43,26 @@ vybeReactions: [
   {
     timestamps: true,
   }
-  
+);
+
+const vybeReactionSchema = new mongoose.Schema(
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
+    type: {
+      type: String,
+      enum: ["felt", "deep", "funny", "chaos", "relatable"],
+      required: true,
+    },
+  },
+  {
+    _id: false,
+    timestamps: true,
+  }
 );
 
 const postSchema = new mongoose.Schema(
@@ -94,33 +72,34 @@ const postSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+
     postType: {
-  type: String,
-  enum: ["normal", "drop", "dropReply"],
-  default: "normal",
-},
+      type: String,
+      enum: ["normal", "drop", "dropReply"],
+      default: "normal",
+    },
 
-vybeTag: {
-  type: String,
-  enum: ["deep", "funny", "chaos", "chill", "creative", "lateNight"],
-  default: "chill",
-},
+    vybeTag: {
+      type: String,
+      enum: ["deep", "funny", "chaos", "chill", "creative", "lateNight"],
+      default: "chill",
+    },
 
-drop: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: "Post",
-  default: null,
-},
+    drop: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Post",
+      default: null,
+    },
 
-isAnonymous: {
-  type: Boolean,
-  default: false,
-},
+    isAnonymous: {
+      type: Boolean,
+      default: false,
+    },
 
-isSeeded: {
-  type: Boolean,
-  default: false,
-},
+    isSeeded: {
+      type: Boolean,
+      default: false,
+    },
 
     caption: {
       type: String,
@@ -144,6 +123,42 @@ isSeeded: {
         ref: "User",
       },
     ],
+
+    vybeReactions: [vybeReactionSchema],
+    threadReplies: [
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
+    text: {
+      type: String,
+      required: true,
+    },
+
+    isAnonymous: {
+      type: Boolean,
+      default: false,
+    },
+
+    parentReply: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+
+    path: {
+      type: String,
+      default: "",
+    },
+
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+],
 
     comments: [commentSchema],
   },

@@ -106,6 +106,7 @@ const getDropReplies = async (req, res) => {
       drop: req.params.dropId,
     })
       .populate("user", "name username profilePic")
+      .populate("threadReplies.user", "name username profilePic")
       .sort({ createdAt: -1 });
 
     res.json(replies);
@@ -173,15 +174,12 @@ const replyToVybeDrop = async (req, res) => {
 
 const reactToVybeReply = async (req, res) => {
   try {
-    const userId = getUserId(req);
+    const userId = req.user?._id || req.user?.id;
     const { type } = req.body;
-
-    if (!userId) {
-      return res.status(401).json({ message: "Not authorized" });
-    }
 
     const allowed = ["felt", "deep", "funny", "chaos", "relatable"];
 
+    if (!userId) return res.status(401).json({ message: "Not authorized" });
     if (!allowed.includes(type)) {
       return res.status(400).json({ message: "Invalid reaction" });
     }
@@ -192,21 +190,27 @@ const reactToVybeReply = async (req, res) => {
       return res.status(404).json({ message: "Reply not found" });
     }
 
-    reply.vybeReactions = (reply.vybeReactions || []).filter(
-      (reaction) => reaction.user.toString() !== userId.toString()
+    const existingReaction = (reply.vybeReactions || []).find(
+      (r) => r.user.toString() === userId.toString()
     );
 
-    reply.vybeReactions.push({
-      user: userId,
-      type,
-    });
+    reply.vybeReactions = (reply.vybeReactions || []).filter(
+      (r) => r.user.toString() !== userId.toString()
+    );
+
+    // same reaction par click kare to remove, different par click kare to replace
+    if (!existingReaction || existingReaction.type !== type) {
+      reply.vybeReactions.push({
+        user: userId,
+        type,
+      });
+    }
 
     await reply.save();
 
-    const updatedReply = await Post.findById(reply._id).populate(
-      "user",
-      "name username profilePic"
-    );
+    const updatedReply = await Post.findById(reply._id)
+      .populate("user", "name username profilePic")
+      .populate("threadReplies.user", "name username profilePic");
 
     const io = req.app.get("io");
 
@@ -222,6 +226,112 @@ const reactToVybeReply = async (req, res) => {
     console.log("Vybe reaction error:", error);
     res.status(500).json({
       message: error.message || "Failed to react",
+    });
+  }
+};
+
+const addNestedVybeReply = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const { text, isAnonymous } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    if (!text || !text.trim()) {
+      return res.status(400).json({ message: "Reply cannot be empty" });
+    }
+
+    const parentReply = await Post.findById(req.params.replyId);
+
+    if (!parentReply || parentReply.postType !== "dropReply") {
+      return res.status(404).json({ message: "Parent reply not found" });
+    }
+
+    parentReply.threadReplies.push({
+      user: userId,
+      text: text.trim(),
+      isAnonymous: Boolean(isAnonymous),
+      parentReply: parentReply._id,
+      path: `${parentReply._id}`,
+    });
+
+    await parentReply.save();
+
+    const updatedReply = await Post.findById(parentReply._id)
+      .populate("user", "name username profilePic")
+      .populate("threadReplies.user", "name username profilePic");
+
+    const io = req.app.get("io");
+
+    if (io) {
+      io.to(`drop-${parentReply.drop}`).emit("drop-thread-reply-created", {
+        dropId: parentReply.drop.toString(),
+        reply: updatedReply,
+      });
+    }
+
+    res.status(201).json(updatedReply);
+  } catch (error) {
+    console.log("Nested Vybe reply error:", error);
+    res.status(500).json({
+      message: error.message || "Failed to reply",
+    });
+  }
+};
+
+const deleteNestedVybeReply = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    const parentReply = await Post.findById(req.params.replyId);
+
+    if (!parentReply || parentReply.postType !== "dropReply") {
+      return res.status(404).json({ message: "Parent reply not found" });
+    }
+
+    const nested = parentReply.threadReplies.id(req.params.threadReplyId);
+
+    if (!nested) {
+      return res.status(404).json({ message: "Thread reply not found" });
+    }
+
+    const isOwner = nested.user.toString() === userId.toString();
+    const isParentOwner = parentReply.user.toString() === userId.toString();
+
+    if (!isOwner && !isParentOwner) {
+      return res.status(403).json({ message: "You cannot delete this reply" });
+    }
+
+    parentReply.threadReplies = parentReply.threadReplies.filter(
+      (item) => item._id.toString() !== req.params.threadReplyId
+    );
+
+    await parentReply.save();
+
+    const updatedReply = await Post.findById(parentReply._id)
+      .populate("user", "name username profilePic")
+      .populate("threadReplies.user", "name username profilePic");
+
+    const io = req.app.get("io");
+
+    if (io) {
+      io.to(`drop-${parentReply.drop}`).emit("drop-thread-reply-deleted", {
+        dropId: parentReply.drop.toString(),
+        reply: updatedReply,
+      });
+    }
+
+    res.json(updatedReply);
+  } catch (error) {
+    console.log("Delete nested reply error:", error);
+    res.status(500).json({
+      message: error.message || "Failed to delete reply",
     });
   }
 };
@@ -634,4 +744,6 @@ module.exports = {
   getDropReplies,
   replyToVybeDrop,
   reactToVybeReply,
+  addNestedVybeReply,
+  deleteNestedVybeReply,
 };
