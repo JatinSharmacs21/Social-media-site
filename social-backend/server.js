@@ -69,6 +69,35 @@ socket.on("leave-drop", (dropId) => {
   socket.leave(`drop-${dropId}`);
 });
 
+socket.on("drop-typing-start", ({ dropId, user }) => {
+  if (!dropId) return;
+
+  socket.to(`drop-${dropId}`).emit("drop-user-typing", {
+    dropId,
+    user: user || "Someone",
+  });
+});
+
+socket.on("drop-typing-stop", ({ dropId }) => {
+  if (!dropId) return;
+
+  socket.to(`drop-${dropId}`).emit("drop-user-stop-typing", {
+    dropId,
+  });
+});
+
+socket.on("drop-pulse", ({ dropId }) => {
+  if (!dropId) return;
+
+  const room = io.sockets.adapter.rooms.get(`drop-${dropId}`);
+  const count = room ? room.size : 0;
+
+  io.to(`drop-${dropId}`).emit("drop-pulse-update", {
+    dropId,
+    count,
+  });
+});
+
   socket.on("join-vybe-room", ({ room = "general", userId }) => {
     socket.join(`vybe-room-${room}`);
 

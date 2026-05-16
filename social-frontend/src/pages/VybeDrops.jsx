@@ -76,6 +76,14 @@ function VybeDrops() {
   const [reactingId, setReactingId] = useState(null);
   const [reactionBurst, setReactionBurst] = useState(null);
 
+  const [typingByDrop, setTypingByDrop] = useState({});
+  const [pulseByDrop, setPulseByDrop] = useState({});
+  const typingTimeoutRef = useRef(null);
+
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [activeMobileDrop, setActiveMobileDrop] = useState(0);
+
   const [nestedComposer, setNestedComposer] = useState(null);
   const [nestedText, setNestedText] = useState("");
   const [nestedAnonymous, setNestedAnonymous] = useState(false);
@@ -100,6 +108,15 @@ function VybeDrops() {
       updateReplyInState(dropId, reply);
     });
 
+    socketRef.current.on("drop-reply-deleted", ({ dropId, replyId }) => {
+  setRepliesByDrop((prev) => ({
+    ...prev,
+    [dropId]: (prev[dropId] || []).filter((reply) => reply._id !== replyId),
+  }));
+
+  fetchDrops();
+});
+
     socketRef.current.on("drop-thread-reply-created", ({ dropId, reply }) => {
       updateReplyInState(dropId, reply);
     });
@@ -107,6 +124,27 @@ function VybeDrops() {
     socketRef.current.on("drop-thread-reply-deleted", ({ dropId, reply }) => {
       updateReplyInState(dropId, reply);
     });
+
+    socketRef.current.on("drop-user-typing", ({ dropId, user }) => {
+  setTypingByDrop((prev) => ({
+    ...prev,
+    [dropId]: user || "Someone",
+  }));
+});
+
+socketRef.current.on("drop-user-stop-typing", ({ dropId }) => {
+  setTypingByDrop((prev) => ({
+    ...prev,
+    [dropId]: null,
+  }));
+});
+
+socketRef.current.on("drop-pulse-update", ({ dropId, count }) => {
+  setPulseByDrop((prev) => ({
+    ...prev,
+    [dropId]: count,
+  }));
+});
 
     return () => {
       socketRef.current?.disconnect();
@@ -161,14 +199,25 @@ function VybeDrops() {
     return list.slice(0, visibleCount);
   }, [filteredDrops, featuredDrop, activeTag, visibleCount]);
 
-  const openThread = async (dropId) => {
-    if (!openDropIds.includes(dropId)) {
-      setOpenDropIds((prev) => [...prev, dropId]);
-      socketRef.current?.emit("join-drop", dropId);
-    }
+  const handleMobileScroll = (e) => {
+  const container = e.currentTarget;
+  const cardWidth = container.clientWidth;
+  const index = Math.round(container.scrollLeft / cardWidth);
+  setActiveMobileDrop(index);
+};
 
-    await fetchReplies(dropId);
-  };
+const openThread = async (dropId) => {
+  if (!openDropIds.includes(dropId)) {
+    setOpenDropIds((prev) => [...prev, dropId]);
+    socketRef.current?.emit("join-drop", dropId);
+
+    setTimeout(() => {
+      socketRef.current?.emit("drop-pulse", { dropId });
+    }, 200);
+  }
+
+  await fetchReplies(dropId);
+};
 
   const toggleReplies = async (dropId) => {
     const isOpen = openDropIds.includes(dropId);
@@ -176,6 +225,9 @@ function VybeDrops() {
     if (isOpen) {
       setOpenDropIds((prev) => prev.filter((id) => id !== dropId));
       socketRef.current?.emit("leave-drop", dropId);
+      setTimeout(() => {
+        socketRef.current?.emit("drop-pulse", { dropId });
+        }, 200);
       return;
     }
 
@@ -211,6 +263,9 @@ function VybeDrops() {
         caption: replyText.trim(),
         isAnonymous,
       });
+      socketRef.current?.emit("drop-typing-stop", {
+    dropId,
+    });
 
       closeReplyModal();
 
@@ -255,6 +310,31 @@ function VybeDrops() {
     }
   };
 
+const deleteDropReply = async () => {
+  if (!deleteTarget || deleting) return;
+
+  try {
+    setDeleting(true);
+
+    await API.delete(`/api/posts/drops/reply/${deleteTarget.replyId}`);
+
+    setRepliesByDrop((prev) => ({
+      ...prev,
+      [deleteTarget.dropId]: (prev[deleteTarget.dropId] || []).filter(
+        (reply) => reply._id !== deleteTarget.replyId
+      ),
+    }));
+
+    setDeleteTarget(null);
+    await fetchDrops();
+  } catch (err) {
+    console.log("Delete reply error:", err.response?.data || err.message);
+    alert(err.response?.data?.message || "Delete failed");
+  } finally {
+    setDeleting(false);
+  }
+};
+
   const openNestedComposer = (replyId) => {
     setNestedComposer(replyId);
     setNestedText("");
@@ -284,6 +364,9 @@ function VybeDrops() {
         ...prev,
         [replyId]: true,
       }));
+      socketRef.current?.emit("drop-typing-stop", {
+      dropId,
+    });
 
       closeNestedComposer();
     } catch (err) {
@@ -366,7 +449,10 @@ function VybeDrops() {
         <div className="bg-black/50 border border-white/10 rounded-2xl p-3">
           <textarea
             value={nestedText}
-            onChange={(e) => setNestedText(e.target.value)}
+            onChange={(e) => {
+  setNestedText(e.target.value);
+
+}}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -422,23 +508,45 @@ function VybeDrops() {
     const threadReplies = reply.threadReplies || [];
     const threadOpen = openThreads[reply._id];
 
+    const replyOwnerId =
+  typeof reply.user === "object" ? reply.user?._id || reply.user?.id : reply.user;
+
+const canDeleteReply =
+  replyOwnerId?.toString() === userId?.toString() && !reply.isSeeded;
+
     return (
       <div
         key={reply._id}
         className="bg-black/40 border border-white/10 rounded-2xl p-4"
       >
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-r from-pink-500 to-indigo-500 flex items-center justify-center font-black shrink-0">
-            {isAnon ? "?" : (reply.user?.username || "U")[0]?.toUpperCase()}
-          </div>
+       <div className="flex items-start justify-between gap-3 mb-3">
+  <div className="flex items-center gap-3 min-w-0">
+    <div className="w-9 h-9 rounded-xl bg-gradient-to-r from-pink-500 to-indigo-500 flex items-center justify-center font-black shrink-0">
+      {isAnon ? "?" : (reply.user?.username || "U")[0]?.toUpperCase()}
+    </div>
 
-          <div className="min-w-0">
-            <p className="font-bold text-sm truncate">{displayName}</p>
-            <p className="text-xs text-gray-500">
-              {isAnon ? "Anonymous reply" : "Vybe reply"}
-            </p>
-          </div>
-        </div>
+    <div className="min-w-0">
+      <p className="font-bold text-sm truncate">{displayName}</p>
+      <p className="text-xs text-gray-500">
+        {isAnon ? "Anonymous reply" : "Vybe reply"}
+      </p>
+    </div>
+  </div>
+
+  {canDeleteReply && (
+    <button
+      onClick={() =>
+  setDeleteTarget({
+    replyId: reply._id,
+    dropId,
+  })
+}
+      className="px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-300 hover:bg-red-500/20 text-xs font-bold transition"
+    >
+      Delete
+    </button>
+  )}
+</div>
 
         <p className="text-gray-100 leading-relaxed text-sm sm:text-base">
           {reply.caption}
@@ -516,6 +624,10 @@ function VybeDrops() {
     const replies = repliesByDrop[drop._id] || [];
     const isOpen = openDropIds.includes(drop._id);
     const replyCount = Number(drop.replyCount || replies.length || 0);
+    const typingUser = typingByDrop[drop._id];
+    const liveCount = pulseByDrop[drop._id] || 0;
+    const isTrending = Number(drop.trendingScore || 0) >= 15;
+    const isHotThread = Number(drop.threadReplyCount || 0) > 0;
 
     return (
       <div
@@ -549,11 +661,25 @@ function VybeDrops() {
               </div>
             </div>
 
-            <span
-              className={`text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 rounded-full bg-gradient-to-r ${tag.gradient} font-bold shadow-lg whitespace-nowrap`}
-            >
-              {tag.icon} {tag.label}
-            </span>
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+  {isTrending && (
+    <span className="text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 rounded-full bg-orange-500/15 border border-orange-400/20 text-orange-200 font-bold whitespace-nowrap">
+      🔥 Trending
+    </span>
+  )}
+
+  {isHotThread && (
+    <span className="text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-400/20 text-cyan-200 font-bold whitespace-nowrap">
+      💬 Active
+    </span>
+  )}
+
+  <span
+    className={`text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 rounded-full bg-gradient-to-r ${tag.gradient} font-bold shadow-lg whitespace-nowrap`}
+  >
+    {tag.icon} {tag.label}
+  </span>
+</div>
           </div>
 
           <button onClick={() => openDropDetail(drop)} className="text-left w-full">
@@ -590,6 +716,36 @@ function VybeDrops() {
               {isOpen ? "Hide" : "Replies"} · {replyCount}
             </button>
           </div>
+          <div className="mt-3 flex items-center gap-2 flex-wrap text-[11px] text-gray-400">
+  <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10">
+    {replyCount} replies
+  </span>
+
+  <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10">
+    {Number(drop.reactionCount || 0)} reactions
+  </span>
+
+  <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10">
+    {Number(drop.threadReplyCount || 0)} threads
+  </span>
+</div>
+
+          {isOpen && (
+            <div className="mt-3 flex items-center gap-2 flex-wrap text-xs">
+            {liveCount > 0 && (
+            <span className="px-3 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-400/20 text-cyan-200">
+        <span className="inline-block w-2 h-2 rounded-full bg-cyan-300 mr-2 animate-pulse" />
+        {liveCount} live in this drop
+      </span>
+    )}
+
+    {typingUser && (
+      <span className="px-3 py-1.5 rounded-full bg-pink-500/10 border border-pink-400/20 text-pink-200">
+        Someone is typing...
+      </span>
+    )}
+  </div>
+)}
 
           {isOpen && (
             <div className="mt-5 sm:mt-6 border-t border-white/10 pt-4 sm:pt-5 space-y-3">
@@ -693,10 +849,65 @@ function VybeDrops() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
-              {visibleDrops.map((drop) => renderDropCard(drop))}
+            <div className="hidden md:grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
+                {visibleDrops.map((drop) => renderDropCard(drop))}
             </div>
 
+            <div className="md:hidden">
+  <div className="flex items-center justify-between mb-3 px-1">
+    <div>
+      <p className="text-xs text-pink-400 font-black">
+        SWIPE DROPS
+      </p>
+      <h3 className="text-lg font-black">
+        Pick your next vybe
+      </h3>
+    </div>
+
+    <span className="text-xs text-gray-500">
+      {visibleDrops.length ? activeMobileDrop + 1 : 0}/{visibleDrops.length}
+    </span>
+  </div>
+
+  <div
+  id="mobile-drops-carousel"
+  onScroll={handleMobileScroll}
+  className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-4 scrollbar-hide"
+>
+    {visibleDrops.map((drop) => (
+      <div
+        key={drop._id}
+        className="min-w-full snap-center"
+      >
+        {renderDropCard(drop)}
+      </div>
+    ))}
+  </div>
+
+  {visibleDrops.length > 1 && (
+    <div className="flex items-center justify-center gap-1.5 mt-1">
+      {visibleDrops.map((drop, index) => (
+        <button
+          key={drop._id}
+          onClick={() => {
+            const container = document.getElementById("mobile-drops-carousel");
+            if (container) {
+              container.scrollTo({
+                left: index * container.clientWidth,
+                behavior: "smooth",
+              });
+            }
+          }}
+          className={`h-1.5 rounded-full transition-all ${
+            activeMobileDrop === index
+              ? "w-6 bg-pink-400"
+              : "w-1.5 bg-white/20"
+          }`}
+        />
+      ))}
+    </div>
+  )}
+</div>
             {visibleDrops.length <
               (activeTag === "all" && featuredDrop
                 ? filteredDrops.length - 1
@@ -740,6 +951,12 @@ function VybeDrops() {
                     <span className="text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-gray-300">
                       {detailReplies.length || detailDrop.replyCount || 0} replies
                     </span>
+                    {pulseByDrop[detailDrop._id] > 0 && (
+                        <span className="text-xs px-3 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-400/20 text-cyan-200">
+                        <span className="inline-block w-2 h-2 rounded-full bg-cyan-300 mr-2 animate-pulse" />
+                        {pulseByDrop[detailDrop._id]} live
+                    </span>
+                )}
                   </div>
                 </div>
 
@@ -768,6 +985,11 @@ function VybeDrops() {
             </div>
 
             <div className="relative p-4 sm:p-6 overflow-y-auto max-h-[58vh] space-y-3">
+                {typingByDrop[detailDrop._id] && (
+                <div className="bg-pink-500/10 border border-pink-400/20 rounded-2xl p-3 text-sm text-pink-200">
+                    Someone is typing...
+                </div>
+            )}
               {loadingReplies[detailDrop._id] && !detailReplies.length ? (
                 <p className="text-gray-500 text-sm">Loading replies...</p>
               ) : detailReplies.length ? (
@@ -814,7 +1036,26 @@ function VybeDrops() {
 
               <textarea
                 value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
+                onChange={(e) => {
+  setReplyText(e.target.value);
+
+  if (selectedDrop?._id) {
+    
+
+    socketRef.current?.emit("drop-typing-start", {
+      dropId: selectedDrop._id,
+      user: isAnonymous ? "Anonymous" : "Someone",
+    });
+
+    clearTimeout(typingTimeoutRef.current);
+
+    typingTimeoutRef.current = setTimeout(() => {
+      socketRef.current?.emit("drop-typing-stop", {
+        dropId: selectedDrop._id,
+      });
+    }, 1200);
+  }
+}}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -861,6 +1102,46 @@ function VybeDrops() {
         </div>
       )}
 
+      {deleteTarget && (
+  <div className="fixed inset-0 z-[60] bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
+    <div className="w-full max-w-sm bg-zinc-950 border border-white/10 rounded-[28px] p-5 shadow-2xl relative overflow-hidden">
+      <div className="absolute -top-20 -right-20 w-44 h-44 bg-red-500/20 blur-3xl rounded-full" />
+
+      <div className="relative">
+        <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-2xl mb-4">
+          🗑️
+        </div>
+
+        <h3 className="text-xl font-black text-white">
+          Delete this reply?
+        </h3>
+
+        <p className="text-sm text-gray-400 mt-2 leading-relaxed">
+          This will remove your reply from this Vybe Drop. This action cannot be undone.
+        </p>
+
+        <div className="flex items-center gap-3 mt-6">
+          <button
+            onClick={() => setDeleteTarget(null)}
+            disabled={deleting}
+            className="flex-1 px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-gray-200 font-bold hover:bg-white/10 transition disabled:opacity-50"
+          >
+            Cancel
+          </button>
+
+          <button
+            onClick={deleteDropReply}
+            disabled={deleting}
+            className="flex-1 px-4 py-3 rounded-2xl bg-red-500/90 text-white font-black hover:bg-red-500 transition disabled:opacity-50"
+          >
+            {deleting ? "Deleting..." : "Delete"}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
       <style>
         {`
           @keyframes vybe-pop {
@@ -873,6 +1154,15 @@ function VybeDrops() {
             animation: vybe-pop 750ms ease-out forwards;
             filter: drop-shadow(0 0 14px rgba(236, 72, 153, 0.8));
           }
+
+        .scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
         `}
       </style>
     </div>

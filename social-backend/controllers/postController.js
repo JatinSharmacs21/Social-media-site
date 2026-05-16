@@ -69,7 +69,12 @@ const getPosts = async (req, res) => {
 const getVybeDrops = async (req, res) => {
   try {
     const drops = await Post.aggregate([
-      { $match: { postType: "drop" } },
+      {
+        $match: {
+          postType: "drop",
+        },
+      },
+
       {
         $lookup: {
           from: "posts",
@@ -78,13 +83,113 @@ const getVybeDrops = async (req, res) => {
           as: "replies",
         },
       },
+
       {
         $addFields: {
-          replyCount: { $size: "$replies" },
-          reactionCount: { $size: { $ifNull: ["$vybeReactions", []] } },
+          replyCount: {
+            $size: "$replies",
+          },
+
+          reactionCount: {
+            $sum: {
+              $map: {
+                input: "$replies",
+                as: "reply",
+                in: {
+                  $size: {
+                    $ifNull: ["$$reply.vybeReactions", []],
+                  },
+                },
+              },
+            },
+          },
+
+          threadReplyCount: {
+            $sum: {
+              $map: {
+                input: "$replies",
+                as: "reply",
+                in: {
+                  $size: {
+                    $ifNull: ["$$reply.threadReplies", []],
+                  },
+                },
+              },
+            },
+          },
+
+          lastReplyAt: {
+            $max: "$replies.createdAt",
+          },
         },
       },
-      { $sort: { createdAt: -1 } },
+
+      {
+        $addFields: {
+          hoursSinceCreated: {
+            $divide: [
+              {
+                $subtract: [new Date(), "$createdAt"],
+              },
+              1000 * 60 * 60,
+            ],
+          },
+
+          hoursSinceLastReply: {
+            $cond: [
+              "$lastReplyAt",
+              {
+                $divide: [
+                  {
+                    $subtract: [new Date(), "$lastReplyAt"],
+                  },
+                  1000 * 60 * 60,
+                ],
+              },
+              999,
+            ],
+          },
+        },
+      },
+
+      {
+        $addFields: {
+          trendingScore: {
+            $add: [
+              { $multiply: ["$replyCount", 5] },
+              { $multiply: ["$reactionCount", 2] },
+              { $multiply: ["$threadReplyCount", 4] },
+              {
+                $cond: [
+                  { $lte: ["$hoursSinceLastReply", 24] },
+                  15,
+                  0,
+                ],
+              },
+              {
+                $cond: [
+                  { $lte: ["$hoursSinceCreated", 48] },
+                  8,
+                  0,
+                ],
+              },
+            ],
+          },
+        },
+      },
+
+      {
+        $sort: {
+          trendingScore: -1,
+          createdAt: -1,
+        },
+      },
+
+      {
+        $project: {
+          replies: 0,
+        },
+      },
     ]);
 
     await Post.populate(drops, {
@@ -95,7 +200,9 @@ const getVybeDrops = async (req, res) => {
     res.json(drops);
   } catch (error) {
     console.log("Get Vybe Drops error:", error);
-    res.status(500).json({ message: "Failed to fetch Vybe Drops" });
+    res.status(500).json({
+      message: "Failed to fetch Vybe Drops",
+    });
   }
 };
 
@@ -226,6 +333,65 @@ const reactToVybeReply = async (req, res) => {
     console.log("Vybe reaction error:", error);
     res.status(500).json({
       message: error.message || "Failed to react",
+    });
+  }
+};
+
+const deleteVybeDropReply = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    const reply = await Post.findById(req.params.replyId);
+
+    if (!reply || reply.postType !== "dropReply") {
+      return res.status(404).json({ message: "Reply not found" });
+    }
+
+    if (reply.isSeeded) {
+      return res.status(403).json({
+        message: "Seeded replies cannot be deleted by users",
+      });
+    }
+
+    const isOwner = reply.user.toString() === userId.toString();
+
+    if (!isOwner) {
+      return res.status(403).json({
+        message: "You can delete only your own reply",
+      });
+    }
+
+    const dropId = reply.drop?.toString();
+
+    await reply.deleteOne();
+
+    const io = req.app.get("io");
+
+    if (io && dropId) {
+      io.to(`drop-${dropId}`).emit("drop-reply-deleted", {
+        dropId,
+        replyId: req.params.replyId,
+      });
+
+      io.emit("drop-count-updated", {
+        dropId,
+        type: "reply-delete",
+      });
+    }
+
+    res.json({
+      message: "Reply deleted successfully",
+      replyId: req.params.replyId,
+      dropId,
+    });
+  } catch (error) {
+    console.log("Delete Vybe reply error:", error);
+    res.status(500).json({
+      message: error.message || "Failed to delete reply",
     });
   }
 };
@@ -744,6 +910,7 @@ module.exports = {
   getDropReplies,
   replyToVybeDrop,
   reactToVybeReply,
+  deleteVybeDropReply,
   addNestedVybeReply,
   deleteNestedVybeReply,
 };

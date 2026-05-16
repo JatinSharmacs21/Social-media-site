@@ -20,6 +20,7 @@ const {
   replyToVybeDrop,
   getDropReplies,
   reactToVybeReply,
+  deleteVybeDropReply,
   addNestedVybeReply,
   deleteNestedVybeReply,
 } = require("../controllers/postController");
@@ -29,6 +30,12 @@ router.get("/drops", getVybeDrops);
 router.get("/drops/:dropId/replies", getDropReplies);
 router.post("/drops/:dropId/reply", protect, replyToVybeDrop);
 router.post("/drops/reply/:replyId/react", protect, reactToVybeReply);
+
+router.delete(
+  "/drops/reply/:replyId",
+  protect,
+  deleteVybeDropReply
+);
 
 router.post(
   "/drops/reply/:replyId/thread",
