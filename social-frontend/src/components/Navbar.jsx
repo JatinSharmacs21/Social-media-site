@@ -11,7 +11,7 @@ function Navbar() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [toast, setToast] = useState(null);
-  const [mobileDropOpen, setMobileDropOpen] = useState(false);
+  const [mobileVybeOpen, setMobileVybeOpen] = useState(false);
 
   useEffect(() => {
     const fetchUnreadCount = async () => {
@@ -75,12 +75,13 @@ function Navbar() {
   };
 
   const isActive = (path) => location.pathname === path;
-  const hideFloatingVybe = location.pathname === "/vybe-drops";
+  const isVybeActive =
+    location.pathname === "/vybe-drops" || location.pathname === "/vybe-room";
 
   const go = (path) => {
     navigate(path);
     setSidebarOpen(false);
-    setMobileDropOpen(false);
+    setMobileVybeOpen(false);
 
     if (path === "/notifications") {
       setUnreadCount(0);
@@ -165,14 +166,12 @@ function Navbar() {
     },
   ];
 
-  const mobileItems = navItems.filter(
-    (item) =>
-      item.path !== "/notifications" &&
-      item.path !== "/vybe-drops" &&
-      item.path !== "/vybe-room"
-  );
-
-
+  const mobileNavItems = [
+    navItems.find((item) => item.path === "/feed"),
+    navItems.find((item) => item.path === "/search"),
+    navItems.find((item) => item.path === "/reels"),
+    navItems.find((item) => item.path === "/profile"),
+  ].filter(Boolean);
 
   const Logo = ({ compact = false }) => (
     <div onClick={() => go(token ? "/feed" : "/")} className="flex items-center gap-3 cursor-pointer select-none">
@@ -272,6 +271,7 @@ function Navbar() {
       <div className="fixed top-24 right-4 z-[9999] animate-[slideIn_.3s_ease]">
         <div className="min-w-[280px] max-w-[360px] rounded-2xl border border-white/10 bg-black/90 backdrop-blur-2xl shadow-2xl shadow-cyan-500/10 overflow-hidden">
           <div className="h-1 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500" />
+
           <div className="p-4 flex items-start gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-pink-500/20 to-cyan-500/20 flex items-center justify-center shrink-0">
               🔔
@@ -291,67 +291,141 @@ function Navbar() {
     );
   };
 
-  const MobileDropsLauncher = () => {
-    if (!token || hideFloatingVybe) return null;
+  const MobileVybeSheet = () => {
+    if (!token || !mobileVybeOpen) return null;
 
     return (
       <>
-        {mobileDropOpen && (
-          <div
-            onClick={() => setMobileDropOpen(false)}
-            className="md:hidden fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]"
-          />
-        )}
+        <div
+          onClick={() => setMobileVybeOpen(false)}
+          className="md:hidden fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px] animate-vybe-fade"
+        />
 
-        <div className="md:hidden fixed right-4 bottom-[92px] z-50">
-          <div
-            className={`absolute right-0 bottom-[70px] w-[245px] rounded-3xl border border-white/10 bg-zinc-950/95 backdrop-blur-2xl shadow-2xl shadow-pink-500/20 overflow-hidden transition-all duration-300 origin-bottom-right ${
-              mobileDropOpen
-                ? "opacity-100 scale-100 translate-y-0 pointer-events-auto"
-                : "opacity-0 scale-95 translate-y-4 pointer-events-none"
-            }`}
-          >
+        <div className="md:hidden fixed left-4 right-4 bottom-[86px] z-50 animate-vybe-sheet">
+          <div className="relative overflow-hidden rounded-[26px] border border-white/10 bg-zinc-950/95 backdrop-blur-2xl shadow-2xl shadow-black/60">
+            <div className="absolute -top-20 -right-20 w-52 h-52 rounded-full bg-pink-500/15 blur-3xl" />
+            <div className="absolute -bottom-20 -left-20 w-52 h-52 rounded-full bg-cyan-500/10 blur-3xl" />
+
             <div className="relative p-3.5">
-              <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full bg-pink-500/20 blur-3xl" />
-              <div className="relative">
-                <p className="text-xs text-pink-400 font-black mb-1">VYBEO SPECIAL</p>
-                <h3 className="text-xl font-black text-white">Vybe Drops</h3>
-                <p className="text-sm text-gray-400 mt-1 leading-relaxed">
-  Pick your space — answer a Drop or jump into live Vybe conversations.
-</p>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div>
+                  <p className="text-[10px] tracking-[0.18em] text-pink-300 font-black">
+                    VYBEO SPECIAL
+                  </p>
+                  <h3 className="text-xl leading-tight font-black text-white mt-0.5">
+                    Choose a space
+                  </h3>
+                </div>
 
-<button
-  onClick={() => go("/vybe-drops")}
-  className="mt-4 w-full rounded-2xl bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 px-4 py-3 font-black text-white shadow-lg shadow-pink-500/20 active:scale-95 hover:scale-[1.02] transition-all duration-300"
->
-  🔥 Drops
-</button>
+                <button
+                  onClick={() => setMobileVybeOpen(false)}
+                  className="w-8 h-8 rounded-full bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10 transition"
+                >
+                  ✕
+                </button>
+              </div>
 
-<button
-  onClick={() => go("/vybe-room")}
-  className="mt-2 w-full rounded-2xl bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-pink-500/20 border border-cyan-400/20 px-4 py-3 font-black text-white shadow-lg shadow-cyan-500/10 active:scale-95 hover:scale-[1.02] transition-all duration-300"
->
-  ✨ Vybe Room
-</button>
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  onClick={() => go("/vybe-drops")}
+                  className={`group relative overflow-hidden rounded-[22px] border p-3 text-left active:scale-[0.98] transition-all duration-300 ${
+                    isActive("/vybe-drops")
+                      ? "border-pink-400/35 bg-pink-500/12"
+                      : "border-white/10 bg-white/[0.035] hover:bg-white/[0.06]"
+                  }`}
+                >
+                  <div className="absolute -top-10 -right-10 w-24 h-24 bg-pink-500/15 blur-2xl rounded-full" />
+                  <div className="relative">
+                    <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 flex items-center justify-center text-base shadow-lg shadow-pink-500/15">
+                      🔥
+                    </div>
+                    <h4 className="text-white font-black mt-2 text-[15px]">Drops</h4>
+                    <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">
+                      Prompts, replies, real thoughts.
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => go("/vybe-room")}
+                  className={`group relative overflow-hidden rounded-[22px] border p-3 text-left active:scale-[0.98] transition-all duration-300 ${
+                    isActive("/vybe-room")
+                      ? "border-cyan-400/35 bg-cyan-500/12"
+                      : "border-white/10 bg-white/[0.035] hover:bg-white/[0.06]"
+                  }`}
+                >
+                  <div className="absolute -top-10 -right-10 w-24 h-24 bg-cyan-500/15 blur-2xl rounded-full" />
+                  <div className="relative">
+                    <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-cyan-500 via-purple-500 to-pink-500 flex items-center justify-center text-base shadow-lg shadow-cyan-500/15">
+                      ✨
+                    </div>
+                    <h4 className="text-white font-black mt-2 text-[15px]">Room</h4>
+                    <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">
+                      Live conversations, shared energy.
+                    </p>
+                  </div>
+                </button>
               </div>
             </div>
           </div>
-
-          <button
-            onClick={() => setMobileDropOpen((prev) => !prev)}
-            className={`relative w-16 h-16 rounded-3xl bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 flex items-center justify-center shadow-2xl shadow-pink-500/30 border border-white/20 transition-all duration-300 active:scale-95 ${
-              mobileDropOpen ? "rotate-45 scale-105" : "rotate-0"
-            }`}
-            aria-label="Open Vybe Drops"
-          >
-            <span className="absolute inset-0 rounded-3xl bg-white/10 backdrop-blur-xl" />
-            <span className="relative text-3xl">{mobileDropOpen ? "×" : "🔥"}</span>
-            {!mobileDropOpen && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-cyan-300 shadow-[0_0_14px_rgba(103,232,249,0.9)]" />
-            )}
-          </button>
         </div>
       </>
+    );
+  };
+
+  const MobileVybeIcon = ({ active = false }) => (
+    <svg
+      viewBox="0 0 24 24"
+      className="w-6 h-6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 3.5l1.9 4.3 4.6 1.7-4.3 1.9-1.7 4.6-1.9-4.3-4.6-1.7 4.3-1.9 1.7-4.6z" />
+      <path d="M18.5 15.5l.7 1.6 1.6.7-1.6.7-.7 1.6-.7-1.6-1.6-.7 1.6-.7.7-1.6z" />
+      {active && <circle cx="12" cy="12" r="9.5" opacity="0.18" />}
+    </svg>
+  );
+
+  const MobileVybeButton = () => {
+    return (
+      <button
+        onClick={() => setMobileVybeOpen((prev) => !prev)}
+        className={`relative flex flex-col items-center justify-center h-14 rounded-2xl transition-all duration-300 ${
+          mobileVybeOpen || isVybeActive
+            ? "text-pink-200"
+            : "text-gray-500 hover:text-white"
+        }`}
+        aria-label="Open Vybe special"
+      >
+        <span
+          className={`relative flex items-center justify-center w-12 h-12 rounded-2xl border transition-all duration-300 ${
+            mobileVybeOpen
+              ? "bg-white/[0.08] border-pink-400/25 shadow-lg shadow-pink-500/10 scale-[0.96]"
+              : isVybeActive
+              ? "bg-white/[0.06] border-cyan-400/20 shadow-lg shadow-cyan-500/10"
+              : "bg-white/[0.03] border-white/10"
+          }`}
+        >
+          <span className="absolute inset-0 rounded-2xl bg-gradient-to-br from-pink-500/10 via-purple-500/5 to-cyan-500/10" />
+          <span className="relative">
+            {mobileVybeOpen ? (
+              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                <path d="M6 6l12 12" />
+                <path d="M18 6L6 18" />
+              </svg>
+            ) : (
+              <MobileVybeIcon active={isVybeActive} />
+            )}
+          </span>
+        </span>
+
+        {isVybeActive && !mobileVybeOpen && (
+          <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.9)]" />
+        )}
+      </button>
     );
   };
 
@@ -359,16 +433,23 @@ function Navbar() {
     return (
       <>
         <NotificationToast />
+
         <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-2xl bg-black/70 border-b border-white/10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
             <Logo />
 
             <div className="flex items-center gap-3">
-              <button onClick={() => navigate("/")} className="px-4 sm:px-5 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all">
+              <button
+                onClick={() => navigate("/")}
+                className="px-4 sm:px-5 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all"
+              >
                 Login
               </button>
 
-              <button onClick={() => navigate("/")} className="px-4 sm:px-5 py-2 rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 hover:scale-105 transition-all font-semibold">
+              <button
+                onClick={() => navigate("/")}
+                className="px-4 sm:px-5 py-2 rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 hover:scale-105 transition-all font-semibold"
+              >
                 Register
               </button>
             </div>
@@ -381,31 +462,25 @@ function Navbar() {
   return (
     <>
       <NotificationToast />
-      <MobileDropsLauncher />
+      <MobileVybeSheet />
 
       <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-[76px] backdrop-blur-2xl bg-black/75 border-b border-white/10">
         <div className="h-full px-4 flex items-center justify-between">
           <Logo />
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => go("/notifications")}
-              className="relative w-11 h-11 rounded-2xl border border-white/10 bg-white/[0.04] flex items-center justify-center hover:bg-white/[0.08] transition-all"
-            >
-              <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-                <path d="M10 21h4" />
-              </svg>
+          <button
+            onClick={() => go("/notifications")}
+            className="relative w-11 h-11 rounded-2xl border border-white/10 bg-white/[0.04] flex items-center justify-center hover:bg-white/[0.08] transition-all"
+          >
+            <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+              <path d="M10 21h4" />
+            </svg>
 
-              {unreadCount > 0 && (
-                <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.9)]" />
-              )}
-            </button>
-
-            <button onClick={logout} className="px-4 py-2 rounded-xl border border-red-500/20 text-red-300 bg-red-500/5 hover:bg-red-500/10 transition-all">
-              Logout
-            </button>
-          </div>
+            {unreadCount > 0 && (
+              <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.9)]" />
+            )}
+          </button>
         </div>
       </header>
 
@@ -454,12 +529,42 @@ function Navbar() {
       </aside>
 
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-2xl border-t border-white/10">
-        <div className="grid grid-cols-4 items-center px-2 py-2">
-          {mobileItems.map((item) => (
-            <NavButton key={item.path} item={item} mobile />
-          ))}
+        <div className="grid grid-cols-5 items-center px-2 py-2">
+          <NavButton item={mobileNavItems[0]} mobile />
+          <NavButton item={mobileNavItems[1]} mobile />
+          <MobileVybeButton />
+          <NavButton item={mobileNavItems[2]} mobile />
+          <NavButton item={mobileNavItems[3]} mobile />
         </div>
       </nav>
+
+      <style>
+        {`
+          @keyframes vybe-fade {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+
+          @keyframes vybe-sheet {
+            from {
+              opacity: 0;
+              transform: translateY(18px) scale(0.98);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+          }
+
+          .animate-vybe-fade {
+            animation: vybe-fade 180ms ease-out forwards;
+          }
+
+          .animate-vybe-sheet {
+            animation: vybe-sheet 240ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+          }
+        `}
+      </style>
     </>
   );
 }

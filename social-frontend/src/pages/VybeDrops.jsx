@@ -199,11 +199,21 @@ socketRef.current.on("drop-pulse-update", ({ dropId, count }) => {
     return list.slice(0, visibleCount);
   }, [filteredDrops, featuredDrop, activeTag, visibleCount]);
 
+  const mobileDrops = useMemo(() => {
+    if (activeTag === "all" && featuredDrop) {
+      return [featuredDrop, ...visibleDrops];
+    }
+
+    return visibleDrops;
+  }, [activeTag, featuredDrop, visibleDrops]);
+
   const handleMobileScroll = (e) => {
   const container = e.currentTarget;
-  const cardWidth = container.clientWidth;
+  const card = container.querySelector("[data-mobile-drop-card]");
+  const cardWidth = card ? card.offsetWidth + 10 : container.clientWidth;
   const index = Math.round(container.scrollLeft / cardWidth);
-  setActiveMobileDrop(index);
+
+  setActiveMobileDrop(Math.max(0, Math.min(index, mobileDrops.length - 1)));
 };
 
 const openThread = async (dropId) => {
@@ -406,9 +416,9 @@ const deleteDropReply = async () => {
     return (
       <div
         key={threadReply._id}
-        className="relative ml-4 sm:ml-8 pl-4 border-l border-white/10"
+        className="relative ml-7 sm:ml-10 pl-4 border-l border-white/15"
       >
-        <div className="bg-white/[0.035] border border-white/10 rounded-2xl p-3">
+        <div className="bg-white/[0.025] border border-white/10 rounded-2xl p-3">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-r from-pink-500 to-indigo-500 flex items-center justify-center text-xs font-black shrink-0">
@@ -517,11 +527,11 @@ const canDeleteReply =
     return (
       <div
         key={reply._id}
-        className="bg-black/40 border border-white/10 rounded-2xl p-4"
+        className="relative rounded-2xl border-l-2 border-pink-500/35 bg-white/[0.035] p-3 sm:p-4 shadow-inner"
       >
-       <div className="flex items-start justify-between gap-3 mb-3">
-  <div className="flex items-center gap-3 min-w-0">
-    <div className="w-9 h-9 rounded-xl bg-gradient-to-r from-pink-500 to-indigo-500 flex items-center justify-center font-black shrink-0">
+       <div className="flex items-start justify-between gap-2.5 mb-2">
+  <div className="flex items-center gap-2.5 min-w-0">
+    <div className="w-7 h-7 rounded-full bg-gradient-to-r from-pink-500 to-indigo-500 flex items-center justify-center text-xs font-black shrink-0">
       {isAnon ? "?" : (reply.user?.username || "U")[0]?.toUpperCase()}
     </div>
 
@@ -548,11 +558,11 @@ const canDeleteReply =
   )}
 </div>
 
-        <p className="text-gray-100 leading-relaxed text-sm sm:text-base">
+        <p className="text-gray-100 leading-relaxed text-[13.5px] sm:text-sm pl-9">
           {reply.caption}
         </p>
 
-        <div className="flex gap-2 flex-wrap mt-4">
+        <div className="flex gap-1.5 flex-wrap mt-3 pl-9">
           {reactions.map((reaction) => {
             const count = getReactionCount(reply, reaction.type);
             const active = hasUserReacted(reply, reaction.type, userId);
@@ -563,7 +573,7 @@ const canDeleteReply =
                 key={reaction.type}
                 disabled={loading}
                 onClick={() => reactToReply(reply._id, reaction.type, dropId)}
-                className={`relative overflow-visible text-xs border rounded-full px-3 py-1.5 transition-all duration-300 disabled:opacity-60 ${
+                className={`relative overflow-visible text-xs border rounded-full px-2.5 py-1.5 transition-all duration-300 disabled:opacity-60 ${
                   active
                     ? "bg-pink-500/20 border-pink-500/40 text-white scale-[1.03]"
                     : "bg-white/5 border-white/10 hover:bg-white/10 text-gray-300"
@@ -586,7 +596,7 @@ const canDeleteReply =
 
           <button
             onClick={() => openNestedComposer(reply._id)}
-            className="text-xs border rounded-full px-3 py-1.5 bg-white/5 border-white/10 hover:bg-white/10 text-gray-300"
+            className="text-xs border rounded-full px-2.5 py-1.5 bg-white/5 border-white/10 hover:bg-white/10 text-gray-300"
           >
             Reply
           </button>
@@ -599,7 +609,7 @@ const canDeleteReply =
                   [reply._id]: !prev[reply._id],
                 }))
               }
-              className="text-xs border rounded-full px-3 py-1.5 bg-white/5 border-white/10 hover:bg-white/10 text-gray-300"
+              className="text-xs border rounded-full px-2.5 py-1.5 bg-white/5 border-white/10 hover:bg-white/10 text-gray-300"
             >
               {threadOpen ? "Hide thread" : `Thread ${threadReplies.length}`}
             </button>
@@ -632,10 +642,10 @@ const canDeleteReply =
     return (
       <div
         key={drop._id}
-        className={`group bg-zinc-950/95 border border-white/10 ${
-          featured
+        className={`group bg-gradient-to-br from-zinc-950 via-[#0d0918] to-zinc-950 border border-white/10 ${
+            featured
             ? "rounded-[30px] sm:rounded-[34px] p-5 sm:p-8"
-            : "rounded-[26px] sm:rounded-[28px] p-4 sm:p-6"
+            : "rounded-[24px] sm:rounded-[28px] p-4 sm:p-6"
         } shadow-xl hover:border-pink-500/60 transition-all relative overflow-hidden`}
       >
         <div
@@ -643,10 +653,10 @@ const canDeleteReply =
         />
 
         <div className="relative">
-          <div className="flex items-start justify-between gap-3 mb-4 sm:mb-6">
-            <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-start justify-between gap-2.5 mb-4 sm:mb-6">
+            <div className="flex items-center gap-2.5 min-w-0">
               <div
-                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-r ${tag.gradient} flex items-center justify-center font-black shadow-lg text-base sm:text-lg shrink-0`}
+                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-r ${tag.gradient} flex items-center justify-center font-black shadow-lg text-base sm:text-lg shrink-0`}
               >
                 V
               </div>
@@ -661,21 +671,21 @@ const canDeleteReply =
               </div>
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap justify-end">
+            <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-[50%] sm:max-w-none">
   {isTrending && (
-    <span className="text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 rounded-full bg-orange-500/15 border border-orange-400/20 text-orange-200 font-bold whitespace-nowrap">
+    <span className="text-[10px] sm:text-xs px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-orange-500/15 border border-orange-400/20 text-orange-200 font-bold whitespace-nowrap">
       🔥 Trending
     </span>
   )}
 
   {isHotThread && (
-    <span className="text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-400/20 text-cyan-200 font-bold whitespace-nowrap">
+    <span className="text-[10px] sm:text-xs px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-cyan-500/10 border border-cyan-400/20 text-cyan-200 font-bold whitespace-nowrap">
       💬 Active
     </span>
   )}
 
   <span
-    className={`text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 rounded-full bg-gradient-to-r ${tag.gradient} font-bold shadow-lg whitespace-nowrap`}
+    className={`text-[10px] sm:text-xs px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-gradient-to-r ${tag.gradient} font-bold shadow-lg whitespace-nowrap`}
   >
     {tag.icon} {tag.label}
   </span>
@@ -686,9 +696,9 @@ const canDeleteReply =
             <p
               className={`${
                 featured
-                    ? "text-[28px] sm:text-4xl"
-                    : "text-[26px] sm:text-2xl"
-}                font-black leading-[1.12] sm:leading-snug mb-5 sm:mb-6 text-white line-clamp-3`}
+                ? "text-[28px] sm:text-4xl"
+                : "text-[22px] sm:text-2xl"
+            } font-black leading-[1.14] sm:leading-snug mb-4 sm:mb-6 text-white line-clamp-3`}
             >
               {drop.caption}
             </p>
@@ -697,35 +707,35 @@ const canDeleteReply =
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             <button
               onClick={() => openReplyModal(drop, false)}
-              className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl font-bold hover:scale-[1.03] active:scale-95 transition-all shadow-lg text-sm sm:text-base"
+              className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl font-bold hover:scale-[1.03] active:scale-95 transition-all shadow-lg text-xs sm:text-base"
             >
               Reply
             </button>
 
             <button
               onClick={() => openReplyModal(drop, true)}
-              className="bg-white/5 border border-white/10 px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl text-gray-200 hover:bg-white/10 active:scale-95 transition-all text-sm sm:text-base"
+              className="bg-white/5 border border-white/10 px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl text-gray-200 hover:bg-white/10 active:scale-95 transition-all text-xs sm:text-base"
             >
               Anonymous
             </button>
 
             <button
               onClick={() => toggleReplies(drop._id)}
-              className="bg-white/5 border border-white/10 px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl text-gray-200 hover:bg-white/10 active:scale-95 transition-all text-sm sm:text-base"
+              className="bg-white/5 border border-white/10 px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl text-gray-200 hover:bg-white/10 active:scale-95 transition-all text-xs sm:text-base"
             >
               {isOpen ? "Hide" : "Replies"} · {replyCount}
             </button>
           </div>
-          <div className="mt-3 flex items-center gap-2 flex-wrap text-[11px] text-gray-400">
-  <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10">
+          <div className="mt-2.5 flex items-center gap-1.5 flex-wrap text-[10px] sm:text-[11px] text-gray-400">
+  <span className="px-2 py-1 rounded-full bg-white/5 border border-white/10">
     {replyCount} replies
   </span>
 
-  <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10">
+  <span className="px-2 py-1 rounded-full bg-white/5 border border-white/10">
     {Number(drop.reactionCount || 0)} reactions
   </span>
 
-  <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10">
+  <span className="px-2 py-1 rounded-full bg-white/5 border border-white/10">
     {Number(drop.threadReplyCount || 0)} threads
   </span>
 </div>
@@ -784,31 +794,40 @@ const canDeleteReply =
     : tagStyles.chill;
 
   return (
-    <div className="min-h-screen bg-black text-white px-3 sm:px-5 md:px-8 pt-[92px] md:pt-8 pb-36 md:pb-24 overflow-x-hidden">
+    <div className="min-h-screen bg-black text-white px-3 sm:px-5 md:px-8 pt-0 sm:pt-2 md:pt-5 pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-24 overflow-x-hidden">
       <div className="max-w-[1120px] mx-auto">
-        <div className="mb-4 sm:mb-6">
-          <div className="bg-zinc-950/90 border border-white/10 rounded-[28px] sm:rounded-[34px] p-5 sm:p-8 shadow-2xl relative overflow-hidden">
+        <div className="mb-2 sm:mb-5">
+          <div className="bg-zinc-950/90 border border-white/10 rounded-[22px] sm:rounded-[34px] p-4 sm:p-8 shadow-2xl relative overflow-hidden">
             <div className="absolute -top-24 -right-20 w-72 h-72 bg-pink-500/20 blur-3xl rounded-full" />
             <div className="absolute -bottom-24 -left-20 w-72 h-72 bg-indigo-500/20 blur-3xl rounded-full" />
 
-            <div className="relative">
-              <p className="text-xs sm:text-sm text-pink-400 font-bold mb-2 tracking-wide">
-                🔥 DAILY VYBE STARTERS
-              </p>
+            <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+              <div>
+                <p className="text-[10px] sm:text-sm text-pink-400 font-bold mb-1.5 sm:mb-2 tracking-[0.16em]">
+                  🔥 DAILY VYBE STARTERS
+                </p>
 
-              <h1 className="text-[34px] leading-none sm:text-4xl font-black tracking-tight">
-                Vybe Drops
-            </h1>
+                <h1 className="text-[30px] leading-none sm:text-4xl font-black tracking-tight">
+                  Vybe Drops
+                </h1>
 
-              <p className="text-gray-400 mt-3 max-w-2xl text-sm sm:text-base leading-relaxed">
-                Pick a prompt, reply your way, or go anonymous when it feels personal.
-              </p>
+                <p className="text-gray-400 mt-2 max-w-2xl text-[12.5px] sm:text-base leading-relaxed">
+                  Pick a prompt, reply your way, or go anonymous when it feels personal.
+                </p>
+              </div>
+
+              {/* <a
+                href="/room"
+                className="self-start sm:self-end inline-flex items-center gap-2 rounded-full bg-white/[0.06] border border-white/10 px-3 py-2 text-xs sm:text-sm font-bold text-gray-200 hover:bg-white/10 hover:text-white transition"
+              >
+                Room <span className="text-pink-300">→</span>
+              </a> */}
             </div>
           </div>
         </div>
 
-        <div className="sticky top-[76px] md:top-0 z-20 bg-black/80 backdrop-blur-xl -mx-3 px-3 sm:mx-0 sm:px-0 pt-2">
-          <div className="flex gap-2 overflow-x-auto pb-4 mb-2">
+        <div className="relative z-20 bg-black -mx-3 px-3 sm:mx-0 sm:px-0 pt-0">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 mb-0">
             {Object.keys(tagStyles).map((tagKey) => {
               const tag = tagStyles[tagKey];
 
@@ -818,8 +837,9 @@ const canDeleteReply =
                   onClick={() => {
                     setActiveTag(tagKey);
                     setVisibleCount(6);
+                    setActiveMobileDrop(0);
                   }}
-                  className={`shrink-0 px-4 py-2 rounded-full border text-sm font-bold transition ${
+                  className={`shrink-0 px-3.5 sm:px-4 py-2 rounded-full border text-[13px] sm:text-sm font-bold transition ${
                     activeTag === tagKey
                       ? `bg-gradient-to-r ${tag.gradient} border-transparent text-white`
                       : "bg-white/5 border-white/10 text-gray-300"
@@ -854,48 +874,47 @@ const canDeleteReply =
             </div>
 
             <div className="md:hidden">
-  <div className="flex items-center justify-between mb-3 px-1">
-    <div>
-      <p className="text-xs text-pink-400 font-black">
-        SWIPE DROPS
-      </p>
-      <h3 className="text-lg font-black">
-        Pick your next vybe
-      </h3>
-    </div>
+  <div className="flex items-center justify-between mb-2 px-0.5">
+    <p className="text-[10px] text-pink-400 font-black tracking-[0.18em]">
+      SWIPE DROPS
+    </p>
 
     <span className="text-xs text-gray-500">
-      {visibleDrops.length ? activeMobileDrop + 1 : 0}/{visibleDrops.length}
+      {mobileDrops.length ? activeMobileDrop + 1 : 0}/{mobileDrops.length}
     </span>
   </div>
 
   <div
   id="mobile-drops-carousel"
   onScroll={handleMobileScroll}
-  className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-6 scrollbar-hide -mx-3 px-3"
+  className="flex overflow-x-auto snap-x snap-mandatory gap-2.5 pb-2 scrollbar-hide -mx-3 px-3"
 >
-    {visibleDrops.map((drop) => (
+    {mobileDrops.map((drop) => (
       <div
-        key={drop._id}
-        className="min-w-[92vw] max-w-[92vw] snap-center"
-      >
+  key={drop._id}
+  data-mobile-drop-card
+  className="min-w-[calc(100vw-24px)] max-w-[calc(100vw-24px)] snap-center"
+>
         {renderDropCard(drop)}
       </div>
     ))}
   </div>
 
-  {visibleDrops.length > 1 && (
-    <div className="flex items-center justify-center gap-1.5 mt-1">
-      {visibleDrops.map((drop, index) => (
+  {mobileDrops.length > 1 && (
+    <div className="flex items-center justify-center gap-1.5 mt-0.5">
+      {mobileDrops.map((drop, index) => (
         <button
           key={drop._id}
           onClick={() => {
             const container = document.getElementById("mobile-drops-carousel");
             if (container) {
-              container.scrollTo({
-                left: index * (container.clientWidth * 0.92 + 12),
-                behavior: "smooth",
-              });
+              const card = container.querySelector("[data-mobile-drop-card]");
+              const cardWidth = card ? card.offsetWidth + 10 : container.clientWidth;
+
+            container.scrollTo({
+            left: index * cardWidth,
+            behavior: "smooth",
+        });
             }
           }}
           className={`h-1.5 rounded-full transition-all ${
@@ -927,18 +946,18 @@ const canDeleteReply =
 
       {detailDrop && (
         <div className="fixed inset-0 z-40 bg-black/85 backdrop-blur-xl flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="w-full sm:max-w-3xl max-h-[92vh] bg-zinc-950 border border-white/10 rounded-t-[32px] sm:rounded-[34px] overflow-hidden shadow-2xl relative">
+          <div className="w-full sm:max-w-3xl max-h-[94vh] bg-zinc-950 border border-white/10 rounded-t-[28px] sm:rounded-[34px] overflow-hidden shadow-2xl relative">
             <div
               className={`absolute -top-28 -right-28 w-72 h-72 bg-gradient-to-r ${detailTag.gradient} opacity-25 blur-3xl rounded-full`}
             />
 
-            <div className="relative p-5 sm:p-7 border-b border-white/10">
+            <div className="relative p-4 sm:p-7 border-b border-white/10">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-xs text-pink-400 font-black mb-2">
                     LIVE DROP THREAD
                   </p>
-                  <h2 className="text-2xl sm:text-4xl font-black leading-tight">
+                  <h2 className="text-xl sm:text-4xl font-black leading-tight">
                     {detailDrop.caption}
                   </h2>
 
@@ -984,7 +1003,7 @@ const canDeleteReply =
               </div>
             </div>
 
-            <div className="relative p-4 sm:p-6 overflow-y-auto max-h-[58vh] space-y-3">
+            <div className="relative p-3 sm:p-6 overflow-y-auto max-h-[60vh] space-y-3">
                 {typingByDrop[detailDrop._id] && (
                 <div className="bg-pink-500/10 border border-pink-400/20 rounded-2xl p-3 text-sm text-pink-200">
                     Someone is typing...
@@ -1007,8 +1026,8 @@ const canDeleteReply =
       )}
 
       {selectedDrop && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-3 sm:p-4">
-          <div className="w-full max-w-lg bg-zinc-950 border border-white/10 rounded-t-[30px] sm:rounded-[30px] p-5 sm:p-6 relative overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="w-full max-w-lg bg-zinc-950 border border-white/10 rounded-t-[28px] sm:rounded-[30px] p-4 sm:p-6 relative overflow-hidden shadow-2xl pb-[calc(1rem+env(safe-area-inset-bottom))]">
             <div className="absolute -top-20 -right-20 w-52 h-52 bg-pink-500/20 blur-3xl rounded-full" />
 
             <div className="relative">
@@ -1028,7 +1047,7 @@ const canDeleteReply =
                 </button>
               </div>
 
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-4">
+              <div className="bg-white/[0.04] border border-white/10 rounded-2xl p-3.5 mb-3">
                 <p className="text-base sm:text-lg font-bold leading-snug">
                   {selectedDrop.caption}
                 </p>
@@ -1065,22 +1084,22 @@ const canDeleteReply =
                 placeholder="Write something real..."
                 maxLength={280}
                 autoFocus
-                className="w-full h-36 bg-black/60 border border-white/10 rounded-2xl p-4 outline-none focus:border-pink-500 resize-none text-white placeholder:text-gray-500"
+                className="w-full h-32 sm:h-36 bg-black/60 border border-white/10 rounded-2xl p-4 outline-none focus:border-pink-500 resize-none text-white placeholder:text-gray-500"
               />
 
               <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
                 <span>
                   {isAnonymous
-                    ? "Posting as Anonymous"
-                    : "Posting with your profile"}
+                    ? "Safe anonymous reply · Enter to post"
+                    : "Profile reply · Enter to post"}
                 </span>
                 <span>{replyText.length}/280</span>
               </div>
 
-              <div className="flex items-center justify-between mt-5 gap-3 flex-wrap">
+              <div className="flex items-center justify-between mt-4 gap-2 sm:gap-3">
                 <button
                   onClick={() => setIsAnonymous(!isAnonymous)}
-                  className={`px-4 py-3 rounded-2xl border font-semibold transition ${
+                  className={`flex-1 sm:flex-none px-4 py-3 rounded-2xl border font-semibold transition ${
                     isAnonymous
                       ? "bg-pink-500 border-pink-500 text-white"
                       : "bg-white/5 border-white/10 text-gray-200"
@@ -1092,7 +1111,7 @@ const canDeleteReply =
                 <button
                   onClick={submitReply}
                   disabled={submitting || !replyText.trim()}
-                  className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-6 py-3 rounded-2xl font-bold hover:scale-[1.03] active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100"
+                  className="flex-1 sm:flex-none bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-5 sm:px-6 py-3 rounded-2xl font-bold hover:scale-[1.03] active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100"
                 >
                   {submitting ? "Posting..." : "Post Reply"}
                 </button>
@@ -1155,14 +1174,14 @@ const canDeleteReply =
             filter: drop-shadow(0 0 14px rgba(236, 72, 153, 0.8));
           }
 
-          .line-clamp-3 {
-             display: -webkit-box;
-            -webkit-line-clamp: 3;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            }
+  .line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 
-        .scrollbar-hide {
+.scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
