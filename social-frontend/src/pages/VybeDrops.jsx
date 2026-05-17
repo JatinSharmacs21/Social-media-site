@@ -686,9 +686,9 @@ const canDeleteReply =
             <p
               className={`${
                 featured
-                  ? "text-2xl sm:text-4xl"
-                  : "text-[21px] sm:text-2xl"
-              } font-black leading-[1.15] sm:leading-snug mb-5 sm:mb-6 text-white`}
+                    ? "text-[28px] sm:text-4xl"
+                    : "text-[26px] sm:text-2xl"
+}                font-black leading-[1.12] sm:leading-snug mb-5 sm:mb-6 text-white line-clamp-3`}
             >
               {drop.caption}
             </p>
@@ -784,7 +784,7 @@ const canDeleteReply =
     : tagStyles.chill;
 
   return (
-    <div className="min-h-screen bg-black text-white px-3 sm:px-5 md:px-8 pt-20 md:pt-8 pb-24">
+    <div className="min-h-screen bg-black text-white px-3 sm:px-5 md:px-8 pt-[92px] md:pt-8 pb-36 md:pb-24 overflow-x-hidden">
       <div className="max-w-[1120px] mx-auto">
         <div className="mb-4 sm:mb-6">
           <div className="bg-zinc-950/90 border border-white/10 rounded-[28px] sm:rounded-[34px] p-5 sm:p-8 shadow-2xl relative overflow-hidden">
@@ -796,12 +796,12 @@ const canDeleteReply =
                 🔥 DAILY VYBE STARTERS
               </p>
 
-              <h1 className="text-3xl sm:text-5xl font-black tracking-tight">
+              <h1 className="text-[34px] leading-none sm:text-4xl font-black tracking-tight">
                 Vybe Drops
-              </h1>
+            </h1>
 
               <p className="text-gray-400 mt-3 max-w-2xl text-sm sm:text-base leading-relaxed">
-                Pick a prompt, share your thought, react to real replies, or go anonymous when the vybe feels personal.
+                Pick a prompt, reply your way, or go anonymous when it feels personal.
               </p>
             </div>
           </div>
@@ -844,9 +844,9 @@ const canDeleteReply =
         ) : (
           <>
             {featuredDrop && activeTag === "all" && (
-              <div className="mb-4 sm:mb-5">
+              <div className="hidden md:block mb-4 sm:mb-5">
                 {renderDropCard(featuredDrop, true)}
-              </div>
+            </div>
             )}
 
             <div className="hidden md:grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
@@ -872,12 +872,12 @@ const canDeleteReply =
   <div
   id="mobile-drops-carousel"
   onScroll={handleMobileScroll}
-  className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-4 scrollbar-hide"
+  className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-6 scrollbar-hide -mx-3 px-3"
 >
     {visibleDrops.map((drop) => (
       <div
         key={drop._id}
-        className="min-w-full snap-center"
+        className="min-w-[92vw] max-w-[92vw] snap-center"
       >
         {renderDropCard(drop)}
       </div>
@@ -893,7 +893,7 @@ const canDeleteReply =
             const container = document.getElementById("mobile-drops-carousel");
             if (container) {
               container.scrollTo({
-                left: index * container.clientWidth,
+                left: index * (container.clientWidth * 0.92 + 12),
                 behavior: "smooth",
               });
             }
@@ -1154,6 +1154,13 @@ const canDeleteReply =
             animation: vybe-pop 750ms ease-out forwards;
             filter: drop-shadow(0 0 14px rgba(236, 72, 153, 0.8));
           }
+
+          .line-clamp-3 {
+             display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            }
 
         .scrollbar-hide {
   -ms-overflow-style: none;

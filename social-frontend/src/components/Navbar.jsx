@@ -75,6 +75,7 @@ function Navbar() {
   };
 
   const isActive = (path) => location.pathname === path;
+  const hideFloatingVybe = location.pathname === "/vybe-drops";
 
   const go = (path) => {
     navigate(path);
@@ -291,7 +292,7 @@ function Navbar() {
   };
 
   const MobileDropsLauncher = () => {
-    if (!token) return null;
+    if (!token || hideFloatingVybe) return null;
 
     return (
       <>
