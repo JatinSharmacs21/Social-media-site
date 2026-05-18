@@ -13,7 +13,7 @@ function Profile() {
   const [user, setUser] = useState(null);
   const [posts, setPosts] = useState([]);
   const [edit, setEdit] = useState(false);
-  const [activeTab, setActiveTab] = useState("images");
+  const [activeTab, setActiveTab] = useState("moments");
 
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
@@ -49,6 +49,8 @@ function Profile() {
   const imagePosts = posts.filter((post) => post.media?.[0]?.type === "image");
   const videoPosts = posts.filter((post) => post.media?.[0]?.type === "video");
   const thoughtPosts = posts.filter((post) => !post.media || post.media.length === 0);
+  const dropsPosts = posts.filter((post) => post.postType === "drop" || post.postType === "dropReply");
+  const totalVybes = posts.length;
 
   const fetchProfileAndPosts = useCallback(async () => {
     try {
@@ -212,9 +214,10 @@ function Profile() {
     }
   };
 
-  const isFollowing = user?.followers?.some((f) => f._id === currentUserId);
+  const isTunedIn = user?.followers?.some((f) => f._id === currentUserId);
 
   const activeList = listModal === "followers" ? user?.followers || [] : user?.following || [];
+  const listTitle = listModal === "followers" ? "Circle" : "Tuned In";
   const filteredList = activeList.filter((person) => {
     const q = listSearch.toLowerCase().trim();
     if (!q) return true;
@@ -243,7 +246,7 @@ function Profile() {
       if (navigator.share) {
         await navigator.share({
           title: `${user?.name || "Vybeo user"} on Vybeo`,
-          text: `Check out ${user?.name || "this profile"} on Vybeo`,
+          text: `Tune into ${user?.name || "this Vybe Space"} on Vybeo`,
           url: profileUrl,
         });
         return;
@@ -308,11 +311,11 @@ function Profile() {
       />
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/5 to-black/25" />
       <div className="absolute top-3 right-3 bg-black/55 backdrop-blur-md border border-white/10 px-3 py-1 rounded-full text-xs font-bold">
-        Reel
+        Clip
       </div>
       <div className="absolute left-3 right-3 bottom-3">
         <p className="text-white font-semibold line-clamp-2 text-sm sm:text-base drop-shadow">
-          {post.caption || post.content || "Vybeo Reel"}
+          {post.caption || post.content || "Vybeo Clip"}
         </p>
         <div className="flex items-center gap-4 mt-3 text-xs sm:text-sm text-gray-200">
           <span>❤️ {post.likes?.length || 0}</span>
@@ -357,11 +360,29 @@ function Profile() {
           </div>
         )}
 
-        <div className="bg-zinc-950 border border-white/10 rounded-[28px] sm:rounded-[32px] p-4 sm:p-6 md:p-10 shadow-2xl">
-          <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-center md:items-start">
-            <div className="flex justify-center md:block">
+        <div className="relative overflow-hidden bg-zinc-950/95 border border-white/10 rounded-[28px] sm:rounded-[32px] p-4 sm:p-6 md:p-8 shadow-2xl shadow-black/40">
+          <div className="absolute -top-28 -right-24 w-72 h-72 rounded-full bg-pink-500/10 blur-3xl" />
+          <div className="absolute -bottom-28 -left-24 w-72 h-72 rounded-full bg-cyan-500/10 blur-3xl" />
+
+          <div className="relative flex items-center justify-between gap-3 mb-5">
+            <div>
+              <p className="text-[10px] sm:text-[11px] tracking-[0.24em] text-pink-300 font-black mb-1">
+                VYBE SPACE
+              </p>
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-black leading-tight">
+                Mood identity, thoughts and moments
+              </h2>
+            </div>
+
+            <span className="hidden sm:inline-flex rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1 text-xs font-bold text-cyan-200">
+              {isViewingOwnProfile ? "Your Space" : "Public Space"}
+            </span>
+          </div>
+
+          <div className="relative flex flex-col md:flex-row gap-5 md:gap-8 items-center md:items-start">
+            <div className="flex justify-center md:block shrink-0">
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-pink-500 to-indigo-500 blur-2xl opacity-40 rounded-full" />
+                <div className="absolute inset-0 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 blur-2xl opacity-35 rounded-full" />
                 <button
                   type="button"
                   onClick={() => setProfilePicOpen(true)}
@@ -371,7 +392,7 @@ function Profile() {
                   <img
                     src={previewPic || avatarUrl(user)}
                     alt="Profile"
-                    className="w-32 h-32 sm:w-36 sm:h-36 md:w-44 md:h-44 rounded-full object-cover border-4 border-white/10 shadow-2xl transition-all duration-300 group-hover:scale-105 group-hover:border-pink-400/60"
+                    className="w-28 h-28 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-white/10 shadow-2xl transition-all duration-300 group-hover:scale-105 group-hover:border-pink-400/60"
                   />
                   <span className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/35 transition-all flex items-end justify-center pb-4 text-xs sm:text-sm font-semibold opacity-0 group-hover:opacity-100">
                     View photo
@@ -380,7 +401,7 @@ function Profile() {
               </div>
             </div>
 
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 w-full">
               {edit ? (
                 <>
                   <div className="grid sm:grid-cols-2 gap-3 mb-4">
@@ -388,7 +409,7 @@ function Profile() {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Name"
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 outline-none"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 outline-none focus:border-pink-400/50"
                     />
                     <input
                       value={username}
@@ -396,22 +417,22 @@ function Profile() {
                         setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))
                       }
                       placeholder="username"
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 outline-none"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 outline-none focus:border-pink-400/50"
                     />
                   </div>
 
                   <textarea
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
-                    placeholder="Bio"
+                    placeholder="Write your current vibe..."
                     rows="4"
                     maxLength={160}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 outline-none mb-4 resize-none"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 outline-none focus:border-pink-400/50 mb-4 resize-none"
                   />
 
-                  <label className="block bg-white/5 border border-dashed border-white/20 rounded-2xl px-5 py-5 mb-5 cursor-pointer hover:bg-white/10">
+                  <label className="block bg-white/5 border border-dashed border-white/20 rounded-2xl px-5 py-5 mb-5 cursor-pointer hover:bg-white/10 transition-all">
                     <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
-                    <span className="font-semibold">Choose a profile photo</span>
+                    <span className="font-semibold">Choose a space photo</span>
                     <p className="text-sm text-gray-400 mt-1">
                       Upload a clear JPG, PNG, or WebP image from your device.
                     </p>
@@ -423,7 +444,7 @@ function Profile() {
                       disabled={saving}
                       className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-6 py-3 rounded-2xl font-semibold disabled:opacity-60"
                     >
-                      {saving ? "Saving..." : "Save"}
+                      {saving ? "Saving..." : "Save Space"}
                     </button>
                     <button
                       onClick={() => {
@@ -432,7 +453,7 @@ function Profile() {
                         setPreviewPic(user?.profilePic || "");
                         setProfileFile(null);
                       }}
-                      className="bg-white/10 px-6 py-3 rounded-2xl"
+                      className="bg-white/10 hover:bg-white/15 px-6 py-3 rounded-2xl transition-all"
                     >
                       Cancel
                     </button>
@@ -442,69 +463,75 @@ function Profile() {
                 <>
                   <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-5 text-center md:text-left">
                     <div className="min-w-0">
-                      <h1 className="text-3xl sm:text-4xl md:text-5xl font-black break-words">
+                      <div className="inline-flex items-center gap-2 rounded-full border border-pink-400/20 bg-pink-500/10 px-3 py-1 text-xs font-bold text-pink-200 mb-3">
+                        ✦ Current Space
+                      </div>
+
+                      <h1 className="text-3xl sm:text-4xl md:text-5xl font-black break-words leading-tight">
                         {user?.name || "User"}
                       </h1>
+
                       {user?.username && (
                         <p className="text-pink-300 mt-2 text-base sm:text-lg font-semibold break-words">
                           @{user.username}
                         </p>
                       )}
+
                       <p className="text-gray-400 mt-3 text-base sm:text-lg leading-relaxed max-w-2xl break-words">
-                        {user?.bio || "No bio yet"}
+                        {user?.bio || "No vibe bio yet"}
                       </p>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto md:min-w-[320px]">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-col gap-3 w-full md:w-[220px] shrink-0">
                       {isViewingOwnProfile ? (
                         <button
                           onClick={() => setEdit(true)}
-                          className="group relative overflow-hidden bg-white/[0.07] hover:bg-white/[0.11] border border-white/10 hover:border-pink-300/35 px-6 py-3.5 rounded-2xl font-bold transition-all shadow-lg shadow-black/20 active:scale-[0.98]"
+                          className="group relative overflow-hidden bg-white/[0.07] hover:bg-white/[0.11] border border-white/10 hover:border-pink-300/35 px-5 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-black/20 active:scale-[0.98]"
                         >
-                          <span className="relative z-10">✦ Edit Profile</span>
+                          <span className="relative z-10">✦ Edit Space</span>
                         </button>
                       ) : (
                         <button
                           onClick={followUser}
-                          className={`px-7 py-3 rounded-2xl font-semibold transition-all ${
-                            isFollowing
-                              ? "bg-white/10 hover:bg-white/20"
-                              : "bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 shadow-lg hover:scale-105"
+                          className={`px-5 py-3 rounded-2xl font-bold transition-all active:scale-[0.98] ${
+                            isTunedIn
+                              ? "bg-white/10 hover:bg-white/20 border border-white/10"
+                              : "bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 shadow-lg hover:scale-[1.02]"
                           }`}
                         >
-                          {isFollowing ? "Following" : "Follow"}
+                          {isTunedIn ? "Tuned In" : "Tune In"}
                         </button>
                       )}
 
                       <button
                         onClick={handleShareProfile}
-                        className="group relative overflow-hidden bg-gradient-to-r from-white/[0.1] to-white/[0.06] hover:from-pink-500/20 hover:to-indigo-500/20 border border-white/10 hover:border-indigo-300/35 px-6 py-3.5 rounded-2xl font-bold transition-all shadow-lg shadow-black/20 active:scale-[0.98]"
+                        className="group relative overflow-hidden bg-white/[0.07] hover:bg-white/[0.11] border border-white/10 hover:border-cyan-300/35 px-5 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-black/20 active:scale-[0.98]"
                       >
-                        <span className="relative z-10">{shareCopied ? "✓ Link Copied" : "↗ Share Profile"}</span>
+                        <span className="relative z-10">{shareCopied ? "✓ Link Copied" : "↗ Share Space"}</span>
                       </button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-8 mt-8 sm:mt-10">
-                    <div className="bg-white/5 border border-white/10 rounded-2xl sm:rounded-3xl px-2 sm:px-6 py-4 sm:py-5 text-center">
-                      <h2 className="text-2xl sm:text-3xl font-black">{posts.length}</h2>
-                      <p className="text-gray-400 mt-1 text-xs sm:text-base">Posts</p>
+                  <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-7 sm:mt-8">
+                    <div className="bg-white/[0.055] border border-white/10 rounded-2xl sm:rounded-3xl px-2 sm:px-5 py-4 sm:py-5 text-center">
+                      <h2 className="text-2xl sm:text-3xl font-black">{totalVybes}</h2>
+                      <p className="text-gray-400 mt-1 text-xs sm:text-base">Vybes</p>
                     </div>
 
                     <button
                       onClick={() => setListModal("followers")}
-                      className="bg-white/5 border border-white/10 rounded-2xl sm:rounded-3xl px-2 sm:px-6 py-4 sm:py-5 text-center hover:bg-white/10 transition-all"
+                      className="bg-white/[0.055] border border-white/10 rounded-2xl sm:rounded-3xl px-2 sm:px-5 py-4 sm:py-5 text-center hover:bg-white/10 transition-all"
                     >
                       <h2 className="text-2xl sm:text-3xl font-black">{user?.followers?.length || 0}</h2>
-                      <p className="text-gray-400 mt-1 text-xs sm:text-base">Followers</p>
+                      <p className="text-gray-400 mt-1 text-xs sm:text-base">Circle</p>
                     </button>
 
                     <button
                       onClick={() => setListModal("following")}
-                      className="bg-white/5 border border-white/10 rounded-2xl sm:rounded-3xl px-2 sm:px-6 py-4 sm:py-5 text-center hover:bg-white/10 transition-all"
+                      className="bg-white/[0.055] border border-white/10 rounded-2xl sm:rounded-3xl px-2 sm:px-5 py-4 sm:py-5 text-center hover:bg-white/10 transition-all"
                     >
                       <h2 className="text-2xl sm:text-3xl font-black">{user?.following?.length || 0}</h2>
-                      <p className="text-gray-400 mt-1 text-xs sm:text-base">Following</p>
+                      <p className="text-gray-400 mt-1 text-xs sm:text-base">Tuned In</p>
                     </button>
                   </div>
                 </>
@@ -516,17 +543,18 @@ function Profile() {
         <div className="mt-8 sm:mt-10">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
-              <h2 className="text-2xl sm:text-3xl font-black">Profile Posts</h2>
+              <h2 className="text-2xl sm:text-3xl font-black">Vybe Space</h2>
               <p className="text-gray-400 mt-1 text-sm sm:text-base">
-                {imagePosts.length} posts • {videoPosts.length} reels • {thoughtPosts.length} thoughts
+                {imagePosts.length} moments • {thoughtPosts.length} thoughts • {videoPosts.length} clips
               </p>
             </div>
 
-            <div className="bg-zinc-950 border border-white/10 rounded-2xl p-1 grid grid-cols-3 sm:flex gap-1">
+            <div className="bg-zinc-950 border border-white/10 rounded-2xl p-1 grid grid-cols-4 sm:flex gap-1">
               {[
-                ["images", "Posts"],
-                ["videos", "Reels"],
+                ["moments", "Moments"],
                 ["thoughts", "Thoughts"],
+                ["clips", "Clips"],
+                ["drops", "Drops"],
               ].map(([key, label]) => (
                 <button
                   key={key}
@@ -543,26 +571,36 @@ function Profile() {
             </div>
           </div>
 
-          {activeTab === "images" ? (
+          {activeTab === "moments" ? (
             imagePosts.length === 0 ? (
-              <EmptyState text="No image posts yet ✨" />
+              <EmptyState text="No moments yet ✨" />
             ) : (
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
                 {imagePosts.map(renderMediaCard)}
               </div>
             )
-          ) : activeTab === "videos" ? (
+          ) : activeTab === "thoughts" ? (
+            thoughtPosts.length === 0 ? (
+              <EmptyState text="No thoughts yet ✨" />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+                {thoughtPosts.map(renderThoughtCard)}
+              </div>
+            )
+          ) : activeTab === "clips" ? (
             videoPosts.length === 0 ? (
-              <EmptyState text="No reels/videos yet 🎬" />
+              <EmptyState text="No clips yet 🎬" />
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
                 {videoPosts.map(renderReelCard)}
               </div>
             )
-          ) : thoughtPosts.length === 0 ? (
-            <EmptyState text="No thoughts yet ✨" />
+          ) : dropsPosts.length === 0 ? (
+            <EmptyState text="No drops yet 🔥" />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">{thoughtPosts.map(renderThoughtCard)}</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+              {dropsPosts.map(renderThoughtCard)}
+            </div>
           )}
         </div>
       </div>
@@ -613,7 +651,7 @@ function Profile() {
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
           <div className="w-full max-w-md bg-zinc-950 border border-white/10 rounded-3xl p-5 sm:p-6 max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-black capitalize">{listModal}</h2>
+              <h2 className="text-2xl font-black">{listTitle}</h2>
               <button
                 onClick={() => {
                   setListModal(null);
@@ -628,14 +666,14 @@ function Profile() {
             <input
               value={listSearch}
               onChange={(e) => setListSearch(e.target.value)}
-              placeholder={`Search ${listModal}...`}
+              placeholder={`Search ${listTitle}...`}
               className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 outline-none mb-4"
             />
 
             <div className="space-y-3 overflow-y-auto pr-1">
               {filteredList.length === 0 ? (
                 <p className="text-gray-400 py-8 text-center">
-                  {activeList.length === 0 ? `No ${listModal} yet` : "No user found"}
+                  {activeList.length === 0 ? `No ${listTitle} yet` : "No one found"}
                 </p>
               ) : (
                 filteredList.map(renderUserRow)
@@ -771,7 +809,7 @@ function PostModal({
     handleDoubleLike(selectedPost);
   };
 
-  const headerTitle = isReel ? "Reel" : isImage ? "Post" : "Thought";
+  const headerTitle = isReel ? "Clip" : isImage ? "Moment" : "Thought";
 
   return (
     <div
@@ -844,7 +882,7 @@ function PostModal({
                 <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
                 <div className="absolute left-4 right-4 bottom-5 flex items-end justify-between gap-4 lg:hidden">
                   <div className="min-w-0">
-                    <p className="font-bold line-clamp-2">{selectedPost.caption || selectedPost.content || "Vybeo Reel"}</p>
+                    <p className="font-bold line-clamp-2">{selectedPost.caption || selectedPost.content || "Vybeo Clip"}</p>
                     <p className="text-xs text-gray-300 mt-1">Single tap mute/unmute • Double tap like</p>
                   </div>
                   <div className="shrink-0 bg-black/55 border border-white/10 backdrop-blur-md px-3 py-2 rounded-full text-sm">
@@ -891,7 +929,7 @@ function PostModal({
                   {selectedPost.createdAt ? new Date(selectedPost.createdAt).toLocaleString() : ""}
                 </p>
               </div>
-              {isReel && <span className="hidden sm:inline-flex bg-cyan-400/10 text-cyan-200 border border-cyan-300/20 px-3 py-1 rounded-full text-xs font-bold">Reel</span>}
+              {isReel && <span className="hidden sm:inline-flex bg-cyan-400/10 text-cyan-200 border border-cyan-300/20 px-3 py-1 rounded-full text-xs font-bold">Clip</span>}
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 sm:p-5 min-h-0">
@@ -903,7 +941,7 @@ function PostModal({
 
               <div className="space-y-4">
                 {selectedPost.comments?.length === 0 ? (
-                  <p className="text-gray-500 text-center py-10">No comments yet ✨</p>
+                  <p className="text-gray-500 text-center py-10">No replies yet ✨</p>
                 ) : (
                   selectedPost.comments?.map((comment) => {
                     const canDelete =
@@ -950,11 +988,11 @@ function PostModal({
                 <button
                   onClick={() => likePost(selectedPost._id)}
                   className="text-2xl hover:scale-110 active:scale-95 transition-all"
-                  title="Like/unlike"
+                  title="Felt/unfelt"
                 >
                   {liked ? "❤️" : "🤍"}
                 </button>
-                <span className="text-gray-300">{selectedPost.likes?.length || 0} likes</span>
+                <span className="text-gray-300">{selectedPost.likes?.length || 0} felt</span>
                 <span className="text-gray-300">💬 {selectedPost.comments?.length || 0}</span>
               </div>
 
@@ -963,7 +1001,7 @@ function PostModal({
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addComment()}
-                  placeholder="Add a comment..."
+                  placeholder="Drop a reply..."
                   className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-2xl px-4 sm:px-5 py-3 sm:py-4 outline-none focus:border-pink-400/50"
                 />
                 <button
@@ -974,7 +1012,7 @@ function PostModal({
                 </button>
               </div>
               <p className="text-xs text-gray-500 mt-3">
-                {isReel ? "Single tap reel to mute/unmute. Double tap to like/unlike." : "Double tap media or use the heart button to like/unlike."}
+                {isReel ? "Single tap clip to mute/unmute. Double tap to feel/unfeel." : "Double tap media or use the heart button to feel/unfeel."}
               </p>
             </div>
           </div>

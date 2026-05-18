@@ -8,7 +8,7 @@ function Reels() {
   const token = localStorage.getItem("token");
   const currentUserId = localStorage.getItem("userId");
 
-  const [reels, setReels] = useState([]);
+  const [clips, setClips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeReelId, setActiveReelId] = useState(null);
   const [muted, setMuted] = useState(true);
@@ -17,6 +17,10 @@ function Reels() {
   const [commentText, setCommentText] = useState({});
   const [shareReel, setShareReel] = useState(null);
   const [copiedShare, setCopiedShare] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [editingClip, setEditingClip] = useState(null);
+  const [editCaption, setEditCaption] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const videoRefs = useRef({});
 
@@ -75,7 +79,7 @@ function Reels() {
       );
     };
 
-    const fetchReels = async () => {
+    const fetchClips = async () => {
       try {
         setLoading(true);
         const res = await API.get("/api/posts");
@@ -97,7 +101,7 @@ function Reels() {
           });
         });
 
-        setReels(videoPosts);
+        setClips(videoPosts);
 
         if (videoPosts.length > 0) {
           setActiveReelId(videoPosts[0].reelId);
@@ -109,7 +113,7 @@ function Reels() {
       }
     };
 
-    fetchReels();
+    fetchClips();
   }, []);
 
   useEffect(() => {
@@ -140,7 +144,7 @@ function Reels() {
     return () => {
       cards.forEach((card) => observer.unobserve(card));
     };
-  }, [reels]);
+  }, [clips]);
 
   useEffect(() => {
     Object.values(videoRefs.current).forEach((video) => {
@@ -156,7 +160,7 @@ function Reels() {
   };
 
   const updateReelPostInState = (updatedPost) => {
-    setReels((prev) =>
+    setClips((prev) =>
       prev.map((reel) =>
         reel._id === updatedPost._id
           ? {
@@ -166,6 +170,54 @@ function Reels() {
           : reel
       )
     );
+  };
+
+  const isClipOwner = (clip) => clip?.user?._id === currentUserId;
+
+  const startEditClip = (clip) => {
+    setEditingClip(clip);
+    setEditCaption(clip.caption || clip.content || "");
+    setOpenMenuId(null);
+  };
+
+  const saveEditClip = async () => {
+    try {
+      if (!editingClip?._id) return;
+
+      setSavingEdit(true);
+
+      const res = await API.put(
+        `/api/posts/${editingClip._id}`,
+        {
+          caption: editCaption.trim(),
+        },
+        authConfig
+      );
+
+      updateReelPostInState(res.data);
+      setEditingClip(null);
+      setEditCaption("");
+    } catch (error) {
+      console.log(error.response?.data || error);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const deleteClip = async (clip) => {
+    try {
+      if (!clip?._id) return;
+
+      const confirmDelete = window.confirm("Delete this clip?");
+      if (!confirmDelete) return;
+
+      await API.delete(`/api/posts/${clip._id}`, authConfig);
+
+      setClips((prev) => prev.filter((reel) => reel._id !== clip._id));
+      setOpenMenuId(null);
+    } catch (error) {
+      console.log(error.response?.data || error);
+    }
   };
 
   const likeReel = async (postId, reelId) => {
@@ -238,8 +290,8 @@ function Reels() {
     if (!shareReel?._id) return;
 
     const data = {
-      title: "Check this reel",
-      text: shareReel.caption || shareReel.content || "Vybeo reel",
+      title: "Check this clip on Vybeo",
+      text: shareReel.caption || shareReel.content || "Vybeo clip",
       url: getShareUrl(shareReel._id),
     };
 
@@ -294,23 +346,23 @@ function Reels() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black text-white pt-20 sm:pt-6 pb-20 flex items-center justify-center">
+      <div className="fixed inset-x-0 top-[76px] bottom-[76px] md:top-0 md:bottom-0 bg-black text-white flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 rounded-full border-4 border-white/20 border-t-pink-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-400">Loading reels...</p>
+          <p className="text-gray-400">Loading clips...</p>
         </div>
       </div>
     );
   }
 
-  if (reels.length === 0) {
+  if (clips.length === 0) {
     return (
-      <div className="min-h-screen bg-black text-white pt-20 sm:pt-6 pb-20 flex items-center justify-center px-4">
+      <div className="fixed inset-x-0 top-[76px] bottom-[76px] md:top-0 md:bottom-0 bg-black text-white flex items-center justify-center px-4">
         <div className="max-w-md text-center bg-zinc-950 border border-white/10 rounded-3xl p-8 shadow-xl">
           <div className="text-5xl mb-4">🎬</div>
-          <h2 className="text-2xl font-bold mb-2">No Reels Yet</h2>
+          <h2 className="text-2xl font-bold mb-2">No Clips Yet</h2>
           <p className="text-gray-400">
-            Upload a video post from Feed and it will automatically appear here.
+            Drop a clip from Vybe Flow and it will appear here.
           </p>
         </div>
       </div>
@@ -318,9 +370,9 @@ function Reels() {
   }
 
   return (
-    <div className="h-screen bg-black text-white overflow-hidden">
-      <div className="h-full overflow-y-scroll snap-y snap-mandatory">
-        {reels.map((reel) => {
+    <div className="fixed inset-x-0 top-[76px] bottom-[76px] md:top-0 md:bottom-0 bg-black text-white overflow-hidden">
+      <div className="h-full w-full overflow-y-scroll overflow-x-hidden snap-y snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {clips.map((reel) => {
           const isActive = activeReelId === reel.reelId;
           const isLiked = isReelLikedByMe(reel);
           const commentsOpen = openComments[reel._id];
@@ -329,9 +381,9 @@ function Reels() {
             <section
               key={reel.reelId}
               data-reel-id={reel.reelId}
-              className="reel-snap-card relative h-screen w-full snap-start flex items-center justify-center bg-black"
+              className="reel-snap-card relative h-full w-full max-w-full snap-start flex items-center justify-center bg-black overflow-hidden"
             >
-              <div className="relative h-full w-full sm:h-[92vh] sm:max-w-[430px] md:max-w-[460px] sm:rounded-[2rem] overflow-hidden bg-zinc-950 shadow-2xl border-x border-white/10">
+              <div className="relative h-full w-full max-w-full sm:h-[92vh] sm:max-w-[430px] md:max-w-[460px] sm:rounded-[2rem] overflow-hidden bg-zinc-950 shadow-2xl border-x border-white/10">
                 <video
                   ref={(el) => {
                     videoRefs.current[reel.reelId] = el;
@@ -359,23 +411,56 @@ function Reels() {
                 <div className="absolute top-0 left-0 right-0 z-20 px-4 pt-5 pb-3 flex items-center justify-between">
                   <div>
                     <h2 className="text-xl font-extrabold tracking-tight">
-                      Reels
+                      Clips
                     </h2>
                     {isActive && (
                       <p className="text-xs text-pink-200/80">Watching now</p>
                     )}
                   </div>
 
-                  <button
-                    onClick={() => setMuted((prev) => !prev)}
-                    className="w-11 h-11 rounded-full bg-black/40 border border-white/15 backdrop-blur-md flex items-center justify-center hover:bg-white/10 active:scale-95 transition-all"
-                    title={muted ? "Unmute" : "Mute"}
-                  >
-                    {muted ? "🔇" : "🔊"}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {isClipOwner(reel) && (
+                      <div className="relative">
+                        <button
+                          onClick={() =>
+                            setOpenMenuId(openMenuId === reel.reelId ? null : reel.reelId)
+                          }
+                          className="w-11 h-11 rounded-full bg-black/40 border border-white/15 backdrop-blur-md flex items-center justify-center hover:bg-white/10 active:scale-95 transition-all text-xl"
+                          title="Clip options"
+                        >
+                          ⋮
+                        </button>
+
+                        {openMenuId === reel.reelId && (
+                          <div className="absolute right-0 top-12 w-40 overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/95 backdrop-blur-xl shadow-2xl">
+                            <button
+                              onClick={() => startEditClip(reel)}
+                              className="block w-full px-4 py-3 text-left text-sm font-semibold text-white hover:bg-white/10"
+                            >
+                              Edit clip
+                            </button>
+                            <button
+                              onClick={() => deleteClip(reel)}
+                              className="block w-full px-4 py-3 text-left text-sm font-semibold text-red-300 hover:bg-red-500/10"
+                            >
+                              Delete clip
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => setMuted((prev) => !prev)}
+                      className="w-11 h-11 rounded-full bg-black/40 border border-white/15 backdrop-blur-md flex items-center justify-center hover:bg-white/10 active:scale-95 transition-all"
+                      title={muted ? "Unmute" : "Mute"}
+                    >
+                      {muted ? "🔇" : "🔊"}
+                    </button>
+                  </div>
                 </div>
 
-                <div className="absolute right-3 bottom-28 z-20 flex flex-col items-center gap-5">
+                <div className="absolute right-4 bottom-24 z-20 flex flex-col items-center gap-4">
                   <button
                     onClick={() => likeReel(reel._id, reel.reelId)}
                     className={`w-12 h-12 rounded-full border backdrop-blur-md flex items-center justify-center active:scale-90 transition-all ${
@@ -413,7 +498,7 @@ function Reels() {
                   </button>
                 </div>
 
-                <div className="absolute left-0 right-16 bottom-0 z-20 p-4 pb-8">
+                <div className="absolute left-0 right-16 bottom-0 z-20 p-4 pb-5">
                   <div
                     onClick={() => openUserProfile(reel.user?._id)}
                     className="inline-flex items-center gap-3 cursor-pointer mb-3"
@@ -431,7 +516,7 @@ function Reels() {
                       <p className="font-bold leading-tight">
                         {reel.user?.name || "Unknown User"}
                       </p>
-                      <p className="text-xs text-gray-300">Original reel</p>
+                      <p className="text-xs text-gray-300">Original clip</p>
                     </div>
                   </div>
 
@@ -452,7 +537,7 @@ function Reels() {
                   <div className="p-4 max-h-[70vh] overflow-y-auto">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-bold">
-                        Comments ({reel.comments?.length || 0})
+                        Replies ({reel.comments?.length || 0})
                       </h3>
 
                       <button
@@ -481,7 +566,7 @@ function Reels() {
                         onKeyDown={(e) => {
                           if (e.key === "Enter") addComment(reel._id);
                         }}
-                        placeholder="Add a comment..."
+                        placeholder="Drop a reply..."
                         className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 outline-none focus:border-indigo-500 text-sm"
                       />
 
@@ -489,7 +574,7 @@ function Reels() {
                         onClick={() => addComment(reel._id)}
                         className="px-4 py-3 rounded-2xl bg-indigo-500/20 hover:bg-indigo-500 text-sm transition-all"
                       >
-                        Send
+                        Reply
                       </button>
                     </div>
 
@@ -525,7 +610,7 @@ function Reels() {
                       </div>
                     ) : (
                       <p className="text-center text-gray-500 py-8">
-                        No comments yet
+                        No replies yet
                       </p>
                     )}
                   </div>
@@ -535,6 +620,75 @@ function Reels() {
           );
         })}
       </div>
+
+
+      {editingClip && (
+        <div
+          onClick={() => {
+            if (!savingEdit) {
+              setEditingClip(null);
+              setEditCaption("");
+            }
+          }}
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-3"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full sm:max-w-md bg-zinc-950 border border-white/10 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-[10px] tracking-[0.2em] text-pink-300 font-black">
+                  EDIT CLIP
+                </p>
+                <h3 className="text-xl font-black mt-1">Update clip caption</h3>
+              </div>
+
+              <button
+                onClick={() => {
+                  if (!savingEdit) {
+                    setEditingClip(null);
+                    setEditCaption("");
+                  }
+                }}
+                className="w-9 h-9 rounded-full bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10"
+              >
+                ×
+              </button>
+            </div>
+
+            <textarea
+              value={editCaption}
+              onChange={(e) => setEditCaption(e.target.value)}
+              rows="4"
+              placeholder="Say something about this clip..."
+              className="w-full resize-none rounded-2xl border border-white/10 bg-white/[0.055] px-4 py-3 text-white outline-none placeholder:text-gray-500 focus:border-pink-400/50"
+            />
+
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={saveEditClip}
+                disabled={savingEdit}
+                className="flex-1 rounded-2xl bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 px-4 py-3 font-bold text-white disabled:opacity-60 active:scale-[0.98]"
+              >
+                {savingEdit ? "Saving..." : "Save Clip"}
+              </button>
+
+              <button
+                onClick={() => {
+                  if (!savingEdit) {
+                    setEditingClip(null);
+                    setEditCaption("");
+                  }
+                }}
+                className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 font-bold text-white hover:bg-white/15"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {shareReel && (
         <div
@@ -546,7 +700,7 @@ function Reels() {
             className="w-full sm:max-w-md bg-zinc-950 border border-white/10 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl"
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold">Share reel</h3>
+              <h3 className="text-lg font-bold">Share clip</h3>
 
               <button
                 onClick={() => setShareReel(null)}
@@ -558,7 +712,7 @@ function Reels() {
 
             <div className="bg-white/5 border border-white/10 rounded-2xl p-3 mb-4">
               <p className="text-sm text-gray-300 line-clamp-2">
-                {shareReel.caption || shareReel.content || "Vybeo reel"}
+                {shareReel.caption || shareReel.content || "Vybeo clip"}
               </p>
               <p className="text-xs text-gray-500 mt-2 truncate">
                 {getShareUrl(shareReel._id)}
@@ -577,7 +731,7 @@ function Reels() {
                 onClick={nativeShare}
                 className="px-4 py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-indigo-500 hover:scale-[1.02] transition-all font-medium"
               >
-                Share now
+                Share Clip
               </button>
             </div>
           </div>

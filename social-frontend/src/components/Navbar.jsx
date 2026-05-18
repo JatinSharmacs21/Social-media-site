@@ -53,8 +53,8 @@ function Navbar() {
 
       setUnreadCount((prev) => Number(prev || 0) + 1);
       setToast({
-        message: data?.message || "You have a new notification",
-        type: data?.type || "notification",
+        message: data?.message || "A new signal just came in",
+        type: data?.type || "signal",
       });
 
       setTimeout(() => setToast(null), 4000);
@@ -75,6 +75,7 @@ function Navbar() {
   };
 
   const isActive = (path) => location.pathname === path;
+
   const isVybeActive =
     location.pathname === "/vybe-drops" || location.pathname === "/vybe-room";
 
@@ -90,41 +91,45 @@ function Navbar() {
 
   const navItems = [
     {
-      label: "Home",
+      label: "Vybe Flow",
+      shortLabel: "Flow",
       path: "/feed",
       icon: (
-        <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2">
-          <path d="M3 11.5L12 4l9 7.5" />
-          <path d="M5 10.5V20h14v-9.5" />
-          <path d="M9 20v-6h6v6" />
+        <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 13c2.5-5 6.5-5 9-2s5.5 3 7-1" />
+          <path d="M4 18c3-3 6-3 9 0s5 2.5 7 0" />
+          <path d="M4 6h.01" />
         </svg>
       ),
     },
     {
-      label: "Search",
+      label: "Discover",
+      shortLabel: "Discover",
       path: "/search",
       icon: (
-        <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2">
+        <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
           <circle cx="11" cy="11" r="7" />
           <path d="M20 20l-3.5-3.5" />
         </svg>
       ),
     },
     {
-      label: "Reels",
+      label: "Clips",
+      shortLabel: "Clips",
       path: "/reels",
       icon: (
-        <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2">
-          <rect x="4" y="4" width="16" height="16" rx="4" />
-          <path d="M9 4l3 6" />
-          <path d="M15 4l3 6" />
-          <path d="M4 10h16" />
-          <path d="M10 14.5v3l3-1.5-3-1.5z" fill="currentColor" stroke="none" />
+        <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="4" y="3.5" width="16" height="17" rx="4" />
+          <path d="M9 3.5l3 6" />
+          <path d="M15 3.5l3 6" />
+          <path d="M4 9.5h16" />
+          <path d="M10.5 14v3.5l3.5-1.75L10.5 14z" fill="currentColor" stroke="none" />
         </svg>
       ),
     },
     {
-      label: "Drops",
+      label: "Vybe Drops",
+      shortLabel: "Drops",
       path: "/vybe-drops",
       special: true,
       icon: (
@@ -136,15 +141,19 @@ function Navbar() {
     },
     {
       label: "Vybe Room",
+      shortLabel: "Room",
       path: "/vybe-room",
       icon: (
         <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 3l2.5 5L20 10l-5.5 2L12 17l-2.5-5L4 10l5.5-2L12 3z" />
+          <path d="M7 9.5h10" />
+          <path d="M8 14h5" />
+          <path d="M5 4h14a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-6l-5 3v-3H5a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3z" />
         </svg>
       ),
     },
     {
-      label: "Notifications",
+      label: "Signals",
+      shortLabel: "Signals",
       path: "/notifications",
       badge: unreadCount,
       icon: (
@@ -155,10 +164,11 @@ function Navbar() {
       ),
     },
     {
-      label: "Profile",
+      label: "Vybe Space",
+      shortLabel: "Space",
       path: "/profile",
       icon: (
-        <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2">
+        <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="8" r="4" />
           <path d="M4 21c1.7-4 5-6 8-6s6.3 2 8 6" />
         </svg>
@@ -186,19 +196,26 @@ function Navbar() {
         </div>
       </div>
 
-      <h1
-        className={`text-2xl font-black tracking-tight bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 bg-clip-text text-transparent transition-all duration-500 ${
+      <div
+        className={`transition-all duration-500 ${
           compact ? "opacity-0 translate-x-[-8px] w-0 overflow-hidden" : "opacity-100 translate-x-0 w-auto"
         }`}
       >
-        Vybeo
-      </h1>
+        <h1 className="text-2xl font-black tracking-tight bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+          Vybeo
+        </h1>
+        <p className="text-[10px] text-gray-500 -mt-1 tracking-[0.22em] font-bold whitespace-nowrap">
+          REAL VYBES
+        </p>
+      </div>
     </div>
   );
 
   const NavButton = ({ item, expanded = false, mobile = false }) => {
+    if (!item) return null;
+
     const active = isActive(item.path);
-    const showBadge = item.label === "Notifications" && Number(item.badge) > 0;
+    const showBadge = item.label === "Signals" && Number(item.badge) > 0;
 
     if (mobile) {
       return (
@@ -215,6 +232,10 @@ function Navbar() {
               {item.badge > 9 ? "9+" : item.badge}
             </span>
           )}
+
+          <span className="text-[10px] mt-0.5 font-semibold">
+            {item.shortLabel}
+          </span>
         </button>
       );
     }
@@ -249,14 +270,14 @@ function Navbar() {
 
         <span
           className={`font-semibold tracking-wide whitespace-nowrap transition-all duration-300 ${
-            expanded ? "opacity-100 translate-x-0 max-w-[150px]" : "opacity-0 -translate-x-2 max-w-0"
+            expanded ? "opacity-100 translate-x-0 max-w-[170px]" : "opacity-0 -translate-x-2 max-w-0"
           }`}
         >
           {item.label}
         </span>
 
         {!expanded && (
-          <span className="pointer-events-none absolute left-[64px] top-1/2 -translate-y-1/2 rounded-xl bg-zinc-900 border border-white/10 px-3 py-2 text-sm text-white opacity-0 shadow-xl group-hover:opacity-100 transition-opacity duration-200">
+          <span className="pointer-events-none absolute left-[64px] top-1/2 -translate-y-1/2 rounded-xl bg-zinc-900 border border-white/10 px-3 py-2 text-sm text-white opacity-0 shadow-xl group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
             {item.label}
           </span>
         )}
@@ -274,11 +295,11 @@ function Navbar() {
 
           <div className="p-4 flex items-start gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-pink-500/20 to-cyan-500/20 flex items-center justify-center shrink-0">
-              🔔
+              ⚡
             </div>
 
             <div className="flex-1">
-              <p className="text-sm font-semibold text-white">New Notification</p>
+              <p className="text-sm font-semibold text-white">New Signal</p>
               <p className="text-sm text-gray-300 mt-1 leading-relaxed">{toast.message}</p>
             </div>
 
@@ -310,7 +331,7 @@ function Navbar() {
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div>
                   <p className="text-[10px] tracking-[0.18em] text-pink-300 font-black">
-                    VYBEO SPECIAL
+                    DROP YOUR VYBE
                   </p>
                   <h3 className="text-xl leading-tight font-black text-white mt-0.5">
                     Choose a space
@@ -328,7 +349,7 @@ function Navbar() {
               <div className="grid grid-cols-2 gap-2.5">
                 <button
                   onClick={() => go("/vybe-drops")}
-                  className={`group relative overflow-hidden rounded-[22px] border p-3 text-left active:scale-[0.98] transition-all duration-300 ${
+                  className={`relative overflow-hidden rounded-[22px] border p-3 text-left active:scale-[0.98] transition-all duration-300 ${
                     isActive("/vybe-drops")
                       ? "border-pink-400/35 bg-pink-500/12"
                       : "border-white/10 bg-white/[0.035] hover:bg-white/[0.06]"
@@ -339,16 +360,16 @@ function Navbar() {
                     <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 flex items-center justify-center text-base shadow-lg shadow-pink-500/15">
                       🔥
                     </div>
-                    <h4 className="text-white font-black mt-2 text-[15px]">Drops</h4>
+                    <h4 className="text-white font-black mt-2 text-[15px]">Vybe Drops</h4>
                     <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">
-                      Prompts, replies, real thoughts.
+                      Prompts, anonymous replies, real thoughts.
                     </p>
                   </div>
                 </button>
 
                 <button
                   onClick={() => go("/vybe-room")}
-                  className={`group relative overflow-hidden rounded-[22px] border p-3 text-left active:scale-[0.98] transition-all duration-300 ${
+                  className={`relative overflow-hidden rounded-[22px] border p-3 text-left active:scale-[0.98] transition-all duration-300 ${
                     isActive("/vybe-room")
                       ? "border-cyan-400/35 bg-cyan-500/12"
                       : "border-white/10 bg-white/[0.035] hover:bg-white/[0.06]"
@@ -359,7 +380,7 @@ function Navbar() {
                     <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-cyan-500 via-purple-500 to-pink-500 flex items-center justify-center text-base shadow-lg shadow-cyan-500/15">
                       ✨
                     </div>
-                    <h4 className="text-white font-black mt-2 text-[15px]">Room</h4>
+                    <h4 className="text-white font-black mt-2 text-[15px]">Vybe Room</h4>
                     <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">
                       Live conversations, shared energy.
                     </p>
@@ -389,45 +410,43 @@ function Navbar() {
     </svg>
   );
 
-  const MobileVybeButton = () => {
-    return (
-      <button
-        onClick={() => setMobileVybeOpen((prev) => !prev)}
-        className={`relative flex flex-col items-center justify-center h-14 rounded-2xl transition-all duration-300 ${
-          mobileVybeOpen || isVybeActive
-            ? "text-pink-200"
-            : "text-gray-500 hover:text-white"
+  const MobileVybeButton = () => (
+    <button
+      onClick={() => setMobileVybeOpen((prev) => !prev)}
+      className={`relative flex flex-col items-center justify-center h-14 rounded-2xl transition-all duration-300 ${
+        mobileVybeOpen || isVybeActive ? "text-pink-200" : "text-gray-500 hover:text-white"
+      }`}
+      aria-label="Open Vybe spaces"
+    >
+      <span
+        className={`relative flex items-center justify-center w-12 h-12 rounded-2xl border transition-all duration-300 ${
+          mobileVybeOpen
+            ? "bg-white/[0.08] border-pink-400/25 shadow-lg shadow-pink-500/10 scale-[0.96]"
+            : isVybeActive
+            ? "bg-white/[0.06] border-cyan-400/20 shadow-lg shadow-cyan-500/10"
+            : "bg-white/[0.03] border-white/10"
         }`}
-        aria-label="Open Vybe special"
       >
-        <span
-          className={`relative flex items-center justify-center w-12 h-12 rounded-2xl border transition-all duration-300 ${
-            mobileVybeOpen
-              ? "bg-white/[0.08] border-pink-400/25 shadow-lg shadow-pink-500/10 scale-[0.96]"
-              : isVybeActive
-              ? "bg-white/[0.06] border-cyan-400/20 shadow-lg shadow-cyan-500/10"
-              : "bg-white/[0.03] border-white/10"
-          }`}
-        >
-          <span className="absolute inset-0 rounded-2xl bg-gradient-to-br from-pink-500/10 via-purple-500/5 to-cyan-500/10" />
-          <span className="relative">
-            {mobileVybeOpen ? (
-              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-                <path d="M6 6l12 12" />
-                <path d="M18 6L6 18" />
-              </svg>
-            ) : (
-              <MobileVybeIcon active={isVybeActive} />
-            )}
-          </span>
+        <span className="absolute inset-0 rounded-2xl bg-gradient-to-br from-pink-500/10 via-purple-500/5 to-cyan-500/10" />
+        <span className="relative">
+          {mobileVybeOpen ? (
+            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+              <path d="M6 6l12 12" />
+              <path d="M18 6L6 18" />
+            </svg>
+          ) : (
+            <MobileVybeIcon active={isVybeActive} />
+          )}
         </span>
+      </span>
 
-        {isVybeActive && !mobileVybeOpen && (
-          <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.9)]" />
-        )}
-      </button>
-    );
-  };
+      <span className="text-[10px] mt-0.5 font-semibold">Vybe</span>
+
+      {isVybeActive && !mobileVybeOpen && (
+        <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.9)]" />
+      )}
+    </button>
+  );
 
   if (!token) {
     return (
@@ -450,7 +469,7 @@ function Navbar() {
                 onClick={() => navigate("/")}
                 className="px-4 sm:px-5 py-2 rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 hover:scale-105 transition-all font-semibold"
               >
-                Register
+                Join Vybeo
               </button>
             </div>
           </div>
@@ -471,6 +490,7 @@ function Navbar() {
           <button
             onClick={() => go("/notifications")}
             className="relative w-11 h-11 rounded-2xl border border-white/10 bg-white/[0.04] flex items-center justify-center hover:bg-white/[0.08] transition-all"
+            aria-label="Open Signals"
           >
             <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2">
               <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
@@ -478,7 +498,7 @@ function Navbar() {
             </svg>
 
             {unreadCount > 0 && (
-              <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.9)]" />
+              <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-pink-500 shadow-[0_0_10px_rgba(236,72,153,0.9)]" />
             )}
           </button>
         </div>

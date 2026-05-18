@@ -5,7 +5,7 @@ import API from "../services/api";
 function Landing() {
   const navigate = useNavigate();
 
-  const [mode, setMode] = useState("login"); // login | register | forgot | reset
+  const [mode, setMode] = useState("login");
   const isLogin = mode === "login";
   const isRegister = mode === "register";
   const isForgot = mode === "forgot";
@@ -34,7 +34,8 @@ function Landing() {
     }
   }, []);
 
-  const cleanUsername = (value) => value.toLowerCase().trim().replace(/^@/, "").replace(/\s/g, "");
+  const cleanUsername = (value) =>
+    value.toLowerCase().trim().replace(/^@/, "").replace(/\s/g, "");
 
   const saveUserData = (data) => {
     localStorage.setItem("token", data.token);
@@ -43,7 +44,6 @@ function Landing() {
     localStorage.setItem("username", data.username || "");
   };
 
-  // LOGIN WITH USERNAME
   const handleLogin = async () => {
     const finalUsername = cleanUsername(username);
 
@@ -71,7 +71,6 @@ function Landing() {
     }
   };
 
-  // REGISTER
   const handleRegister = async () => {
     const finalUsername = cleanUsername(username);
 
@@ -111,7 +110,6 @@ function Landing() {
     }
   };
 
-  // FORGOT PASSWORD
   const handleForgotPassword = async () => {
     if (!email) {
       setMessage("Please enter your registered email");
@@ -132,7 +130,6 @@ function Landing() {
     }
   };
 
-  // RESET PASSWORD
   const handleResetPassword = async () => {
     if (!password) {
       setMessage("Please enter new password");
@@ -161,7 +158,6 @@ function Landing() {
     }
   };
 
-  // ENTER KEY
   const handleKeyDown = (e) => {
     if (e.key !== "Enter") return;
 
@@ -172,241 +168,277 @@ function Landing() {
   };
 
   const getTitle = () => {
-    if (isLogin) return "Welcome Back ";
-    if (isRegister) return "Join Vybeo 🚀";
-    if (isForgot) return "Forgot Password 🔐";
-    return "Reset Password 🔑";
+    if (isLogin) return "Welcome back";
+    if (isRegister) return "Join Vybeo";
+    if (isForgot) return "Forgot password";
+    return "Reset password";
   };
 
   const getSubtitle = () => {
-    if (isLogin) return "Login with your username to continue.";
-    if (isRegister) return "Create your account and start sharing.";
-    if (isForgot) return "Enter your email and we will send a reset link.";
+    if (isLogin) return "Tune back into your Vybe Flow.";
+    if (isRegister) return "Create your Vybe Space and drop your first thought.";
+    if (isForgot) return "Enter your email and we’ll send a reset link.";
     return "Create a new strong password for your account.";
   };
 
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden relative">
-      {/* BACKGROUND */}
-      <div className="absolute top-[-150px] left-[-120px] w-[400px] h-[400px] bg-pink-500/20 rounded-full blur-3xl" />
-      <div className="absolute bottom-[-150px] right-[-120px] w-[400px] h-[400px] bg-indigo-500/20 rounded-full blur-3xl" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,0,128,0.08),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(99,102,241,0.08),transparent_30%)]" />
+      <div className="absolute top-[-180px] left-[-140px] w-[460px] h-[460px] bg-pink-500/20 rounded-full blur-3xl" />
+      <div className="absolute bottom-[-180px] right-[-140px] w-[460px] h-[460px] bg-cyan-500/15 rounded-full blur-3xl" />
+      <div className="absolute top-[30%] right-[35%] w-[340px] h-[340px] bg-purple-500/10 rounded-full blur-3xl" />
 
-      <div className="relative z-10 flex flex-col lg:flex-row min-h-screen">
-        {/* LEFT SIDE */}
-        <div className="flex-1 flex flex-col justify-center px-6 md:px-16 py-16">
-          {/* LOGO */}
-          <div className="flex items-center gap-4 mb-12">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-pink-500 to-indigo-500 blur-xl opacity-70 rounded-3xl" />
-              <div className="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 flex items-center justify-center shadow-2xl">
-                <div className="relative w-10 h-10 border-[4px] border-white rounded-2xl">
-                  <div className="absolute top-[6px] left-[6px] w-4 h-4 border-[3px] border-white rounded-full" />
-                  <div className="absolute top-[-6px] right-[-6px] w-3 h-3 bg-white rounded-full" />
+      <div className="relative z-10 min-h-screen grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_500px]">
+        <section className="px-5 sm:px-8 md:px-14 lg:px-16 py-8 sm:py-10 flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-4 mb-10">
+            <div className="flex items-center gap-3">
+              <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 flex items-center justify-center shadow-xl shadow-pink-500/25">
+                <div className="relative w-7 h-7 rounded-full border-[3px] border-white">
+                  <div className="absolute top-1/2 left-1/2 w-2.5 h-2.5 rounded-full bg-white -translate-x-1/2 -translate-y-1/2" />
+                  <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white" />
                 </div>
+              </div>
+
+              <div>
+                <h1 className="text-3xl sm:text-4xl font-black tracking-tight bg-gradient-to-r from-pink-400 via-purple-300 to-cyan-300 bg-clip-text text-transparent">
+                  Vybeo
+                </h1>
+                <p className="text-[11px] sm:text-xs tracking-[0.28em] text-gray-500 font-bold">
+                  REAL VYBES
+                </p>
               </div>
             </div>
 
-            <div>
-              <h1 className="text-5xl font-black bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-400 bg-clip-text text-transparent tracking-tight">
-                Vybeo
-              </h1>
-              <p className="text-gray-400 text-lg">Feel the social vibe.</p>
-            </div>
+            <button
+              onClick={() => setMode(isLogin ? "register" : "login")}
+              className="hidden sm:inline-flex px-5 py-2.5 rounded-2xl border border-white/10 bg-white/[0.05] hover:bg-white/[0.09] transition-all font-semibold"
+            >
+              {isLogin ? "Join Vybeo" : "Login"}
+            </button>
           </div>
 
-          {/* HERO SECTION */}
-          <div className="max-w-2xl">
-            <h2 className="text-5xl md:text-7xl font-black leading-[1.05] tracking-tight">
-              Connect with
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center gap-2 bg-white/[0.045] border border-white/10 rounded-full px-4 py-2 text-xs font-black tracking-[0.18em] text-pink-300 mb-6">
+              VIBE-FIRST SOCIAL SPACE
+            </div>
+
+            <h2 className="text-5xl sm:text-6xl md:text-7xl font-black leading-[1.02] tracking-tight">
+              Drop your
               <br />
-              your <span className="bg-gradient-to-r from-pink-500 via-purple-400 to-indigo-400 bg-clip-text text-transparent">people</span>.
+              <span className="bg-gradient-to-r from-pink-400 via-purple-300 to-cyan-300 bg-clip-text text-transparent">
+                real vybe.
+              </span>
             </h2>
 
-            <p className="text-gray-400 text-lg md:text-2xl mt-8 leading-relaxed max-w-xl">
-              Share photos, videos, thoughts and real moments with your friends,
-              creators and communities around the world.
+            <p className="text-gray-400 text-base sm:text-xl md:text-2xl mt-7 leading-relaxed max-w-2xl">
+              Thoughts, moments, drops and rooms — built around your current mood,
+              not perfect content.
             </p>
-          </div>
 
-          {/* SOCIAL PREVIEW */}
-          <div className="relative mt-16 h-[280px] hidden md:block">
-            <div className="absolute left-0 top-10 rotate-[-10deg] bg-white/10 border border-white/10 backdrop-blur-xl rounded-[30px] p-3 w-[180px] shadow-2xl hover:scale-105 transition-all">
-              <div className="h-[180px] rounded-[22px] bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500" />
-              <div className="flex items-center justify-between mt-4">
-                <div>
-                  <h3 className="font-bold">@alex</h3>
-                  <p className="text-sm text-gray-400">Weekend vibes ✨</p>
-                </div>
-                <span>❤️</span>
-              </div>
-            </div>
+            <div className="flex flex-wrap gap-3 mt-8">
+              <button
+                onClick={() => setMode("register")}
+                className="px-6 py-4 rounded-2xl bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 font-black shadow-xl shadow-pink-500/20 hover:scale-[1.02] transition-all"
+              >
+                Join Vybeo
+              </button>
 
-            <div className="absolute left-[140px] top-0 z-20 rotate-[4deg] bg-white/10 border border-white/10 backdrop-blur-xl rounded-[30px] p-3 w-[220px] shadow-2xl hover:scale-105 transition-all">
-              <div className="h-[240px] rounded-[24px] bg-gradient-to-br from-yellow-400 via-pink-500 to-purple-600 relative overflow-hidden">
-                <div className="absolute bottom-4 left-4 bg-black/40 px-4 py-2 rounded-full text-sm backdrop-blur-md">🔥 Trending</div>
-              </div>
-            </div>
-
-            <div className="absolute left-[320px] top-16 rotate-[10deg] bg-white/10 border border-white/10 backdrop-blur-xl rounded-[30px] p-3 w-[180px] shadow-2xl hover:scale-105 transition-all">
-              <div className="h-[180px] rounded-[22px] bg-gradient-to-br from-cyan-400 via-indigo-500 to-purple-600" />
-              <div className="flex items-center justify-between mt-4">
-                <div>
-                  <h3 className="font-bold">@mia</h3>
-                  <p className="text-sm text-gray-400">New reel 🎬</p>
-                </div>
-                <span>💜</span>
-              </div>
+              <button
+                onClick={() => setMode("login")}
+                className="px-6 py-4 rounded-2xl bg-white/[0.06] border border-white/10 font-bold hover:bg-white/[0.1] transition-all"
+              >
+                Login
+              </button>
             </div>
           </div>
-        </div>
 
-        {/* RIGHT SIDE */}
-        <div className="w-full lg:w-[520px] flex items-center justify-center p-6">
-          <div className="w-full bg-white/[0.06] border border-white/10 backdrop-blur-2xl rounded-[40px] p-8 md:p-10 shadow-[0_0_50px_rgba(0,0,0,0.4)]">
-            <div className="mb-6">
-              <h2 className="text-4xl md:text-5xl font-black mb-3">{getTitle()}</h2>
-              <p className="text-gray-400 text-lg">{getSubtitle()}</p>
-            </div>
+          <div className="hidden md:grid grid-cols-2 xl:grid-cols-4 gap-4 mt-14">
+            {[
+              ["Vybe Flow", "Real thoughts and moments in one clean feed.", "〰️"],
+              ["Vybe Drops", "Daily prompts for honest conversations.", "✦"],
+              ["Vybe Room", "Live public spaces for shared energy.", "💬"],
+              ["Clips", "Short raw moments, separate from the Flow.", "🎬"],
+            ].map(([title, text, icon]) => (
+              <div
+                key={title}
+                className="relative overflow-hidden rounded-[26px] bg-zinc-950/75 border border-white/10 p-5 shadow-xl shadow-black/25"
+              >
+                <div className="absolute -top-12 -right-12 w-28 h-28 rounded-full bg-pink-500/10 blur-2xl" />
+                <div className="relative">
+                  <div className="w-11 h-11 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center text-xl mb-4">
+                    {icon}
+                  </div>
+                  <h3 className="font-black text-lg">{title}</h3>
+                  <p className="text-sm text-gray-400 mt-2 leading-relaxed">{text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
 
-            {/* MESSAGE */}
-            {message && <div className="mb-5 bg-red-500/20 border border-red-500/30 text-red-300 p-4 rounded-2xl">{message}</div>}
-            {success && <div className="mb-5 bg-green-500/20 border border-green-500/30 text-green-300 p-4 rounded-2xl">{success}</div>}
+        <section className="flex items-center justify-center p-5 sm:p-8 lg:pr-10">
+          <div className="w-full max-w-[460px] relative overflow-hidden bg-zinc-950/85 border border-white/10 backdrop-blur-2xl rounded-[32px] sm:rounded-[40px] p-6 sm:p-8 shadow-[0_0_60px_rgba(0,0,0,0.55)]">
+            <div className="absolute -top-24 -right-24 w-56 h-56 rounded-full bg-pink-500/10 blur-3xl" />
+            <div className="absolute -bottom-24 -left-24 w-56 h-56 rounded-full bg-cyan-500/10 blur-3xl" />
 
-            {/* NAME */}
-            {isRegister && (
-              <input
-                type="text"
-                placeholder="Full name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="w-full p-5 rounded-2xl bg-black/40 border border-white/10 outline-none mb-5 focus:border-pink-500 transition-all"
-              />
-            )}
+            <div className="relative">
+              <div className="mb-6">
+                <p className="text-[11px] tracking-[0.22em] text-pink-300 font-black mb-2">
+                  {isLogin ? "LOGIN" : isRegister ? "CREATE SPACE" : isForgot ? "RECOVER" : "RESET"}
+                </p>
+                <h2 className="text-3xl sm:text-4xl font-black mb-2">{getTitle()}</h2>
+                <p className="text-gray-400 text-sm sm:text-base">{getSubtitle()}</p>
+              </div>
 
-            {/* USERNAME */}
-            {(isLogin || isRegister) && (
-              <div className="relative mb-5">
-                <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500">@</span>
+              {message && (
+                <div className="mb-5 bg-red-500/15 border border-red-500/30 text-red-200 p-4 rounded-2xl text-sm">
+                  {message}
+                </div>
+              )}
+
+              {success && (
+                <div className="mb-5 bg-green-500/15 border border-green-500/30 text-green-200 p-4 rounded-2xl text-sm">
+                  {success}
+                </div>
+              )}
+
+              {isRegister && (
                 <input
                   type="text"
-                  placeholder="Username"
-                  value={username}
-                  onChange={(e) => setUsername(cleanUsername(e.target.value))}
+                  placeholder="Full name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className="w-full p-5 pl-10 rounded-2xl bg-black/40 border border-white/10 outline-none focus:border-pink-500 transition-all"
+                  className="w-full p-4 rounded-2xl bg-black/40 border border-white/10 outline-none mb-4 focus:border-pink-500 transition-all"
                 />
-              </div>
-            )}
+              )}
 
-            {/* EMAIL */}
-            {(isRegister || isForgot) && (
-              <input
-                type="email"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="w-full p-5 rounded-2xl bg-black/40 border border-white/10 outline-none mb-5 focus:border-pink-500 transition-all"
-              />
-            )}
+              {(isLogin || isRegister) && (
+                <div className="relative mb-4">
+                  <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500">@</span>
+                  <input
+                    type="text"
+                    placeholder="Username"
+                    value={username}
+                    onChange={(e) => setUsername(cleanUsername(e.target.value))}
+                    onKeyDown={handleKeyDown}
+                    className="w-full p-4 pl-10 rounded-2xl bg-black/40 border border-white/10 outline-none focus:border-pink-500 transition-all"
+                  />
+                </div>
+              )}
 
-            {/* PASSWORD */}
-            {(isLogin || isRegister || isReset) && (
-              <div className="relative">
+              {(isRegister || isForgot) && (
                 <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder={isReset ? "New password" : "Password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  type="email"
+                  placeholder="Email address"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className="w-full p-5 pr-16 rounded-2xl bg-black/40 border border-white/10 outline-none focus:border-purple-500 transition-all"
+                  className="w-full p-4 rounded-2xl bg-black/40 border border-white/10 outline-none mb-4 focus:border-pink-500 transition-all"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-5 top-1/2 -translate-y-1/2 text-xl"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? "🙈" : "👁️"}
-                </button>
-              </div>
-            )}
+              )}
 
-            {(isRegister || isReset) && (
-              <p className="text-sm text-gray-400 mt-3">
-                Password must be 8+ characters with alphabet, number and special character.
-              </p>
-            )}
+              {(isLogin || isRegister || isReset) && (
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder={isReset ? "New password" : "Password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="w-full p-4 pr-14 rounded-2xl bg-black/40 border border-white/10 outline-none focus:border-purple-500 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-xl"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
+              )}
 
-            {/* FORGOT */}
-            {isLogin && (
-              <div className="flex justify-end mt-3 mb-6">
+              {(isRegister || isReset) && (
+                <p className="text-xs text-gray-500 mt-3">
+                  Password must be 8+ characters with alphabet, number and special character.
+                </p>
+              )}
+
+              {isLogin && (
+                <div className="flex justify-end mt-3 mb-5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("forgot");
+                      setMessage("");
+                      setSuccess("");
+                      setPassword("");
+                    }}
+                    className="text-pink-400 hover:text-pink-300 text-sm transition-all"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              )}
+
+              <button
+                onClick={
+                  isLogin
+                    ? handleLogin
+                    : isRegister
+                    ? handleRegister
+                    : isForgot
+                    ? handleForgotPassword
+                    : handleResetPassword
+                }
+                disabled={loading}
+                className="w-full mt-6 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 p-4 rounded-2xl font-black text-lg hover:scale-[1.02] transition-all duration-300 shadow-[0_0_30px_rgba(236,72,153,0.25)] disabled:opacity-60 disabled:hover:scale-100"
+              >
+                {loading
+                  ? "Please wait..."
+                  : isLogin
+                  ? "Enter Vybeo"
+                  : isRegister
+                  ? "Create Vybe Space"
+                  : isForgot
+                  ? "Send Reset Link"
+                  : "Reset Password"}
+              </button>
+
+              <p className="text-center text-gray-400 mt-7 text-sm">
+                {isLogin && "New to Vybeo?"}
+                {isRegister && "Already have a Vybe Space?"}
+                {(isForgot || isReset) && "Remember your password?"}
+
                 <button
                   type="button"
                   onClick={() => {
-                    setMode("forgot");
+                    setMode(isLogin ? "register" : "login");
                     setMessage("");
                     setSuccess("");
                     setPassword("");
                   }}
-                  className="text-pink-400 hover:text-pink-300 text-sm transition-all"
+                  className="text-pink-400 font-semibold ml-2 hover:text-pink-300"
                 >
-                  Forgot Password?
+                  {isLogin ? "Join now" : "Login"}
                 </button>
+              </p>
+
+              <div className="mt-9 pt-5 border-t border-white/10">
+                <div className="flex items-center justify-center gap-4 text-gray-500 text-xs sm:text-sm flex-wrap">
+                  <span>〰️ Flow</span>
+                  <span>✦ Drops</span>
+                  <span>💬 Room</span>
+                  <span>🎬 Clips</span>
+                </div>
+
+                <p className="text-center text-gray-600 text-xs mt-4">
+                  © 2026 Vybeo. Real thoughts, real moments.
+                </p>
               </div>
-            )}
-
-            {/* BUTTON */}
-            <button
-              onClick={isLogin ? handleLogin : isRegister ? handleRegister : isForgot ? handleForgotPassword : handleResetPassword}
-              disabled={loading}
-              className="w-full mt-7 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 p-5 rounded-2xl font-bold text-xl hover:scale-[1.02] transition-all duration-300 shadow-[0_0_30px_rgba(168,85,247,0.4)] disabled:opacity-60 disabled:hover:scale-100"
-            >
-              {loading
-                ? "Please wait..."
-                : isLogin
-                ? "Login"
-                : isRegister
-                ? "Create Account"
-                : isForgot
-                ? "Send Reset Link"
-                : "Reset Password"}
-            </button>
-
-            {/* TOGGLE */}
-            <p className="text-center text-gray-400 mt-8">
-              {isLogin && "Don't have an account?"}
-              {isRegister && "Already have an account?"}
-              {(isForgot || isReset) && "Remember your password?"}
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMode(isLogin ? "register" : "login");
-                  setMessage("");
-                  setSuccess("");
-                  setPassword("");
-                }}
-                className="text-pink-400 font-semibold ml-2 hover:text-pink-300"
-              >
-                {isLogin ? "Register" : "Login"}
-              </button>
-            </p>
-
-            {/* FOOTER */}
-            <div className="mt-12 pt-6 border-t border-white/10">
-              <div className="flex items-center justify-center gap-6 text-gray-500 text-sm">
-                <span>📸 Photos</span>
-                <span>🎬 Reels</span>
-                <span>💬 Chat</span>
-              </div>
-
-              <p className="text-center text-gray-600 text-sm mt-5">© 2026 Vybeo. All rights reserved.</p>
             </div>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );

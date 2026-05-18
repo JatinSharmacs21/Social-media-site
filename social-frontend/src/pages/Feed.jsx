@@ -25,6 +25,8 @@ function Feed() {
   const [editCaption, setEditCaption] = useState("");
   const [openMenuId, setOpenMenuId] = useState(null);
 
+  const [composerType, setComposerType] = useState("Thought");
+
   const [heartPostId, setHeartPostId] = useState(null);
   const [heartCommentId, setHeartCommentId] = useState(null);
 
@@ -41,6 +43,11 @@ function Feed() {
 
   const [likesModalPost, setLikesModalPost] = useState(null);
   const [followingUsers, setFollowingUsers] = useState({});
+  const [activeMood, setActiveMood] = useState("All");
+  const [activeFlowTab, setActiveFlowTab] = useState("For You");
+
+  const moodChips = ["All", "Deep", "Funny", "Chaos", "Late Night", "Creative", "College"];
+  const flowTabs = ["For You", "Tuned In", "Close Circle"];
 
   const authConfig = {
     headers: {
@@ -124,7 +131,7 @@ useEffect(() => {
 
     const shareData = {
       title: "Check this post on Vybeo",
-      text: sharePost.caption || sharePost.content || "Vybeo post",
+      text: sharePost.caption || sharePost.content || "Vybeo vybe",
       url: getPostShareUrl(sharePost._id),
     };
 
@@ -214,11 +221,65 @@ useEffect(() => {
     );
   };
 
+  const getPostKind = (post) => {
+  const hasMedia = post.media && post.media.length > 0;
+
+  if (!hasMedia) return "Thought";
+
+  const hasVideo = post.media.some((item) => {
+    const type = (item?.type || item?.resource_type || "").toLowerCase();
+    const url = getMediaUrl(item).toLowerCase();
+
+    return (
+      type.includes("video") ||
+      url.endsWith(".mp4") ||
+      url.endsWith(".mov") ||
+      url.endsWith(".webm")
+    );
+  });
+
+  if (hasVideo) return "Clip";
+  return "Moment";
+};
+
+const getPostKindStyle = (kind) => {
+  if (kind === "Thought") {
+    return "border-pink-400/25 bg-pink-500/10 text-pink-200";
+  }
+
+  if (kind === "Moment") {
+    return "border-cyan-400/25 bg-cyan-500/10 text-cyan-200";
+  }
+
+  return "border-purple-400/25 bg-purple-500/10 text-purple-200";
+};
+
+const formatVybeTime = (date) => {
+  if (!date) return "";
+
+  const diff = Date.now() - new Date(date).getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+
+  return new Date(date).toLocaleDateString();
+};
+
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     setSelectedFile(file);
+    if (file.type.startsWith("video")) {
+  setComposerType("Clip");
+} else if (file.type.startsWith("image")) {
+  setComposerType("Moment");
+}
     setPreview(URL.createObjectURL(file));
   };
 
@@ -257,6 +318,7 @@ useEffect(() => {
       setCaption("");
       setSelectedFile(null);
       setPreview("");
+      setComposerType("Thought");
     } catch (error) {
       console.log(error.response?.data || error);
     } finally {
@@ -423,7 +485,7 @@ useEffect(() => {
 
   const deletePost = async (postId) => {
     try {
-      const confirmDelete = window.confirm("Delete this post?");
+      const confirmDelete = window.confirm("Delete this vybe?");
       if (!confirmDelete) return;
 
       await API.delete(`/api/posts/${postId}`, authConfig);
@@ -514,80 +576,183 @@ useEffect(() => {
     return users.length > 0 ? users : fallbackUsers.slice(0, 5);
   }, [posts, currentUserId, fallbackUsers]);
 
-  const trendingTags = useMemo(
-    () =>
-      ["#Vybeo", "#Reels", "#Coding", "#MERN", "#Developers", "#Vibes"]
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 4),
-    []
-  );
+const hasVideoMedia = (post) => {
+  return post.media?.some((item) => {
+    const type = (item?.type || item?.resource_type || "").toLowerCase();
+    const url = getMediaUrl(item).toLowerCase();
 
+    return (
+      type.includes("video") ||
+      url.endsWith(".mp4") ||
+      url.endsWith(".mov") ||
+      url.endsWith(".webm")
+    );
+  });
+};
+
+const flowPosts = posts.filter((post) => !hasVideoMedia(post));
+
+  const trendingTags = useMemo(
+  () =>
+    ["#DeepVybes", "#LateNight", "#Chaos", "#CollegeLife", "#RealThoughts", "#Creative"]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 4),
+  []
+);
   return (
-    <div className="min-h-screen bg-black text-white px-2 sm:px-4 md:px-6 pt-20 md:pt-8 pb-24 md:pb-10">
+    <div className="min-h-screen bg-black text-white px-2 sm:px-4 md:px-6 pt-4 md:pt-8 pb-24 md:pb-10">
       <div className="w-full max-w-[1080px] mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,590px)_300px] xl:grid-cols-[minmax(0,600px)_320px] gap-8 xl:gap-10 justify-center items-start">
         <div className="w-full max-w-[600px] mx-auto lg:mx-0">
-        {/* CREATE POST */}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            createPost();
-          }}
-          className="bg-zinc-950 border border-white/10 rounded-2xl sm:rounded-3xl p-3 sm:p-5 mb-6 sm:mb-8 shadow-xl w-full"
-        >
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-gradient-to-r from-pink-500 to-indigo-500 flex items-center justify-center font-bold text-lg shrink-0">
-              V
+          {/* VYBE FLOW HEADER */}
+          <div className="mb-5 sm:mb-7">
+            <div className="flex items-end justify-between gap-4 mb-4">
+              <div>
+                <p className="text-[11px] tracking-[0.24em] text-pink-300 font-black mb-1">
+                  VYBEO
+                </p>
+
+                <h1 className="text-2xl sm:text-4xl font-black tracking-tight">
+                  Vybe Flow
+                </h1>
+
+                <p className="text-xs sm:text-sm text-gray-400 mt-1">
+                  Real thoughts, real moments, current energy.
+                </p>
+              </div>
+
+              <button
+                onClick={() => navigate("/vybe-drops")}
+                className="hidden sm:inline-flex px-4 py-2 rounded-2xl bg-white/[0.06] border border-white/10 text-sm font-semibold text-pink-200 hover:bg-pink-500/10 transition-all"
+              >
+                Daily Drop
+              </button>
             </div>
 
-            <input
-              type="text"
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              placeholder="What's on your mind?"
-              className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 sm:px-5 sm:py-4 outline-none focus:border-pink-500 transition-all text-white placeholder:text-gray-400"
-            />
+            <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {moodChips.map((mood) => (
+                <button
+                  key={mood}
+                  onClick={() => setActiveMood(mood)}
+                  className={`shrink-0 px-4 py-2 rounded-full border text-sm font-semibold transition-all ${
+                    activeMood === mood
+                      ? "bg-gradient-to-r from-pink-500/25 to-cyan-500/20 border-pink-400/30 text-white"
+                      : "bg-white/[0.04] border-white/10 text-gray-400 hover:text-white hover:bg-white/[0.07]"
+                  }`}
+                >
+                  {mood}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {preview && (
-            <div className="mb-4 rounded-2xl overflow-hidden border border-white/10 bg-black aspect-[4/5] max-h-[520px]">
-              {selectedFile?.type.startsWith("image") ? (
-                <img
-                  src={preview}
-                  alt="preview"
-                  loading="lazy"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <video
-                  src={preview}
-                  controls
-                  playsInline
-                  className="w-full h-full object-contain bg-black"
-                />
-              )}
+          {/* CREATE POST */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              createPost();
+            }}
+            className="bg-zinc-950/90 border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-5 mb-5 sm:mb-7 shadow-xl shadow-black/30 w-full"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              {["Thought", "Moment", "Clip"].map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setComposerType(type)}
+                  className={`px-4 py-2 rounded-full text-xs sm:text-sm font-bold border transition-all ${
+                    composerType === type
+                      ? "bg-gradient-to-r from-pink-500/25 to-cyan-500/20 border-pink-400/30 text-white"
+                      : "bg-white/[0.04] border-white/10 text-gray-400 hover:text-white"
+                  }`}
+                >
+                  {type}
+                </button>
+              ))}
             </div>
-          )}
 
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <label className="cursor-pointer bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-3 rounded-2xl text-sm transition-all">
-              📎 Add Photo/Video
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-gradient-to-r from-pink-500 to-indigo-500 flex items-center justify-center font-bold text-lg shrink-0">
+                V
+              </div>
+
               <input
-                type="file"
-                accept="image/*,video/*"
-                onChange={handleFileChange}
-                className="hidden"
+                type="text"
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                placeholder={
+                  composerType === "Thought"
+                    ? "Drop a real thought..."
+                    : composerType === "Moment"
+                    ? "Say something about this moment..."
+                    : "Add a caption to your clip..."
+                }
+                className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 sm:px-5 sm:py-4 outline-none focus:border-pink-500 transition-all text-white placeholder:text-gray-400"
               />
-            </label>
+            </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-7 py-3 rounded-2xl font-semibold hover:scale-105 transition-all shadow-lg disabled:opacity-60"
-            >
-              {loading ? "Uploading..." : "Post"}
-            </button>
+            {preview && (
+              <div className="mb-4 rounded-2xl overflow-hidden border border-white/10 bg-black aspect-[4/5] max-h-[520px]">
+                {selectedFile?.type.startsWith("image") ? (
+                  <img
+                    src={preview}
+                    alt="preview"
+                    loading="lazy"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <video
+                    src={preview}
+                    controls
+                    playsInline
+                    className="w-full h-full object-contain bg-black"
+                  />
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <label className="cursor-pointer bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-3 rounded-2xl text-sm transition-all">
+                {composerType === "Clip" ? "🎬 Add Clip" : "📎 Add Moment"}
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-7 py-3 rounded-2xl font-semibold hover:scale-105 transition-all shadow-lg disabled:opacity-60"
+              >
+                {loading
+                  ? "Dropping..."
+                  : composerType === "Thought"
+                  ? "Drop Thought"
+                  : composerType === "Moment"
+                  ? "Drop Moment"
+                  : "Drop Clip"}
+              </button>
+            </div>
+          </form>
+
+          {/* FLOW TABS */}
+          <div className="flex items-center gap-2 mb-5 bg-white/[0.035] border border-white/10 rounded-2xl p-1">
+            {flowTabs.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveFlowTab(tab)}
+                className={`flex-1 px-3 py-2 rounded-xl text-sm font-bold transition-all ${
+                  activeFlowTab === tab
+                    ? "bg-white/[0.10] text-white shadow-lg"
+                    : "text-gray-500 hover:text-white"
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
-        </form>
 
         {/* POSTS */}
         <div className="space-y-6">
@@ -616,21 +781,23 @@ useEffect(() => {
                 </div>
               ))}
             </div>
-          ) : posts.length === 0 ? (
+          ) : flowPosts.length === 0 ? (
             <div className="text-center py-20 text-gray-400">
-              <h2 className="text-2xl font-bold mb-2">No Posts Yet</h2>
-              <p>Start sharing your vibe ✨</p>
+             <h2 className="text-2xl font-bold mb-2">No Vybes Yet</h2>
+            <p>Drop your first thought or moment ✨</p>
             </div>
           ) : (
-            posts.map((post) => {
+            flowPosts.map((post) => {
               const isPostOwner = post.user?._id === currentUserId;
               const commentsOpen = openComments[post._id];
               const isSaved = savedPosts.includes(post._id);
+              const postKind = getPostKind(post);
+              const postKindStyle = getPostKindStyle(postKind);
 
               return (
                 <div
                   key={post._id}
-                  className="relative bg-zinc-950 border border-white/10 rounded-2xl sm:rounded-3xl overflow-hidden shadow-xl w-full"
+                  className="relative bg-zinc-950/95 border border-white/10 rounded-2xl sm:rounded-3xl overflow-hidden shadow-xl shadow-black/30 w-full"
                 >
                   {heartPostId === post._id && (
                     <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
@@ -662,11 +829,17 @@ useEffect(() => {
                           {post.user?.name || "Unknown User"}
                         </h4>
 
-                        <p className="text-xs text-gray-400 truncate">
-                          {post.createdAt
-                            ? new Date(post.createdAt).toLocaleString()
-                            : ""}
-                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+  <p className="text-xs text-gray-500 truncate">
+    {formatVybeTime(post.createdAt)}
+  </p>
+
+  <span
+    className={`px-2 py-0.5 rounded-full border text-[10px] font-black tracking-wide ${postKindStyle}`}
+  >
+    {postKind}
+  </span>
+</div>
                       </div>
                     </div>
 
@@ -689,14 +862,14 @@ useEffect(() => {
                               onClick={() => startEditPost(post)}
                               className="block w-full text-left px-4 py-3 hover:bg-white/10 text-sm"
                             >
-                              Edit caption
+                              Edit vybe
                             </button>
 
                             <button
                               onClick={() => deletePost(post._id)}
                               className="block w-full text-left px-4 py-3 hover:bg-red-500/10 text-red-400 text-sm"
                             >
-                              Delete post
+                              Delete vybe
                             </button>
                           </div>
                         )}
@@ -736,7 +909,9 @@ useEffect(() => {
                         onDoubleClick={() =>
                           handlePostLikeWithAnimation(post._id)
                         }
-                        className="px-4 pt-1 pb-4 text-[15px] sm:text-[16px] text-gray-100 leading-7 break-words cursor-pointer select-none"
+                        className={`mx-4 mb-4 rounded-2xl border border-white/5 bg-white/[0.035] px-4 py-3 text-[15px] sm:text-[16px] text-gray-100 leading-7 break-words cursor-pointer select-none ${
+                    postKind === "Thought" ? "text-lg sm:text-xl font-semibold leading-8" : ""
+                  }`}
                       >
                         {post.caption || post.content}
                       </p>
@@ -796,18 +971,18 @@ useEffect(() => {
                               ? "text-pink-400"
                               : "text-gray-100 hover:text-pink-400"
                           }`}
-                          title="Like"
+                          title="Felt"
                         >
                           <HeartIcon filled={isPostLikedByMe(post)} />
                           <span
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setLikesModalPost(post);
-                            }}
-                            className="text-[15px] font-semibold hover:underline cursor-pointer"
-                          >
-                            {post.likes?.length || 0}
-                          </span>
+  onClick={(e) => {
+    e.stopPropagation();
+    setLikesModalPost(post);
+  }}
+  className="text-[13px] font-semibold hover:underline cursor-pointer"
+>
+  {post.likes?.length || 0} Felt
+</span>
                         </button>
 
                         <button
@@ -818,11 +993,11 @@ useEffect(() => {
                             }))
                           }
                           className="flex items-center gap-2 text-gray-100 hover:text-indigo-300 active:scale-90 transition-all"
-                          title="Comments"
+                          title="Replies"
                         >
                           <CommentIcon />
-                          <span className="text-[15px] font-semibold">
-                            {post.comments?.length || 0}
+                          <span className="text-[13px] font-semibold">
+                            {post.comments?.length || 0} Replies
                           </span>
                         </button>
 
@@ -850,7 +1025,7 @@ useEffect(() => {
 
                     {isSaved && (
                       <p className="mb-3 text-xs text-yellow-400">
-                        Saved to your collection
+                        Saved to your Vybe collection
                       </p>
                     )}
 
@@ -863,7 +1038,7 @@ useEffect(() => {
                       }`}
                     >
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-semibold">Comments</h3>
+                        <h3 className="font-semibold">Replies</h3>
 
                         <button
                           onClick={() =>
@@ -894,7 +1069,7 @@ useEffect(() => {
                               addComment(post._id);
                             }
                           }}
-                          placeholder="Add a comment..."
+                          placeholder="Drop a reply..."
                           className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 outline-none focus:border-indigo-500 text-sm"
                         />
 
@@ -902,7 +1077,7 @@ useEffect(() => {
                           onClick={() => addComment(post._id)}
                           className="px-4 py-3 rounded-2xl bg-indigo-500/20 hover:bg-indigo-500 text-sm transition-all sm:w-auto w-full"
                         >
-                          Send
+                          Reply
                         </button>
                       </div>
 
@@ -1115,7 +1290,7 @@ useEffect(() => {
                         </div>
                       ) : (
                         <p className="text-sm text-gray-500 text-center py-6">
-                          No comments yet. Be the first one ✨
+                          No replies yet. Be the first to feel this ✨
                         </p>
                       )}
                     </div>
@@ -1160,13 +1335,13 @@ useEffect(() => {
                 onClick={() => navigate("/profile")}
                 className="text-sm text-cyan-300 hover:text-cyan-200 font-semibold"
               >
-                Profile
+                Vybe Space
               </button>
             </div>
 
             <div className="bg-zinc-950/40 border border-white/5 rounded-3xl p-5">
               <div className="flex items-center justify-between mb-5">
-                <h3 className="font-bold text-gray-200">Suggested for you</h3>
+                <h3 className="font-bold text-gray-200">People to Tune In</h3>
                 <span className="text-xs text-gray-500">Fresh</span>
               </div>
 
@@ -1203,7 +1378,7 @@ useEffect(() => {
                             {user.name || "User"}
                           </p>
                           <p className="text-xs text-gray-500 truncate">
-                            {user.bio || "Suggested for you"}
+                            {user.bio || "People to Tune In"}
                           </p>
                         </div>
                       </div>
@@ -1216,7 +1391,7 @@ useEffect(() => {
                             : "text-cyan-300 hover:text-cyan-200"
                         }`}
                       >
-                        {following ? "Following" : "Follow"}
+                        {following ? "Tuned In" : "Tune In"}
                       </button>
                     </div>
                   );
@@ -1225,7 +1400,7 @@ useEffect(() => {
             </div>
 
             <div className="bg-zinc-950/40 border border-white/5 rounded-3xl p-5">
-              <h3 className="font-bold text-gray-200 mb-4">Trending now</h3>
+              <h3 className="font-bold text-gray-200 mb-4">Trending Vybes</h3>
 
               <div className="space-y-3">
                 {trendingTags.map((tag) => (
@@ -1263,7 +1438,7 @@ useEffect(() => {
           >
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-lg font-bold">
-                Likes ({likesModalPost.likes?.length || 0})
+                Felt by ({likesModalPost.likes?.length || 0})
               </h3>
 
               <button
@@ -1297,7 +1472,7 @@ useEffect(() => {
                       </p>
 
                       <p className="text-xs text-gray-400">
-                        Liked this post ❤️
+                        Felt this vybe ❤️
                       </p>
                     </div>
                   </div>
@@ -1305,7 +1480,7 @@ useEffect(() => {
               </div>
             ) : (
               <p className="text-center text-gray-400 py-8">
-                No likes yet
+                No one felt this yet
               </p>
             )}
           </div>
@@ -1324,7 +1499,7 @@ useEffect(() => {
             className="w-full sm:max-w-md bg-zinc-950 border border-white/10 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl animate-[fadeIn_0.2s_ease-in-out]"
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold">Share post</h3>
+              <h3 className="text-lg font-bold">Share this vybe</h3>
 
               <button
                 onClick={() => setSharePost(null)}
@@ -1336,7 +1511,7 @@ useEffect(() => {
 
             <div className="bg-white/5 border border-white/10 rounded-2xl p-3 mb-4">
               <p className="text-sm text-gray-300 line-clamp-2">
-                {sharePost.caption || sharePost.content || "Vybeo post"}
+                {sharePost.caption || sharePost.content || "Vybeo vybe"}
               </p>
               <p className="text-xs text-gray-500 mt-2 truncate">
                 {getPostShareUrl(sharePost._id)}
@@ -1355,7 +1530,7 @@ useEffect(() => {
                 onClick={nativeSharePost}
                 className="px-4 py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-indigo-500 hover:scale-[1.02] transition-all font-medium"
               >
-                Share now
+                Share Vybe
               </button>
             </div>
           </div>
