@@ -13,11 +13,18 @@ function Feed() {
   const [caption, setCaption] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [preview, setPreview] = useState("");
+  const [editedPreview, setEditedPreview] = useState("");
+  const [mediaItems, setMediaItems] = useState([]);
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0);
+  const [mediaInputMode, setMediaInputMode] = useState("add");
+  const [mediaEditModalOpen, setMediaEditModalOpen] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [mediaFilter, setMediaFilter] = useState("Original");
   const [mediaAspect, setMediaAspect] = useState("Original");
   const [mediaZoom, setMediaZoom] = useState(1);
   const [mediaStudioOpen, setMediaStudioOpen] = useState(false);
+  const [mediaEditTab, setMediaEditTab] = useState("Crop");
+  const [mediaUploadStage, setMediaUploadStage] = useState("");
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
@@ -195,11 +202,13 @@ useEffect(() => {
 
 useEffect(() => {
   return () => {
-    if (preview) {
-      URL.revokeObjectURL(preview);
-    }
+    mediaItems.forEach((item) => {
+      if (item.preview) URL.revokeObjectURL(item.preview);
+      if (item.editedPreview) URL.revokeObjectURL(item.editedPreview);
+    });
   };
-}, [preview]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
 
 
   const updatePostInState = (updatedPost) => {
@@ -380,15 +389,35 @@ const formatVybeTime = (date) => {
 };
 
 
-const getSelectedFilter = () => {
-  return mediaFilterOptions.find((item) => item.value === mediaFilter) || mediaFilterOptions[0];
+const getSelectedFilter = (filterValue = mediaFilter) => {
+  return mediaFilterOptions.find((item) => item.value === filterValue) || mediaFilterOptions[0];
 };
 
-const getAspectRatioValue = () => {
-  if (mediaAspect === "Square") return 1;
-  if (mediaAspect === "Portrait") return 4 / 5;
-  if (mediaAspect === "Wide") return 16 / 9;
+const getAspectRatioValue = (aspectValue = mediaAspect) => {
+  if (aspectValue === "Square") return 1;
+  if (aspectValue === "Portrait") return 4 / 5;
+  if (aspectValue === "Wide") return 16 / 9;
   return null;
+};
+
+const activeMedia = mediaItems[activeMediaIndex] || null;
+const hasSelectedMedia = mediaItems.length > 0;
+const activePreviewSrc = activeMedia?.editedPreview || activeMedia?.preview || editedPreview || preview;
+const isSelectedImage = activeMedia?.type === "image" || selectedFile?.type?.startsWith("image");
+const isSelectedVideo = activeMedia?.type === "video" || selectedFile?.type?.startsWith("video");
+
+const getPreviewFrameClass = (aspectValue = mediaAspect) => {
+  if (aspectValue === "Square") return "aspect-square max-h-[390px]";
+  if (aspectValue === "Portrait") return "aspect-[4/5] max-h-[470px]";
+  if (aspectValue === "Wide") return "aspect-video max-h-[310px]";
+  return "h-[270px] sm:h-[340px]";
+};
+
+const hasMediaEdits = (item = activeMedia) => {
+  return Boolean(
+    item?.type === "image" &&
+      (item.aspect !== "Original" || item.filter !== "Original" || item.zoom !== 1)
+  );
 };
 
 const resetMediaEditor = () => {
@@ -396,26 +425,71 @@ const resetMediaEditor = () => {
   setMediaAspect("Original");
   setMediaZoom(1);
   setMediaStudioOpen(false);
+  setMediaEditTab("Crop");
+  setMediaUploadStage("");
   setUploadError("");
 };
 
-const removeSelectedMedia = () => {
-  if (preview) {
-    URL.revokeObjectURL(preview);
+const syncActiveMediaState = (item, index) => {
+  if (!item) {
+    setSelectedFile(null);
+    setPreview("");
+    setEditedPreview("");
+    resetMediaEditor();
+    return;
   }
 
-  setSelectedFile(null);
-  setPreview("");
-  resetMediaEditor();
-  setComposerType("Thought");
-
-  if (mediaInputRef.current) {
-    mediaInputRef.current.value = "";
-  }
+  setActiveMediaIndex(index);
+  setSelectedFile(item.file);
+  setPreview(item.preview || "");
+  setEditedPreview(item.editedPreview || "");
+  setMediaFilter(item.filter || "Original");
+  setMediaAspect(item.aspect || "Original");
+  setMediaZoom(item.zoom || 1);
+  setComposerType(item.type === "video" ? "Clip" : "Moment");
 };
 
-const isSelectedImage = selectedFile?.type?.startsWith("image");
-const isSelectedVideo = selectedFile?.type?.startsWith("video");
+const selectMediaItem = (index) => {
+  const item = mediaItems[index];
+  if (!item) return;
+  syncActiveMediaState(item, index);
+  setMediaStudioOpen(false);
+  setMediaEditModalOpen(false);
+};
+
+const revokeMediaItemUrls = (item) => {
+  if (item?.preview) URL.revokeObjectURL(item.preview);
+  if (item?.editedPreview) URL.revokeObjectURL(item.editedPreview);
+};
+
+const removeMediaItem = (index = activeMediaIndex) => {
+  setMediaItems((prev) => {
+    const removed = prev[index];
+    if (removed) revokeMediaItemUrls(removed);
+
+    const next = prev.filter((_, itemIndex) => itemIndex !== index);
+    const nextIndex = Math.max(0, Math.min(index, next.length - 1));
+
+    setTimeout(() => {
+      if (next.length > 0) {
+        syncActiveMediaState(next[nextIndex], nextIndex);
+      } else {
+        setActiveMediaIndex(0);
+        setSelectedFile(null);
+        setPreview("");
+        setEditedPreview("");
+        setComposerType("Thought");
+        resetMediaEditor();
+      }
+    }, 0);
+
+    return next;
+  });
+
+  if (mediaInputRef.current) mediaInputRef.current.value = "";
+};
+
+const removeSelectedMedia = () => removeMediaItem(activeMediaIndex);
 
 const loadImageFromFile = (file) => {
   return new Promise((resolve, reject) => {
@@ -436,15 +510,16 @@ const loadImageFromFile = (file) => {
   });
 };
 
-const getCanvasFilter = () => {
-  return getSelectedFilter().css || "none";
+const getCanvasFilter = (filterValue = mediaFilter) => {
+  return getSelectedFilter(filterValue).css || "none";
 };
 
-const getProcessedImageFile = async () => {
-  if (!selectedFile || !isSelectedImage) return selectedFile;
+const getProcessedImageBlob = async (item = activeMedia) => {
+  if (!item?.file || item.type !== "image") return null;
 
-  const image = await loadImageFromFile(selectedFile);
-  const targetRatio = getAspectRatioValue();
+  const image = await loadImageFromFile(item.file);
+  const targetRatio = getAspectRatioValue(item.aspect || "Original");
+  const itemZoom = item.zoom || 1;
 
   let sourceX = 0;
   let sourceY = 0;
@@ -463,16 +538,16 @@ const getProcessedImageFile = async () => {
     }
   }
 
-  if (mediaZoom > 1) {
-    const zoomedWidth = sourceWidth / mediaZoom;
-    const zoomedHeight = sourceHeight / mediaZoom;
+  if (itemZoom > 1) {
+    const zoomedWidth = sourceWidth / itemZoom;
+    const zoomedHeight = sourceHeight / itemZoom;
     sourceX += (sourceWidth - zoomedWidth) / 2;
     sourceY += (sourceHeight - zoomedHeight) / 2;
     sourceWidth = zoomedWidth;
     sourceHeight = zoomedHeight;
   }
 
-  const maxOutputSize = 1400;
+  const maxOutputSize = 1600;
   const outputRatio = sourceWidth / sourceHeight;
   let outputWidth = sourceWidth;
   let outputHeight = sourceHeight;
@@ -492,7 +567,7 @@ const getProcessedImageFile = async () => {
   canvas.height = Math.round(outputHeight);
 
   const ctx = canvas.getContext("2d");
-  ctx.filter = getCanvasFilter();
+  ctx.filter = getCanvasFilter(item.filter || "Original");
   ctx.drawImage(
     image,
     sourceX,
@@ -506,106 +581,233 @@ const getProcessedImageFile = async () => {
   );
 
   return await new Promise((resolve) => {
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) {
-          resolve(selectedFile);
-          return;
-        }
-
-        const cleanName = selectedFile.name.replace(/\.[^/.]+$/, "");
-        resolve(
-          new File([blob], `${cleanName}-vybeo.jpg`, {
-            type: "image/jpeg",
-            lastModified: Date.now(),
-          })
-        );
-      },
-      "image/jpeg",
-      0.92
-    );
+    canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.92);
   });
 };
 
+const getProcessedImageFile = async (item = activeMedia) => {
+  if (!item?.file || item.type !== "image") return item?.file;
+
+  const blob = await getProcessedImageBlob(item);
+  if (!blob) return item.file;
+
+  const cleanName = item.file.name.replace(/\.[^/.]+$/, "");
+
+  return new File([blob], `${cleanName}-vybeo.jpg`, {
+    type: "image/jpeg",
+    lastModified: Date.now(),
+  });
+};
+
+const patchActiveMedia = (patch) => {
+  setMediaItems((prev) =>
+    prev.map((item, index) =>
+      index === activeMediaIndex
+        ? {
+            ...item,
+            ...patch,
+          }
+        : item
+    )
+  );
+};
+
+useEffect(() => {
+  if (!activeMedia || activeMedia.type !== "image") return;
+
+  const patch = {
+    aspect: mediaAspect,
+    zoom: mediaZoom,
+    filter: mediaFilter,
+  };
+
+  patchActiveMedia(patch);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [mediaAspect, mediaZoom, mediaFilter]);
+
+useEffect(() => {
+  let cancelled = false;
+
+  const buildEditedPreview = async () => {
+    if (!activeMedia || activeMedia.type !== "image") {
+      setEditedPreview("");
+      return;
+    }
+
+    try {
+      const workingItem = {
+        ...activeMedia,
+        aspect: mediaAspect,
+        zoom: mediaZoom,
+        filter: mediaFilter,
+      };
+
+      const blob = await getProcessedImageBlob(workingItem);
+      if (!blob || cancelled) return;
+
+      const nextUrl = URL.createObjectURL(blob);
+
+      setMediaItems((prev) =>
+        prev.map((item, index) => {
+          if (index !== activeMediaIndex) return item;
+          if (item.editedPreview) URL.revokeObjectURL(item.editedPreview);
+          return {
+            ...item,
+            editedPreview: nextUrl,
+            aspect: mediaAspect,
+            zoom: mediaZoom,
+            filter: mediaFilter,
+          };
+        })
+      );
+
+      setEditedPreview(nextUrl);
+    } catch (error) {
+      console.log("Preview render failed:", error);
+    }
+  };
+
+  buildEditedPreview();
+
+  return () => {
+    cancelled = true;
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [activeMediaIndex, mediaAspect, mediaZoom, mediaFilter, activeMedia?.preview]);
+
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-    const isValidMedia = file.type.startsWith("image") || file.type.startsWith("video");
+    const validFiles = files.filter((file) => file.type.startsWith("image") || file.type.startsWith("video"));
 
-    if (!isValidMedia) {
-      setUploadError("Please select an image or video file.");
+    if (validFiles.length !== files.length) {
+      setUploadError("Please select only image or video files.");
       return;
     }
 
-    if (file.size > 60 * 1024 * 1024) {
-      setUploadError("Media is too large. Please choose a file under 60MB.");
+    const oversizedFile = validFiles.find((file) => file.size > 60 * 1024 * 1024);
+    if (oversizedFile) {
+      setUploadError("Media is too large. Please choose files under 60MB.");
       return;
     }
 
-    if (preview) {
-      URL.revokeObjectURL(preview);
+    const nextItems = validFiles.map((file) => ({
+      id: `${Date.now()}-${file.name}-${Math.random().toString(36).slice(2)}`,
+      file,
+      preview: URL.createObjectURL(file),
+      editedPreview: "",
+      type: file.type.startsWith("video") ? "video" : "image",
+      filter: "Original",
+      aspect: "Original",
+      zoom: 1,
+    }));
+
+    setUploadError("");
+    setMediaEditModalOpen(false);
+    setMediaStudioOpen(false);
+
+    if (mediaInputMode === "replace" && nextItems[0]) {
+      setMediaItems((prev) => {
+        const oldItem = prev[activeMediaIndex];
+        if (oldItem) revokeMediaItemUrls(oldItem);
+
+        const updated = [...prev];
+        updated[activeMediaIndex] = nextItems[0];
+        return updated;
+      });
+
+      syncActiveMediaState(nextItems[0], activeMediaIndex);
+
+      nextItems.slice(1).forEach((item) => {
+        URL.revokeObjectURL(item.preview);
+      });
+    } else {
+      setMediaItems((prev) => {
+        const startIndex = prev.length;
+        const updated = [...prev, ...nextItems];
+
+        setTimeout(() => {
+          const targetIndex = startIndex;
+          if (updated[targetIndex]) {
+            syncActiveMediaState(updated[targetIndex], targetIndex);
+          }
+        }, 0);
+
+        return updated;
+      });
     }
 
-    resetMediaEditor();
-    setSelectedFile(file);
-    setPreview(URL.createObjectURL(file));
+    const hasVideo = nextItems.some((item) => item.type === "video");
+    setComposerType(hasVideo ? "Clip" : "Moment");
+    setMediaInputMode("add");
 
-    if (file.type.startsWith("video")) {
-      setComposerType("Clip");
-    } else if (file.type.startsWith("image")) {
-      setComposerType("Moment");
-      setMediaStudioOpen(true);
+    if (mediaInputRef.current) {
+      mediaInputRef.current.value = "";
     }
   };
 
   const createPost = async () => {
     try {
-      if (!caption.trim() && !selectedFile) return;
+      if (!caption.trim() && mediaItems.length === 0) return;
 
       setLoading(true);
+      setUploadError("");
 
       let media = [];
 
-      if (selectedFile) {
-        const fileToUpload = isSelectedImage
-          ? await getProcessedImageFile()
-          : selectedFile;
+      if (mediaItems.length > 0) {
+        for (let index = 0; index < mediaItems.length; index += 1) {
+          const item = mediaItems[index];
+          setMediaUploadStage(
+            item.type === "image"
+              ? `Preparing image ${index + 1}/${mediaItems.length}...`
+              : `Preparing clip ${index + 1}/${mediaItems.length}...`
+          );
 
-        const formData = new FormData();
-        formData.append("file", fileToUpload);
+          const fileToUpload = item.type === "image" ? await getProcessedImageFile(item) : item.file;
 
-        const uploadRes = await API.post("/api/upload", formData, {
-          headers: {
-            Authorization: "Bearer " + token,
-            "Content-Type": "multipart/form-data",
-          },
-        });
+          setMediaUploadStage(`Uploading ${index + 1}/${mediaItems.length}...`);
 
-        media.push(uploadRes.data);
+          const formData = new FormData();
+          formData.append("file", fileToUpload);
+
+          const uploadRes = await API.post("/api/upload", formData, {
+            headers: {
+              Authorization: "Bearer " + token,
+              "Content-Type": "multipart/form-data",
+            },
+          });
+
+          media.push(uploadRes.data);
+        }
       }
+
+      setMediaUploadStage("Dropping vybe...");
 
       const newPost = await API.post(
         "/api/posts/create",
         {
-  caption: caption.trim(),
-  media,
-  mood: selectedMood,
-},
+          caption: caption.trim(),
+          media,
+          mood: selectedMood,
+        },
         authConfig
       );
 
       setPosts((prevPosts) => [newPost.data, ...prevPosts]);
       setCaption("");
-      if (preview) {
-        URL.revokeObjectURL(preview);
-      }
 
+      mediaItems.forEach((item) => revokeMediaItemUrls(item));
+      setMediaItems([]);
+      setActiveMediaIndex(0);
       setSelectedFile(null);
       setPreview("");
+      setEditedPreview("");
       setComposerType("Thought");
       setSelectedMood("All");
       setMoodPickerOpen(false);
+      setMediaEditModalOpen(false);
       resetMediaEditor();
 
       if (mediaInputRef.current) {
@@ -616,6 +818,7 @@ const getProcessedImageFile = async () => {
       setUploadError(error.response?.data?.message || "Could not upload your vybe. Please try again.");
     } finally {
       setLoading(false);
+      setMediaUploadStage("");
     }
   };
 
@@ -1031,6 +1234,13 @@ useEffect(() => {
   />
 
   <div ref={moodPickerRef} className="relative flex-1 min-w-0">
+    {hasSelectedMedia && (
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-[10px] tracking-[0.18em] text-cyan-300 font-black">MEDIA CAPTION</p>
+        <span className="text-[10px] text-gray-500">Shift + Enter for new line</span>
+      </div>
+    )}
+
     <textarea
       ref={captionRef}
       value={caption}
@@ -1042,15 +1252,23 @@ useEffect(() => {
         }
       }}
       placeholder={
-        composerType === "Thought"
+        hasSelectedMedia
+          ? isSelectedVideo
+            ? "Write a caption for this clip..."
+            : "Write a caption for this moment..."
+          : composerType === "Thought"
           ? moodMeta[selectedMood]?.placeholder || "Drop a real thought..."
           : composerType === "Moment"
           ? "Say something about this moment..."
           : "Add a caption to your clip..."
       }
       rows={1}
-      className="w-full min-w-0 overflow-y-auto no-scrollbar bg-white/5 border border-white/10 rounded-2xl px-4 py-3 pr-24 outline-none focus:border-pink-500 focus:bg-white/[0.07] transition-all text-white placeholder:text-gray-400 resize-none leading-6"
-      style={{ minHeight: "58px", maxHeight: "180px" }}
+      className={`w-full min-w-0 overflow-y-auto no-scrollbar border outline-none transition-all text-white placeholder:text-gray-400 resize-none leading-6 ${
+        selectedFile
+          ? "bg-black/35 border-cyan-400/15 rounded-[22px] px-4 py-3 pr-24 focus:border-cyan-400/40 focus:bg-black/45 shadow-inner shadow-black/30"
+          : "bg-white/5 border-white/10 rounded-2xl px-4 py-3 pr-24 focus:border-pink-500 focus:bg-white/[0.07]"
+      }`}
+      style={{ minHeight: hasSelectedMedia ? "52px" : "58px", maxHeight: "180px" }}
     />
 
     <button
@@ -1107,109 +1325,173 @@ useEffect(() => {
   </div>
 </div>
 
-            {(preview || uploadError) && (
-              <div className="mb-4 rounded-[24px] border border-white/10 bg-gradient-to-br from-white/[0.055] via-white/[0.025] to-cyan-500/[0.025] p-3 shadow-2xl shadow-black/35">
-                <div className="flex items-center justify-between gap-3 mb-2">
+            {(hasSelectedMedia || uploadError) && (
+              <div className="mb-4 rounded-[28px] border border-white/10 bg-gradient-to-br from-white/[0.07] via-white/[0.025] to-cyan-500/[0.04] p-3 shadow-2xl shadow-black/40">
+                <div className="flex items-center justify-between gap-3 mb-3">
                   <div className="min-w-0">
-                    <p className="text-[10px] tracking-[0.2em] text-pink-300 font-black">
+                    <p className="text-[10px] tracking-[0.22em] text-pink-300 font-black">
                       MEDIA PREVIEW
                     </p>
                     <p className="text-[11px] text-gray-500 mt-0.5 truncate">
-                      Original preview, crop and filters before dropping.
+                      Preview your media. Use Edit only when you want crop or filters.
                     </p>
                   </div>
 
-                  {selectedFile && (
-                    <span className="shrink-0 px-2.5 py-1 rounded-full border border-white/10 bg-white/[0.05] text-[11px] font-bold text-gray-300">
-                      {isSelectedVideo ? "🎬 Clip" : "📸 Moment"}
+                  {hasSelectedMedia && (
+                    <span className="shrink-0 px-2.5 py-1 rounded-full border border-white/10 bg-white/[0.06] text-[11px] font-bold text-gray-300">
+                      {isSelectedVideo ? "🎬 Clip" : hasMediaEdits() ? "✨ Edited" : "📸 Moment"}
                     </span>
                   )}
                 </div>
 
                 {uploadError && (
-                  <div className="mb-2 rounded-2xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                  <div className="mb-3 rounded-2xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm text-red-200">
                     {uploadError}
                   </div>
                 )}
 
-                {preview && (
-                  <div className="space-y-2.5">
-                    <div className="relative rounded-[20px] overflow-hidden border border-white/10 bg-black/80 h-[230px] sm:h-[280px] shadow-xl shadow-black/35">
+                {activeMedia && (
+                  <div className="space-y-3">
+                    <div
+                      className={`relative rounded-[24px] overflow-hidden border border-white/10 bg-[#050508] ${getPreviewFrameClass()} shadow-2xl shadow-black/40 transition-all duration-300`}
+                    >
                       {isSelectedImage ? (
                         <>
                           <img
-                            src={preview}
+                            src={activePreviewSrc}
                             alt=""
                             aria-hidden="true"
-                            className={`absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-35 ${getSelectedFilter().className}`}
+                            className="absolute inset-0 w-full h-full object-cover scale-110 blur-3xl opacity-35"
                           />
 
-                          <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/50" />
+                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(236,72,153,0.13),transparent_40%),linear-gradient(to_bottom,rgba(0,0,0,0.08),rgba(0,0,0,0.58))]" />
 
                           <img
-                            src={preview}
+                            src={activePreviewSrc}
                             alt="preview"
                             loading="lazy"
-                            className={`relative z-10 w-full h-full object-contain p-2.5 transition-transform duration-300 ${getSelectedFilter().className}`}
-                            style={{ transform: `scale(${mediaZoom})` }}
+                            className="relative z-10 w-full h-full object-contain p-2.5 transition-all duration-300"
                           />
                         </>
                       ) : (
                         <video
-                          src={preview}
+                          src={activeMedia?.preview || preview}
                           controls
                           playsInline
                           className="relative z-10 w-full h-full object-contain bg-black"
                         />
                       )}
 
-                      <div className="absolute left-2.5 top-2.5 z-20 max-w-[48%]">
-                        <span className="block truncate px-2.5 py-1.5 rounded-full bg-black/65 border border-white/10 backdrop-blur-xl text-[10px] font-black text-white shadow-lg">
-                          {selectedFile?.name || "Selected media"}
+                      <div className="absolute left-3 top-3 z-20 max-w-[68%]">
+                        <span className="block truncate px-3 py-1.5 rounded-full bg-black/65 border border-white/10 backdrop-blur-xl text-[10px] font-black text-white shadow-lg">
+                          {activeMedia?.file?.name || "Selected media"}
                         </span>
                       </div>
 
-                      <div className="absolute right-2.5 top-2.5 z-20 flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => mediaInputRef.current?.click()}
-                          className="px-2.5 py-1.5 rounded-full bg-black/65 border border-white/10 backdrop-blur-xl text-[10px] font-black text-white hover:bg-white/10 transition-all shadow-lg"
-                        >
-                          Replace
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={removeSelectedMedia}
-                          className="px-2.5 py-1.5 rounded-full bg-red-500/25 border border-red-400/25 backdrop-blur-xl text-[10px] font-black text-red-100 hover:bg-red-500/35 transition-all shadow-lg"
-                        >
-                          Remove
-                        </button>
-                      </div>
+                      {loading && hasSelectedMedia && (
+                        <div className="absolute inset-0 z-30 bg-black/70 backdrop-blur-sm flex items-center justify-center px-6">
+                          <div className="w-full max-w-xs text-center">
+                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 mx-auto mb-4 animate-pulse shadow-lg shadow-pink-500/30" />
+                            <p className="font-black text-white">
+                              {mediaUploadStage || "Preparing your vybe..."}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">Please keep this screen open.</p>
+                            <div className="mt-4 h-2 rounded-full bg-white/10 overflow-hidden">
+                              <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 animate-[uploadFlow_1.1s_ease-in-out_infinite]" />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
-                    {isSelectedImage ? (
-                      <div className="rounded-[20px] border border-white/10 bg-black/30 p-3">
-                        <div className="flex items-center justify-between gap-3 mb-2">
-                          <div className="min-w-0">
-                            <p className="text-xs font-black text-white">Edit image</p>
-                            <p className="text-[10px] text-gray-500 truncate">Crop and filters apply to final upload.</p>
+                    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+                      {isSelectedImage && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMediaStudioOpen(true);
+                            setMediaEditModalOpen(true);
+                          }}
+                          className={`shrink-0 px-4 py-2.5 rounded-2xl border text-xs font-black transition-all ${
+                            mediaStudioOpen
+                              ? "bg-pink-500/15 border-pink-400/30 text-white"
+                              : "bg-white/[0.05] border-white/10 text-gray-300 hover:text-white hover:bg-white/[0.08]"
+                          }`}
+                        >
+                          Edit
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMediaInputMode("add");
+                          mediaInputRef.current?.click();
+                        }}
+                        className="shrink-0 px-4 py-2.5 rounded-2xl border border-white/10 bg-white/[0.05] text-xs font-black text-gray-300 hover:text-white hover:bg-white/[0.08] transition-all"
+                      >
+                        Add another
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMediaInputMode("replace");
+                          mediaInputRef.current?.click();
+                        }}
+                        className="shrink-0 px-4 py-2.5 rounded-2xl border border-white/10 bg-white/[0.05] text-xs font-black text-gray-300 hover:text-white hover:bg-white/[0.08] transition-all"
+                      >
+                        Replace current
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={removeSelectedMedia}
+                        className="shrink-0 px-4 py-2.5 rounded-2xl border border-red-400/20 bg-red-500/15 text-xs font-black text-red-100 hover:bg-red-500/25 transition-all"
+                      >
+                        Remove
+                      </button>
+                    </div>
+
+                    {false && isSelectedImage && mediaStudioOpen && (
+                      <div className="rounded-[24px] border border-white/10 bg-black/40 p-3 shadow-xl shadow-black/20">
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                          <div>
+                            <p className="text-xs font-black text-white">Edit media</p>
+                            <p className="text-[10px] text-gray-500">Crop and filters apply to preview and final upload.</p>
                           </div>
 
                           <button
                             type="button"
-                            onClick={() => setMediaStudioOpen((prev) => !prev)}
-                            className="px-3 py-1.5 rounded-xl bg-white/[0.05] border border-white/10 text-[11px] font-bold text-gray-300 hover:text-white hover:bg-white/[0.08] transition-all"
+                            onClick={resetMediaEditor}
+                            className="px-3 py-2 rounded-2xl bg-white/[0.04] border border-white/10 text-[11px] font-bold text-gray-400 hover:text-white"
                           >
-                            {mediaStudioOpen ? "Hide" : "Edit"}
+                            Reset
                           </button>
                         </div>
 
-                        {mediaStudioOpen && (
-                          <div className="space-y-3 max-h-[210px] overflow-y-auto no-scrollbar pr-1">
+                        <div className="flex items-center gap-1.5 rounded-2xl bg-white/[0.04] border border-white/10 p-1 mb-3 w-fit">
+                          {["Crop", "Filter"].map((tab) => (
+                            <button
+                              key={tab}
+                              type="button"
+                              onClick={() => setMediaEditTab(tab)}
+                              className={`px-3 py-1.5 rounded-xl text-[11px] font-black transition-all ${
+                                mediaEditTab === tab
+                                  ? "bg-white/[0.1] text-white"
+                                  : "text-gray-500 hover:text-white"
+                              }`}
+                            >
+                              {tab}
+                            </button>
+                          ))}
+                        </div>
+
+                        {mediaEditTab === "Crop" ? (
+                          <div className="space-y-3">
                             <div>
-                              <div className="flex items-center justify-between mb-1.5">
-                                <p className="text-[10px] tracking-[0.18em] text-gray-500 font-black">CROP</p>
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-[10px] tracking-[0.18em] text-gray-500 font-black">FRAME</p>
                                 <span className="text-[10px] text-gray-600">{mediaAspect}</span>
                               </div>
 
@@ -1226,13 +1508,14 @@ useEffect(() => {
                                     }`}
                                   >
                                     <p className="text-[11px] font-black leading-none">{option.label}</p>
+                                    <p className="text-[9px] text-gray-500 mt-1">{option.hint}</p>
                                   </button>
                                 ))}
                               </div>
                             </div>
 
                             <div>
-                              <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center justify-between mb-1.5">
                                 <p className="text-[10px] tracking-[0.18em] text-gray-500 font-black">ZOOM</p>
                                 <span className="text-[10px] text-gray-500">{mediaZoom.toFixed(1)}x</span>
                               </div>
@@ -1247,36 +1530,80 @@ useEffect(() => {
                                 className="w-full accent-pink-500 h-2"
                               />
                             </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="text-[10px] tracking-[0.18em] text-gray-500 font-black mb-2">FILTER</p>
 
-                            <div>
-                              <p className="text-[10px] tracking-[0.18em] text-gray-500 font-black mb-1.5">FILTER</p>
-
-                              <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
-                                {mediaFilterOptions.map((option) => (
-                                  <button
-                                    key={option.value}
-                                    type="button"
-                                    onClick={() => setMediaFilter(option.value)}
-                                    className={`shrink-0 w-[74px] rounded-2xl border p-2 transition-all ${
-                                      mediaFilter === option.value
-                                        ? "bg-cyan-500/15 border-cyan-400/30 text-white"
-                                        : "bg-white/[0.035] border-white/10 text-gray-400 hover:text-white hover:bg-white/[0.06]"
-                                    }`}
-                                  >
-                                    <div className={`h-8 rounded-xl bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 shadow-inner ${option.className}`} />
-                                    <p className="text-[9px] font-bold mt-1 truncate">{option.label}</p>
-                                  </button>
-                                ))}
-                              </div>
+                            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                              {mediaFilterOptions.map((option) => (
+                                <button
+                                  key={option.value}
+                                  type="button"
+                                  onClick={() => setMediaFilter(option.value)}
+                                  className={`shrink-0 w-[72px] rounded-2xl border p-1.5 transition-all ${
+                                    mediaFilter === option.value
+                                      ? "bg-cyan-500/15 border-cyan-400/30 text-white"
+                                      : "bg-white/[0.035] border-white/10 text-gray-400 hover:text-white hover:bg-white/[0.06]"
+                                  }`}
+                                >
+                                  <div className={`h-9 rounded-xl bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 ${option.className}`} />
+                                  <p className="text-[10px] font-bold mt-1 truncate">{option.label}</p>
+                                </button>
+                              ))}
                             </div>
                           </div>
                         )}
                       </div>
-                    ) : (
+                    )}
+
+
+                    {mediaItems.length > 1 && (
+                      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+                        {mediaItems.map((item, index) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => selectMediaItem(index)}
+                            className={`relative shrink-0 w-16 h-16 rounded-2xl overflow-hidden border transition-all ${
+                              activeMediaIndex === index
+                                ? "border-pink-400 shadow-lg shadow-pink-500/20"
+                                : "border-white/10 opacity-70 hover:opacity-100"
+                            }`}
+                          >
+                            {item.type === "image" ? (
+                              <img
+                                src={item.editedPreview || item.preview}
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <video src={item.preview} className="w-full h-full object-cover" />
+                            )}
+                            <span className="absolute bottom-1 right-1 rounded-full bg-black/65 px-1.5 py-0.5 text-[9px] font-black text-white">
+                              {index + 1}
+                            </span>
+                          </button>
+                        ))}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMediaInputMode("add");
+                            mediaInputRef.current?.click();
+                          }}
+                          className="shrink-0 w-16 h-16 rounded-2xl border border-dashed border-white/20 bg-white/[0.035] text-xl text-gray-400 hover:text-white hover:bg-white/[0.07] transition-all"
+                        >
+                          +
+                        </button>
+                      </div>
+                    )}
+
+                    {isSelectedVideo && (
                       <div className="rounded-[20px] border border-white/10 bg-black/25 p-3">
                         <p className="text-sm font-black text-white">Clip preview</p>
                         <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                          Video editing is lightweight for speed. Replace or remove this clip before posting.
+                          Video editing is lightweight for speed. Add another clip or remove this one before posting.
                         </p>
                       </div>
                     )}
@@ -1289,31 +1616,31 @@ useEffect(() => {
               ref={mediaInputRef}
               type="file"
               accept="image/*,video/*"
+              multiple={mediaInputMode === "add"}
               onChange={handleFileChange}
               className="hidden"
             />
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <button
-                type="button"
-                onClick={() => mediaInputRef.current?.click()}
-                className="bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-3 rounded-2xl text-sm font-semibold transition-all"
-              >
-                {selectedFile
-                  ? isSelectedVideo
-                    ? "🎬 Replace Clip"
-                    : "📎 Replace Moment"
-                  : composerType === "Clip"
-                  ? "🎬 Add Clip"
-                  : "📎 Add Moment"}
-              </button>
+              {!hasSelectedMedia && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMediaInputMode("add");
+                    mediaInputRef.current?.click();
+                  }}
+                  className="bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-3 rounded-2xl text-sm font-semibold transition-all"
+                >
+                  {composerType === "Clip" ? "🎬 Add Clip" : "📎 Add Moment"}
+                </button>
+              )}
 
               <button
                 type="submit"
                 disabled={loading}
-                className="bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 px-7 py-3 rounded-2xl font-black hover:scale-[1.02] transition-all shadow-lg shadow-pink-500/15 disabled:opacity-60 disabled:hover:scale-100"
+                className="ml-auto bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 px-7 py-3 rounded-2xl font-black hover:scale-[1.02] transition-all shadow-lg shadow-pink-500/15 disabled:opacity-60 disabled:hover:scale-100"
               >
                 {loading
-                  ? selectedFile
+                  ? hasSelectedMedia
                     ? "Preparing media..."
                     : "Dropping..."
                   : composerType === "Thought"
@@ -2056,8 +2383,158 @@ useEffect(() => {
           .no-scrollbar::-webkit-scrollbar {
             display: none;
           }
+
+          @keyframes uploadFlow {
+            0% { transform: translateX(-100%); }
+            50% { transform: translateX(20%); }
+            100% { transform: translateX(160%); }
+          }
         `}
       </style>
+
+
+      {/* MEDIA EDIT MODAL */}
+      {mediaEditModalOpen && activeMedia && isSelectedImage && (
+        <div
+          onClick={() => setMediaEditModalOpen(false)}
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-3"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto no-scrollbar rounded-t-[34px] sm:rounded-[34px] border border-white/10 bg-zinc-950 shadow-2xl shadow-black/60"
+          >
+            <div className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-white/10 bg-zinc-950/95 backdrop-blur-xl px-4 py-4">
+              <div>
+                <p className="text-[10px] tracking-[0.22em] text-pink-300 font-black">EDIT MEDIA</p>
+                <h3 className="text-xl font-black text-white">Crop & filters</h3>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setMediaEditModalOpen(false)}
+                className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-black text-white hover:bg-white/[0.08]"
+              >
+                Done
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              <div className={`relative overflow-hidden rounded-[28px] border border-white/10 bg-black ${getPreviewFrameClass(mediaAspect)} shadow-2xl shadow-black/40`}>
+                <img
+                  src={activePreviewSrc}
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute inset-0 h-full w-full scale-110 object-cover blur-3xl opacity-30"
+                />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(236,72,153,0.16),transparent_40%),linear-gradient(to_bottom,rgba(0,0,0,0.08),rgba(0,0,0,0.6))]" />
+                <img
+                  src={activePreviewSrc}
+                  alt="editing preview"
+                  className="relative z-10 h-full w-full object-contain p-3"
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5 rounded-2xl bg-white/[0.04] border border-white/10 p-1 w-fit">
+                {["Crop", "Filter"].map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setMediaEditTab(tab)}
+                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                      mediaEditTab === tab ? "bg-white/[0.1] text-white" : "text-gray-500 hover:text-white"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+
+              {mediaEditTab === "Crop" ? (
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[10px] tracking-[0.18em] text-gray-500 font-black">FRAME</p>
+                      <span className="text-[10px] text-gray-500">{mediaAspect}</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {mediaAspectOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setMediaAspect(option.value)}
+                          className={`rounded-2xl border px-3 py-3 text-left transition-all ${
+                            mediaAspect === option.value
+                              ? "bg-pink-500/15 border-pink-400/30 text-white"
+                              : "bg-white/[0.035] border-white/10 text-gray-400 hover:text-white hover:bg-white/[0.06]"
+                          }`}
+                        >
+                          <p className="text-sm font-black leading-none">{option.label}</p>
+                          <p className="text-[10px] text-gray-500 mt-1">{option.hint}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[10px] tracking-[0.18em] text-gray-500 font-black">ZOOM</p>
+                      <span className="text-xs text-gray-400">{mediaZoom.toFixed(1)}x</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="2"
+                      step="0.05"
+                      value={mediaZoom}
+                      onChange={(e) => setMediaZoom(Number(e.target.value))}
+                      className="w-full accent-pink-500"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-[10px] tracking-[0.18em] text-gray-500 font-black mb-3">FILTER</p>
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                    {mediaFilterOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setMediaFilter(option.value)}
+                        className={`rounded-2xl border p-2 transition-all ${
+                          mediaFilter === option.value
+                            ? "bg-cyan-500/15 border-cyan-400/30 text-white"
+                            : "bg-white/[0.035] border-white/10 text-gray-400 hover:text-white hover:bg-white/[0.06]"
+                        }`}
+                      >
+                        <div className={`h-14 rounded-xl bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 ${option.className}`} />
+                        <p className="text-[11px] font-bold mt-2 truncate">{option.label}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={resetMediaEditor}
+                  className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-black text-gray-300 hover:text-white hover:bg-white/[0.08]"
+                >
+                  Reset edits
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMediaEditModalOpen(false)}
+                  className="rounded-2xl bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 px-6 py-3 text-sm font-black text-white shadow-lg shadow-pink-500/20"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* LIKES MODAL */}
       {likesModalPost && (
