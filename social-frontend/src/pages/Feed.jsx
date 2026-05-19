@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import API from "../services/api";
 import { useNavigate } from "react-router-dom";
 
@@ -26,6 +26,8 @@ function Feed() {
   const [openMenuId, setOpenMenuId] = useState(null);
 
   const [composerType, setComposerType] = useState("Thought");
+  const [selectedMood, setSelectedMood] = useState("All");
+  const [moodPickerOpen, setMoodPickerOpen] = useState(false);
 
   const [heartPostId, setHeartPostId] = useState(null);
   const [heartCommentId, setHeartCommentId] = useState(null);
@@ -45,9 +47,55 @@ function Feed() {
   const [followingUsers, setFollowingUsers] = useState({});
   const [activeMood, setActiveMood] = useState("All");
   const [activeFlowTab, setActiveFlowTab] = useState("For You");
+  const [visiblePosts, setVisiblePosts] = useState(5);
+  const moodPickerRef = useRef(null);
 
   const moodChips = ["All", "Deep", "Funny", "Chaos", "Late Night", "Creative", "College"];
   const flowTabs = ["For You", "Tuned In", "Close Circle"];
+  const moodMeta = {
+  All: {
+    icon: "✨",
+    placeholder: "What’s your vybe right now?",
+    style: "from-zinc-500/20 to-zinc-700/20",
+    keywords: [],
+  },
+  Deep: {
+    icon: "🌊",
+    placeholder: "What’s been sitting in your mind lately?",
+    style: "from-indigo-500/25 to-purple-500/20",
+    keywords: ["deep", "sad", "alone", "lonely", "overthink", "thinking", "lost", "empty", "2am", "miss", "heart"],
+  },
+  Funny: {
+    icon: "😂",
+    placeholder: "Drop the most unserious thing today.",
+    style: "from-yellow-500/25 to-orange-500/20",
+    keywords: ["funny", "meme", "lol", "lmao", "haha", "joke", "bro"],
+  },
+  Chaos: {
+    icon: "⚡",
+    placeholder: "What just happened?",
+    style: "from-pink-500/25 to-red-500/20",
+    keywords: ["chaos", "wild", "crazy", "wtf", "panic", "mess", "drama", "random"],
+  },
+  "Late Night": {
+    icon: "🌙",
+    placeholder: "Late night thoughts hit different...",
+    style: "from-blue-500/25 to-indigo-500/20",
+    keywords: ["night", "2am", "3am", "midnight", "sleep", "awake", "moon", "late night"],
+  },
+  Creative: {
+    icon: "🎨",
+    placeholder: "Share something you created or imagined.",
+    style: "from-cyan-500/25 to-purple-500/20",
+    keywords: ["art", "design", "creative", "music", "drawing", "edit", "idea", "project"],
+  },
+  College: {
+    icon: "🎓",
+    placeholder: "What’s happening around campus?",
+    style: "from-emerald-500/25 to-cyan-500/20",
+    keywords: ["college", "hostel", "campus", "assignment", "exam", "class", "semester", "attendance", "canteen"],
+  },
+};
 
   const authConfig = {
     headers: {
@@ -93,6 +141,27 @@ useEffect(() => {
 
   loadCurrentUser();
 }, [currentUserId]);
+
+useEffect(() => {
+  setVisiblePosts(5);
+}, [activeMood, activeFlowTab]);
+
+useEffect(() => {
+  const handleClickOutside = (event) => {
+    if (
+      moodPickerRef.current &&
+      !moodPickerRef.current.contains(event.target)
+    ) {
+      setMoodPickerOpen(false);
+    }
+  };
+
+  document.addEventListener("mousedown", handleClickOutside);
+
+  return () => {
+    document.removeEventListener("mousedown", handleClickOutside);
+  };
+}, []);
 
   const updatePostInState = (updatedPost) => {
     setPosts((prevPosts) =>
@@ -242,16 +311,18 @@ useEffect(() => {
   return "Moment";
 };
 
-const getPostKindStyle = (kind) => {
-  if (kind === "Thought") {
-    return "border-pink-400/25 bg-pink-500/10 text-pink-200";
+
+
+const getHeartAnimationSize = (postKind) => {
+  if (postKind === "Thought") {
+    return "text-[54px] sm:text-[68px]";
   }
 
-  if (kind === "Moment") {
-    return "border-cyan-400/25 bg-cyan-500/10 text-cyan-200";
+  if (postKind === "Moment") {
+    return "text-[88px] sm:text-[115px]";
   }
 
-  return "border-purple-400/25 bg-purple-500/10 text-purple-200";
+  return "text-[78px] sm:text-[100px]";
 };
 
 const formatVybeTime = (date) => {
@@ -308,9 +379,10 @@ const formatVybeTime = (date) => {
       const newPost = await API.post(
         "/api/posts/create",
         {
-          caption: caption.trim(),
-          media,
-        },
+  caption: caption.trim(),
+  media,
+  mood: selectedMood,
+},
         authConfig
       );
 
@@ -319,6 +391,8 @@ const formatVybeTime = (date) => {
       setSelectedFile(null);
       setPreview("");
       setComposerType("Thought");
+      setSelectedMood("All");
+      setMoodPickerOpen(false);
     } catch (error) {
       console.log(error.response?.data || error);
     } finally {
@@ -590,7 +664,39 @@ const hasVideoMedia = (post) => {
   });
 };
 
-const flowPosts = posts.filter((post) => !hasVideoMedia(post));
+const flowPosts = posts.filter((post) => {
+  if (hasVideoMedia(post)) return false;
+
+  if (activeMood !== "All") {
+    const directMoodMatch = post.mood === activeMood;
+
+    const content = `${post.caption || ""} ${post.content || ""}`.toLowerCase();
+    const keywords = moodMeta[activeMood]?.keywords || [];
+    const keywordMatch = keywords.some((word) => content.includes(word));
+
+    if (!directMoodMatch && !keywordMatch) return false;
+  }
+
+  if (activeFlowTab === "Tuned In") {
+    return currentUser?.following?.some((f) => {
+      const id = typeof f === "string" ? f : f?._id;
+      return id === post.user?._id;
+    });
+  }
+
+  if (activeFlowTab === "Close Circle") {
+    return currentUser?.closeCircle?.some((f) => {
+      const id = typeof f === "string" ? f : f?._id;
+      return id === post.user?._id;
+    });
+  }
+
+  return true;
+});
+
+const displayedPosts = flowPosts.slice(0, visiblePosts);
+const hasMorePosts = visiblePosts < flowPosts.length;
+
 
   const trendingTags = useMemo(
   () =>
@@ -615,9 +721,11 @@ const flowPosts = posts.filter((post) => !hasVideoMedia(post));
                   Vybe Flow
                 </h1>
 
-                <p className="text-xs sm:text-sm text-gray-400 mt-1">
-                  Real thoughts, real moments, current energy.
-                </p>
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <span className="px-3 py-1 rounded-full bg-pink-500/10 border border-pink-500/20 text-pink-200 text-[10px] sm:text-[11px] font-black tracking-wide">
+                    REAL THOUGHTS
+                  </span>
+                </div>
               </div>
 
               <button
@@ -635,10 +743,11 @@ const flowPosts = posts.filter((post) => !hasVideoMedia(post));
                   onClick={() => setActiveMood(mood)}
                   className={`shrink-0 px-4 py-2 rounded-full border text-sm font-semibold transition-all ${
                     activeMood === mood
-                      ? "bg-gradient-to-r from-pink-500/25 to-cyan-500/20 border-pink-400/30 text-white"
+                      ? `bg-gradient-to-r ${moodMeta[mood]?.style} border-white/20 text-white shadow-lg shadow-pink-500/10`
                       : "bg-white/[0.04] border-white/10 text-gray-400 hover:text-white hover:bg-white/[0.07]"
                   }`}
                 >
+                  <span className="mr-1">{moodMeta[mood]?.icon}</span>
                   {mood}
                 </button>
               ))}
@@ -651,7 +760,9 @@ const flowPosts = posts.filter((post) => !hasVideoMedia(post));
               e.preventDefault();
               createPost();
             }}
-            className="bg-zinc-950/90 border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-5 mb-5 sm:mb-7 shadow-xl shadow-black/30 w-full"
+            className={`relative overflow-visible bg-zinc-950/90 border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-5 mb-5 sm:mb-7 shadow-xl shadow-black/30 w-full transition-all duration-300 ${
+              selectedMood !== "All" ? "shadow-pink-500/10" : ""
+            }`}
           >
             <div className="flex items-center gap-2 mb-4">
               {["Thought", "Moment", "Clip"].map((type) => (
@@ -669,26 +780,93 @@ const flowPosts = posts.filter((post) => !hasVideoMedia(post));
                 </button>
               ))}
             </div>
+            
+            <div className="flex items-start gap-3 mb-4">
+  <img
+    src={
+      currentUser?.profilePic ||
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(
+        currentUser?.name || "User"
+      )}&background=8b5cf6&color=fff`
+    }
+    alt=""
+    className="w-11 h-11 sm:w-12 sm:h-12 rounded-full object-cover border border-white/10 shrink-0"
+  />
 
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-gradient-to-r from-pink-500 to-indigo-500 flex items-center justify-center font-bold text-lg shrink-0">
-                V
-              </div>
+  <div ref={moodPickerRef} className="relative flex-1 min-w-0">
+    <textarea
+      value={caption}
+      onChange={(e) => setCaption(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          createPost();
+        }
+      }}
+      placeholder={
+        composerType === "Thought"
+          ? moodMeta[selectedMood]?.placeholder || "Drop a real thought..."
+          : composerType === "Moment"
+          ? "Say something about this moment..."
+          : "Add a caption to your clip..."
+      }
+      rows={2}
+      className="w-full min-w-0 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 pr-24 outline-none focus:border-pink-500 focus:bg-white/[0.07] transition-all text-white placeholder:text-gray-400 resize-none leading-6" style={{ minHeight: "58px", maxHeight: "180px" }}
+    />
 
-              <input
-                type="text"
-                value={caption}
-                onChange={(e) => setCaption(e.target.value)}
-                placeholder={
-                  composerType === "Thought"
-                    ? "Drop a real thought..."
-                    : composerType === "Moment"
-                    ? "Say something about this moment..."
-                    : "Add a caption to your clip..."
-                }
-                className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 sm:px-5 sm:py-4 outline-none focus:border-pink-500 transition-all text-white placeholder:text-gray-400"
-              />
-            </div>
+    <button
+      type="button"
+      onClick={() => setMoodPickerOpen((prev) => !prev)}
+      className={`absolute right-2 top-2 h-9 px-3 rounded-xl border text-xs font-black transition-all ${
+        selectedMood !== "All"
+          ? `bg-gradient-to-r ${moodMeta[selectedMood]?.style} border-white/20 text-white`
+          : "bg-black/40 border-white/10 text-gray-400 hover:text-white hover:bg-white/10"
+      }`}
+    >
+      <span className="mr-1">{moodMeta[selectedMood]?.icon}</span>
+      {selectedMood === "All" ? "Mood" : selectedMood}
+    </button>
+
+    {moodPickerOpen && (
+      <div className="absolute right-0 top-12 z-30 w-[260px] rounded-3xl border border-white/10 bg-zinc-950/95 backdrop-blur-2xl shadow-2xl shadow-black/50 p-3">
+        <div className="flex items-center justify-between mb-3 px-1">
+          <p className="text-[10px] tracking-[0.2em] text-pink-300 font-black">
+            SELECT VYBE
+          </p>
+
+          <button
+            type="button"
+            onClick={() => setMoodPickerOpen(false)}
+            className="text-gray-500 hover:text-white text-sm"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          {moodChips.map((mood) => (
+            <button
+              key={mood}
+              type="button"
+              onClick={() => {
+                setSelectedMood(mood);
+                setMoodPickerOpen(false);
+              }}
+              className={`px-3 py-2.5 rounded-2xl border text-sm font-bold text-left transition-all ${
+                selectedMood === mood
+                  ? `bg-gradient-to-r ${moodMeta[mood]?.style} border-white/20 text-white`
+                  : "bg-white/[0.035] border-white/10 text-gray-400 hover:text-white hover:bg-white/[0.07]"
+              }`}
+            >
+              <span className="mr-1">{moodMeta[mood]?.icon}</span>
+              {mood}
+            </button>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+</div>
 
             {preview && (
               <div className="mb-4 rounded-2xl overflow-hidden border border-white/10 bg-black aspect-[4/5] max-h-[520px]">
@@ -710,8 +888,8 @@ const flowPosts = posts.filter((post) => !hasVideoMedia(post));
               </div>
             )}
 
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <label className="cursor-pointer bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-3 rounded-2xl text-sm transition-all">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <label className="cursor-pointer bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-3 rounded-2xl text-sm font-semibold transition-all">
                 {composerType === "Clip" ? "🎬 Add Clip" : "📎 Add Moment"}
                 <input
                   type="file"
@@ -724,7 +902,7 @@ const flowPosts = posts.filter((post) => !hasVideoMedia(post));
               <button
                 type="submit"
                 disabled={loading}
-                className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-7 py-3 rounded-2xl font-semibold hover:scale-105 transition-all shadow-lg disabled:opacity-60"
+                className="bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 px-7 py-3 rounded-2xl font-black hover:scale-[1.02] transition-all shadow-lg shadow-pink-500/15 disabled:opacity-60 disabled:hover:scale-100"
               >
                 {loading
                   ? "Dropping..."
@@ -738,14 +916,14 @@ const flowPosts = posts.filter((post) => !hasVideoMedia(post));
           </form>
 
           {/* FLOW TABS */}
-          <div className="flex items-center gap-2 mb-5 bg-white/[0.035] border border-white/10 rounded-2xl p-1">
+          <div className="flex items-center gap-2 mb-5 bg-zinc-950/90 border border-white/10 rounded-3xl p-1.5 shadow-lg shadow-black/20 backdrop-blur-xl">
             {flowTabs.map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveFlowTab(tab)}
                 className={`flex-1 px-3 py-2 rounded-xl text-sm font-bold transition-all ${
                   activeFlowTab === tab
-                    ? "bg-white/[0.10] text-white shadow-lg"
+                    ? "bg-gradient-to-r from-pink-500/20 to-cyan-500/20 border border-white/10 text-white shadow-lg"
                     : "text-gray-500 hover:text-white"
                 }`}
               >
@@ -783,33 +961,51 @@ const flowPosts = posts.filter((post) => !hasVideoMedia(post));
             </div>
           ) : flowPosts.length === 0 ? (
             <div className="text-center py-20 text-gray-400">
-             <h2 className="text-2xl font-bold mb-2">No Vybes Yet</h2>
-            <p>Drop your first thought or moment ✨</p>
-            </div>
+  <div className="w-20 h-20 rounded-full bg-white/[0.05] border border-white/10 flex items-center justify-center text-3xl mx-auto mb-5">
+    ✨
+  </div>
+
+  <h2 className="text-2xl font-black mb-2">
+    No Vybes Found
+  </h2>
+
+  <p className="text-gray-500 max-w-sm mx-auto leading-relaxed">
+    Try another mood or tune into more people to shape your Flow.
+  </p>
+</div>
           ) : (
-            flowPosts.map((post) => {
+            displayedPosts.map((post) => {
               const isPostOwner = post.user?._id === currentUserId;
               const commentsOpen = openComments[post._id];
               const isSaved = savedPosts.includes(post._id);
               const postKind = getPostKind(post);
-              const postKindStyle = getPostKindStyle(postKind);
 
               return (
                 <div
                   key={post._id}
-                  className="relative bg-zinc-950/95 border border-white/10 rounded-2xl sm:rounded-3xl overflow-hidden shadow-xl shadow-black/30 w-full"
+                  className="relative bg-zinc-950/95 border border-white/10 rounded-[26px] sm:rounded-[30px] overflow-hidden shadow-xl shadow-black/30 w-full hover:border-pink-500/20 hover:shadow-[0_0_45px_rgba(236,72,153,0.08)] transition-all duration-300"
                 >
                   {heartPostId === post._id && (
                     <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
-                      <div className="absolute w-40 h-40 bg-pink-500/20 rounded-full blur-3xl" />
-                      <div className="text-[92px] sm:text-[120px] animate-[heartPremium_0.9s_cubic-bezier(0.22,1,0.36,1)_forwards] drop-shadow-[0_0_24px_rgba(236,72,153,0.55)]">
+                      <div
+  className={`absolute rounded-full bg-pink-500/20 blur-3xl ${
+    postKind === "Thought"
+      ? "w-24 h-24"
+      : postKind === "Moment"
+      ? "w-40 h-40"
+      : "w-36 h-36"
+  }`}
+/>
+                      <div
+                      className={`${getHeartAnimationSize(postKind)} animate-[heartPremium_0.9s_cubic-bezier(0.22,1,0.36,1)_forwards] drop-shadow-[0_0_24px_rgba(236,72,153,0.55)]`}
+                      >
                         ❤️
                       </div>
                     </div>
                   )}
 
                   {/* HEADER */}
-                  <div className="flex items-center justify-between p-4 relative">
+                  <div className="flex items-center justify-between p-4 pb-3 relative">
                     <div
                       onClick={() => openUserProfile(post.user?._id)}
                       className="flex items-center gap-3 min-w-0 cursor-pointer"
@@ -829,16 +1025,10 @@ const flowPosts = posts.filter((post) => !hasVideoMedia(post));
                           {post.user?.name || "Unknown User"}
                         </h4>
 
-                        <div className="flex items-center gap-2 mt-0.5">
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
   <p className="text-xs text-gray-500 truncate">
     {formatVybeTime(post.createdAt)}
   </p>
-
-  <span
-    className={`px-2 py-0.5 rounded-full border text-[10px] font-black tracking-wide ${postKindStyle}`}
-  >
-    {postKind}
-  </span>
 </div>
                       </div>
                     </div>
@@ -906,13 +1096,15 @@ const flowPosts = posts.filter((post) => !hasVideoMedia(post));
                   ) : (
                     (post.caption || post.content) && (
                       <p
-                        onDoubleClick={() =>
-                          handlePostLikeWithAnimation(post._id)
-                        }
-                        className={`mx-4 mb-4 rounded-2xl border border-white/5 bg-white/[0.035] px-4 py-3 text-[15px] sm:text-[16px] text-gray-100 leading-7 break-words cursor-pointer select-none ${
-                    postKind === "Thought" ? "text-lg sm:text-xl font-semibold leading-8" : ""
-                  }`}
-                      >
+  onDoubleClick={() =>
+    handlePostLikeWithAnimation(post._id)
+  }
+  className={`mx-6 mb-6 mt-2 max-w-[92%] break-words whitespace-pre-wrap cursor-pointer select-none transition-all ${
+    postKind === "Thought"
+      ? "text-[20px] sm:text-[22px] leading-[1.45] font-bold tracking-[-0.01em] text-white"
+      : "text-[15px] sm:text-[16px] leading-7 text-gray-100"
+  }`}
+>
                         {post.caption || post.content}
                       </p>
                     )
@@ -961,12 +1153,12 @@ const flowPosts = posts.filter((post) => !hasVideoMedia(post));
                     ))}
 
                   {/* ACTIONS */}
-                  <div className="px-4 pt-4 pb-4">
-                    <div className="flex items-center justify-between gap-4 mb-3">
-                      <div className="flex items-center gap-5">
+                  <div className="px-4 pt-4 pb-4 border-t border-white/5">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div className="flex items-center gap-2 sm:gap-3">
                         <button
                           onClick={() => handlePostLikeWithAnimation(post._id)}
-                          className={`flex items-center gap-2 active:scale-90 transition-all ${
+                          className={`flex items-center gap-2 rounded-2xl px-2.5 py-2 active:scale-95 hover:bg-white/[0.055] transition-all ${
                             isPostLikedByMe(post)
                               ? "text-pink-400"
                               : "text-gray-100 hover:text-pink-400"
@@ -992,7 +1184,7 @@ const flowPosts = posts.filter((post) => !hasVideoMedia(post));
                               [post._id]: !prev[post._id],
                             }))
                           }
-                          className="flex items-center gap-2 text-gray-100 hover:text-indigo-300 active:scale-90 transition-all"
+                          className="flex items-center gap-2 rounded-2xl px-2.5 py-2 text-gray-100 hover:text-indigo-300 hover:bg-white/[0.055] active:scale-95 transition-all"
                           title="Replies"
                         >
                           <CommentIcon />
@@ -1003,7 +1195,7 @@ const flowPosts = posts.filter((post) => !hasVideoMedia(post));
 
                         <button
                           onClick={() => setSharePost(post)}
-                          className="text-gray-100 hover:text-cyan-300 active:scale-90 transition-all"
+                          className="rounded-2xl px-2.5 py-2 text-gray-100 hover:text-cyan-300 hover:bg-white/[0.055] active:scale-95 transition-all"
                           title="Share"
                         >
                           <ShareIcon />
@@ -1012,7 +1204,7 @@ const flowPosts = posts.filter((post) => !hasVideoMedia(post));
 
                       <button
                         onClick={() => toggleSavePost(post._id)}
-                        className={`active:scale-90 transition-all ${
+                        className={`rounded-2xl px-2.5 py-2 active:scale-95 hover:bg-white/[0.055] transition-all ${
                           isSaved
                             ? "text-yellow-400"
                             : "text-gray-100 hover:text-yellow-300"
@@ -1033,7 +1225,7 @@ const flowPosts = posts.filter((post) => !hasVideoMedia(post));
                     <div
                       className={`overflow-hidden transition-all duration-300 ease-in-out ${
                         commentsOpen
-                          ? "max-h-[900px] opacity-100 mt-4 border-t border-white/10 pt-4"
+                          ? "max-h-[720px] opacity-100 mt-4 border-t border-white/10 pt-4"
                           : "max-h-0 opacity-0"
                       }`}
                     >
@@ -1299,6 +1491,17 @@ const flowPosts = posts.filter((post) => !hasVideoMedia(post));
               );
             })
           )}
+
+          {!initialLoading && flowPosts.length > 0 && hasMorePosts && (
+            <div className="flex justify-center pt-2">
+              <button
+                onClick={() => setVisiblePosts((prev) => prev + 5)}
+                className="px-6 py-3 rounded-2xl bg-white/[0.05] border border-white/10 text-sm font-black text-gray-300 hover:bg-white/[0.08] hover:text-white transition-all shadow-lg shadow-black/20"
+              >
+                Load more vybes
+              </button>
+            </div>
+          )}
         </div>
         </div>
 
@@ -1326,7 +1529,7 @@ const flowPosts = posts.filter((post) => !hasVideoMedia(post));
                     {currentUser?.name || "User"}
                   </h3>
                   <p className="text-sm text-gray-400 truncate">
-                    @{currentUser?.email?.split("@")[0] || currentUserId?.slice(-8) || "user"}
+                    @{currentUser?.username?.split("@")[0] || currentUserId?.slice(-8) || "user"}
                   </p>
                 </div>
               </div>
@@ -1509,7 +1712,27 @@ const flowPosts = posts.filter((post) => !hasVideoMedia(post));
               </button>
             </div>
 
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-3 mb-4">
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-4">
+  <div className="flex items-center gap-3 mb-3">
+    <img
+      src={
+        sharePost.user?.profilePic ||
+        "https://ui-avatars.com/api/?name=User&background=8b5cf6&color=fff"
+      }
+      alt=""
+      className="w-11 h-11 rounded-full object-cover border border-white/10"
+    />
+
+    <div>
+      <p className="font-semibold text-white">
+        {sharePost.user?.name || "User"}
+      </p>
+
+      <p className="text-xs text-gray-500">
+        Shared from Vybe Flow
+      </p>
+    </div>
+  </div>
               <p className="text-sm text-gray-300 line-clamp-2">
                 {sharePost.caption || sharePost.content || "Vybeo vybe"}
               </p>

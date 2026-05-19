@@ -106,6 +106,12 @@ const postSchema = new mongoose.Schema(
       default: "",
     },
 
+    mood: {
+    type: String,
+    enum: ["All", "Deep", "Funny", "Chaos", "Late Night", "Creative", "College"],
+    default: "All",
+    },
+
     media: [
       {
         url: String,

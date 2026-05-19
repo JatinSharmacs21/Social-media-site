@@ -32,12 +32,13 @@ const getPopulatedPost = async (postId) => {
 const createPost = async (req, res) => {
   try {
     const userId = getUserId(req);
-    const { caption, media } = req.body;
+    const { caption, media, mood } = req.body;
 
     const post = await Post.create({
       user: userId,
       caption,
       media,
+      mood: mood || "All",
       postType: "normal",
     });
 
