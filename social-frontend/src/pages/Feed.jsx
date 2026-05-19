@@ -13,6 +13,11 @@ function Feed() {
   const [caption, setCaption] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [preview, setPreview] = useState("");
+  const [uploadError, setUploadError] = useState("");
+  const [mediaFilter, setMediaFilter] = useState("Original");
+  const [mediaAspect, setMediaAspect] = useState("Original");
+  const [mediaZoom, setMediaZoom] = useState(1);
+  const [mediaStudioOpen, setMediaStudioOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
@@ -51,9 +56,25 @@ function Feed() {
   const moodPickerRef = useRef(null);
   const captionRef = useRef(null);
   const loadMoreRef = useRef(null);
+  const mediaInputRef = useRef(null);
 
   const moodChips = ["All", "Deep", "Funny", "Chaos", "Late Night", "Creative", "College"];
   const flowTabs = ["For You", "Tuned In", "Close Circle"];
+
+  const mediaAspectOptions = [
+    { label: "Original", value: "Original", hint: "Keep natural frame" },
+    { label: "Square", value: "Square", hint: "1:1 clean post" },
+    { label: "Portrait", value: "Portrait", hint: "4:5 feed style" },
+    { label: "Wide", value: "Wide", hint: "16:9 landscape" },
+  ];
+
+  const mediaFilterOptions = [
+    { label: "Original", value: "Original", className: "", css: "none" },
+    { label: "Soft", value: "Soft", className: "brightness-105 contrast-95 saturate-110", css: "brightness(1.05) contrast(0.95) saturate(1.1)" },
+    { label: "Vivid", value: "Vivid", className: "brightness-105 contrast-110 saturate-150", css: "brightness(1.05) contrast(1.1) saturate(1.5)" },
+    { label: "Mono", value: "Mono", className: "grayscale contrast-110", css: "grayscale(1) contrast(1.1)" },
+    { label: "Warm", value: "Warm", className: "sepia-[.22] saturate-125 brightness-105", css: "sepia(0.22) saturate(1.25) brightness(1.05)" },
+  ];
   const moodMeta = {
   All: {
     icon: "✨",
@@ -171,6 +192,14 @@ useEffect(() => {
   captionRef.current.style.height = "58px";
   captionRef.current.style.height = `${Math.min(captionRef.current.scrollHeight, 180)}px`;
 }, [caption, composerType]);
+
+useEffect(() => {
+  return () => {
+    if (preview) {
+      URL.revokeObjectURL(preview);
+    }
+  };
+}, [preview]);
 
 
   const updatePostInState = (updatedPost) => {
@@ -350,17 +379,184 @@ const formatVybeTime = (date) => {
   return new Date(date).toLocaleDateString();
 };
 
+
+const getSelectedFilter = () => {
+  return mediaFilterOptions.find((item) => item.value === mediaFilter) || mediaFilterOptions[0];
+};
+
+const getAspectRatioValue = () => {
+  if (mediaAspect === "Square") return 1;
+  if (mediaAspect === "Portrait") return 4 / 5;
+  if (mediaAspect === "Wide") return 16 / 9;
+  return null;
+};
+
+const resetMediaEditor = () => {
+  setMediaFilter("Original");
+  setMediaAspect("Original");
+  setMediaZoom(1);
+  setMediaStudioOpen(false);
+  setUploadError("");
+};
+
+const removeSelectedMedia = () => {
+  if (preview) {
+    URL.revokeObjectURL(preview);
+  }
+
+  setSelectedFile(null);
+  setPreview("");
+  resetMediaEditor();
+  setComposerType("Thought");
+
+  if (mediaInputRef.current) {
+    mediaInputRef.current.value = "";
+  }
+};
+
+const isSelectedImage = selectedFile?.type?.startsWith("image");
+const isSelectedVideo = selectedFile?.type?.startsWith("video");
+
+const loadImageFromFile = (file) => {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not read selected image"));
+    };
+
+    image.src = url;
+  });
+};
+
+const getCanvasFilter = () => {
+  return getSelectedFilter().css || "none";
+};
+
+const getProcessedImageFile = async () => {
+  if (!selectedFile || !isSelectedImage) return selectedFile;
+
+  const image = await loadImageFromFile(selectedFile);
+  const targetRatio = getAspectRatioValue();
+
+  let sourceX = 0;
+  let sourceY = 0;
+  let sourceWidth = image.naturalWidth;
+  let sourceHeight = image.naturalHeight;
+
+  if (targetRatio) {
+    const imageRatio = image.naturalWidth / image.naturalHeight;
+
+    if (imageRatio > targetRatio) {
+      sourceWidth = image.naturalHeight * targetRatio;
+      sourceX = (image.naturalWidth - sourceWidth) / 2;
+    } else {
+      sourceHeight = image.naturalWidth / targetRatio;
+      sourceY = (image.naturalHeight - sourceHeight) / 2;
+    }
+  }
+
+  if (mediaZoom > 1) {
+    const zoomedWidth = sourceWidth / mediaZoom;
+    const zoomedHeight = sourceHeight / mediaZoom;
+    sourceX += (sourceWidth - zoomedWidth) / 2;
+    sourceY += (sourceHeight - zoomedHeight) / 2;
+    sourceWidth = zoomedWidth;
+    sourceHeight = zoomedHeight;
+  }
+
+  const maxOutputSize = 1400;
+  const outputRatio = sourceWidth / sourceHeight;
+  let outputWidth = sourceWidth;
+  let outputHeight = sourceHeight;
+
+  if (outputWidth > maxOutputSize || outputHeight > maxOutputSize) {
+    if (outputRatio >= 1) {
+      outputWidth = maxOutputSize;
+      outputHeight = maxOutputSize / outputRatio;
+    } else {
+      outputHeight = maxOutputSize;
+      outputWidth = maxOutputSize * outputRatio;
+    }
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(outputWidth);
+  canvas.height = Math.round(outputHeight);
+
+  const ctx = canvas.getContext("2d");
+  ctx.filter = getCanvasFilter();
+  ctx.drawImage(
+    image,
+    sourceX,
+    sourceY,
+    sourceWidth,
+    sourceHeight,
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
+  return await new Promise((resolve) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          resolve(selectedFile);
+          return;
+        }
+
+        const cleanName = selectedFile.name.replace(/\.[^/.]+$/, "");
+        resolve(
+          new File([blob], `${cleanName}-vybeo.jpg`, {
+            type: "image/jpeg",
+            lastModified: Date.now(),
+          })
+        );
+      },
+      "image/jpeg",
+      0.92
+    );
+  });
+};
+
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
+    const isValidMedia = file.type.startsWith("image") || file.type.startsWith("video");
+
+    if (!isValidMedia) {
+      setUploadError("Please select an image or video file.");
+      return;
+    }
+
+    if (file.size > 60 * 1024 * 1024) {
+      setUploadError("Media is too large. Please choose a file under 60MB.");
+      return;
+    }
+
+    if (preview) {
+      URL.revokeObjectURL(preview);
+    }
+
+    resetMediaEditor();
     setSelectedFile(file);
-    if (file.type.startsWith("video")) {
-  setComposerType("Clip");
-} else if (file.type.startsWith("image")) {
-  setComposerType("Moment");
-}
     setPreview(URL.createObjectURL(file));
+
+    if (file.type.startsWith("video")) {
+      setComposerType("Clip");
+    } else if (file.type.startsWith("image")) {
+      setComposerType("Moment");
+      setMediaStudioOpen(true);
+    }
   };
 
   const createPost = async () => {
@@ -372,8 +568,12 @@ const formatVybeTime = (date) => {
       let media = [];
 
       if (selectedFile) {
+        const fileToUpload = isSelectedImage
+          ? await getProcessedImageFile()
+          : selectedFile;
+
         const formData = new FormData();
-        formData.append("file", selectedFile);
+        formData.append("file", fileToUpload);
 
         const uploadRes = await API.post("/api/upload", formData, {
           headers: {
@@ -397,13 +597,23 @@ const formatVybeTime = (date) => {
 
       setPosts((prevPosts) => [newPost.data, ...prevPosts]);
       setCaption("");
+      if (preview) {
+        URL.revokeObjectURL(preview);
+      }
+
       setSelectedFile(null);
       setPreview("");
       setComposerType("Thought");
       setSelectedMood("All");
       setMoodPickerOpen(false);
+      resetMediaEditor();
+
+      if (mediaInputRef.current) {
+        mediaInputRef.current.value = "";
+      }
     } catch (error) {
       console.log(error.response?.data || error);
+      setUploadError(error.response?.data?.message || "Could not upload your vybe. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -763,7 +973,7 @@ useEffect(() => {
               </button>
             </div>
 
-            <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
               {moodChips.map((mood) => (
                 <button
                   key={mood}
@@ -839,7 +1049,7 @@ useEffect(() => {
           : "Add a caption to your clip..."
       }
       rows={1}
-      className="w-full min-w-0 overflow-y-auto bg-white/5 border border-white/10 rounded-2xl px-4 py-3 pr-24 outline-none focus:border-pink-500 focus:bg-white/[0.07] transition-all text-white placeholder:text-gray-400 resize-none leading-6"
+      className="w-full min-w-0 overflow-y-auto no-scrollbar bg-white/5 border border-white/10 rounded-2xl px-4 py-3 pr-24 outline-none focus:border-pink-500 focus:bg-white/[0.07] transition-all text-white placeholder:text-gray-400 resize-none leading-6"
       style={{ minHeight: "58px", maxHeight: "180px" }}
     />
 
@@ -897,36 +1107,205 @@ useEffect(() => {
   </div>
 </div>
 
-            {preview && (
-              <div className="mb-4 rounded-[24px] overflow-hidden border border-white/10 bg-black/70 aspect-[4/5] max-h-[520px] shadow-2xl shadow-black/35">
-                {selectedFile?.type.startsWith("image") ? (
-                  <img
-                    src={preview}
-                    alt="preview"
-                    loading="lazy"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <video
-                    src={preview}
-                    controls
-                    playsInline
-                    className="w-full h-full object-contain bg-black"
-                  />
+            {(preview || uploadError) && (
+              <div className="mb-4 rounded-[24px] border border-white/10 bg-gradient-to-br from-white/[0.055] via-white/[0.025] to-cyan-500/[0.025] p-3 shadow-2xl shadow-black/35">
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <div className="min-w-0">
+                    <p className="text-[10px] tracking-[0.2em] text-pink-300 font-black">
+                      MEDIA PREVIEW
+                    </p>
+                    <p className="text-[11px] text-gray-500 mt-0.5 truncate">
+                      Original preview, crop and filters before dropping.
+                    </p>
+                  </div>
+
+                  {selectedFile && (
+                    <span className="shrink-0 px-2.5 py-1 rounded-full border border-white/10 bg-white/[0.05] text-[11px] font-bold text-gray-300">
+                      {isSelectedVideo ? "🎬 Clip" : "📸 Moment"}
+                    </span>
+                  )}
+                </div>
+
+                {uploadError && (
+                  <div className="mb-2 rounded-2xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                    {uploadError}
+                  </div>
+                )}
+
+                {preview && (
+                  <div className="space-y-2.5">
+                    <div className="relative rounded-[20px] overflow-hidden border border-white/10 bg-black/80 h-[230px] sm:h-[280px] shadow-xl shadow-black/35">
+                      {isSelectedImage ? (
+                        <>
+                          <img
+                            src={preview}
+                            alt=""
+                            aria-hidden="true"
+                            className={`absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-35 ${getSelectedFilter().className}`}
+                          />
+
+                          <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/50" />
+
+                          <img
+                            src={preview}
+                            alt="preview"
+                            loading="lazy"
+                            className={`relative z-10 w-full h-full object-contain p-2.5 transition-transform duration-300 ${getSelectedFilter().className}`}
+                            style={{ transform: `scale(${mediaZoom})` }}
+                          />
+                        </>
+                      ) : (
+                        <video
+                          src={preview}
+                          controls
+                          playsInline
+                          className="relative z-10 w-full h-full object-contain bg-black"
+                        />
+                      )}
+
+                      <div className="absolute left-2.5 top-2.5 z-20 max-w-[48%]">
+                        <span className="block truncate px-2.5 py-1.5 rounded-full bg-black/65 border border-white/10 backdrop-blur-xl text-[10px] font-black text-white shadow-lg">
+                          {selectedFile?.name || "Selected media"}
+                        </span>
+                      </div>
+
+                      <div className="absolute right-2.5 top-2.5 z-20 flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => mediaInputRef.current?.click()}
+                          className="px-2.5 py-1.5 rounded-full bg-black/65 border border-white/10 backdrop-blur-xl text-[10px] font-black text-white hover:bg-white/10 transition-all shadow-lg"
+                        >
+                          Replace
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={removeSelectedMedia}
+                          className="px-2.5 py-1.5 rounded-full bg-red-500/25 border border-red-400/25 backdrop-blur-xl text-[10px] font-black text-red-100 hover:bg-red-500/35 transition-all shadow-lg"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+
+                    {isSelectedImage ? (
+                      <div className="rounded-[20px] border border-white/10 bg-black/30 p-3">
+                        <div className="flex items-center justify-between gap-3 mb-2">
+                          <div className="min-w-0">
+                            <p className="text-xs font-black text-white">Edit image</p>
+                            <p className="text-[10px] text-gray-500 truncate">Crop and filters apply to final upload.</p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setMediaStudioOpen((prev) => !prev)}
+                            className="px-3 py-1.5 rounded-xl bg-white/[0.05] border border-white/10 text-[11px] font-bold text-gray-300 hover:text-white hover:bg-white/[0.08] transition-all"
+                          >
+                            {mediaStudioOpen ? "Hide" : "Edit"}
+                          </button>
+                        </div>
+
+                        {mediaStudioOpen && (
+                          <div className="space-y-3 max-h-[210px] overflow-y-auto no-scrollbar pr-1">
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <p className="text-[10px] tracking-[0.18em] text-gray-500 font-black">CROP</p>
+                                <span className="text-[10px] text-gray-600">{mediaAspect}</span>
+                              </div>
+
+                              <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                                {mediaAspectOptions.map((option) => (
+                                  <button
+                                    key={option.value}
+                                    type="button"
+                                    onClick={() => setMediaAspect(option.value)}
+                                    className={`shrink-0 rounded-2xl border px-3.5 py-2.5 text-left transition-all ${
+                                      mediaAspect === option.value
+                                        ? "bg-pink-500/15 border-pink-400/30 text-white"
+                                        : "bg-white/[0.035] border-white/10 text-gray-400 hover:text-white hover:bg-white/[0.06]"
+                                    }`}
+                                  >
+                                    <p className="text-[11px] font-black leading-none">{option.label}</p>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <p className="text-[10px] tracking-[0.18em] text-gray-500 font-black">ZOOM</p>
+                                <span className="text-[10px] text-gray-500">{mediaZoom.toFixed(1)}x</span>
+                              </div>
+
+                              <input
+                                type="range"
+                                min="1"
+                                max="2"
+                                step="0.05"
+                                value={mediaZoom}
+                                onChange={(e) => setMediaZoom(Number(e.target.value))}
+                                className="w-full accent-pink-500 h-2"
+                              />
+                            </div>
+
+                            <div>
+                              <p className="text-[10px] tracking-[0.18em] text-gray-500 font-black mb-1.5">FILTER</p>
+
+                              <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                                {mediaFilterOptions.map((option) => (
+                                  <button
+                                    key={option.value}
+                                    type="button"
+                                    onClick={() => setMediaFilter(option.value)}
+                                    className={`shrink-0 w-[74px] rounded-2xl border p-2 transition-all ${
+                                      mediaFilter === option.value
+                                        ? "bg-cyan-500/15 border-cyan-400/30 text-white"
+                                        : "bg-white/[0.035] border-white/10 text-gray-400 hover:text-white hover:bg-white/[0.06]"
+                                    }`}
+                                  >
+                                    <div className={`h-8 rounded-xl bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 shadow-inner ${option.className}`} />
+                                    <p className="text-[9px] font-bold mt-1 truncate">{option.label}</p>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="rounded-[20px] border border-white/10 bg-black/25 p-3">
+                        <p className="text-sm font-black text-white">Clip preview</p>
+                        <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                          Video editing is lightweight for speed. Replace or remove this clip before posting.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             )}
 
+            <input
+              ref={mediaInputRef}
+              type="file"
+              accept="image/*,video/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <label className="cursor-pointer bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-3 rounded-2xl text-sm font-semibold transition-all">
-                {composerType === "Clip" ? "🎬 Add Clip" : "📎 Add Moment"}
-                <input
-                  type="file"
-                  accept="image/*,video/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-              </label>
+              <button
+                type="button"
+                onClick={() => mediaInputRef.current?.click()}
+                className="bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-3 rounded-2xl text-sm font-semibold transition-all"
+              >
+                {selectedFile
+                  ? isSelectedVideo
+                    ? "🎬 Replace Clip"
+                    : "📎 Replace Moment"
+                  : composerType === "Clip"
+                  ? "🎬 Add Clip"
+                  : "📎 Add Moment"}
+              </button>
 
               <button
                 type="submit"
@@ -934,7 +1313,9 @@ useEffect(() => {
                 className="bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 px-7 py-3 rounded-2xl font-black hover:scale-[1.02] transition-all shadow-lg shadow-pink-500/15 disabled:opacity-60 disabled:hover:scale-100"
               >
                 {loading
-                  ? "Dropping..."
+                  ? selectedFile
+                    ? "Preparing media..."
+                    : "Dropping..."
                   : composerType === "Thought"
                   ? "Drop Thought"
                   : composerType === "Moment"
@@ -1304,7 +1685,7 @@ useEffect(() => {
 
                       {/* COMMENTS */}
                       {post.comments && post.comments.length > 0 ? (
-                        <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1">
+                        <div className="space-y-4 max-h-[420px] overflow-y-auto no-scrollbar pr-1">
                           {post.comments.map((comment) => {
                             const isCommentOwner =
                               comment.user?._id === currentUserId;
@@ -1665,6 +2046,15 @@ useEffect(() => {
 
           .animate-vybe-card {
             animation: vybeCardIn 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          }
+
+          .no-scrollbar {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+          }
+
+          .no-scrollbar::-webkit-scrollbar {
+            display: none;
           }
         `}
       </style>
