@@ -182,46 +182,37 @@ function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white overflow-hidden relative">
-      <div className="absolute top-[-180px] left-[-140px] w-[460px] h-[460px] bg-pink-500/20 rounded-full blur-3xl" />
-      <div className="absolute bottom-[-180px] right-[-140px] w-[460px] h-[460px] bg-cyan-500/15 rounded-full blur-3xl" />
-      <div className="absolute top-[30%] right-[35%] w-[340px] h-[340px] bg-purple-500/10 rounded-full blur-3xl" />
+    <div className="min-h-screen bg-black text-white overflow-x-hidden relative">
+      <div className="absolute top-[-180px] left-[-140px] w-[430px] h-[430px] bg-pink-500/20 rounded-full blur-3xl" />
+      <div className="absolute bottom-[-180px] right-[-140px] w-[430px] h-[430px] bg-cyan-500/15 rounded-full blur-3xl" />
+      <div className="absolute top-[28%] right-[34%] w-[320px] h-[320px] bg-purple-500/10 rounded-full blur-3xl" />
 
       <div className="relative z-10 min-h-screen grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_500px]">
-        <section className="px-5 sm:px-8 md:px-14 lg:px-16 py-8 sm:py-10 flex flex-col justify-between">
-          <div className="flex items-center justify-between gap-4 mb-10">
-            <div className="flex items-center gap-3">
-              <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 flex items-center justify-center shadow-xl shadow-pink-500/25">
-                <div className="relative w-7 h-7 rounded-full border-[3px] border-white">
-                  <div className="absolute top-1/2 left-1/2 w-2.5 h-2.5 rounded-full bg-white -translate-x-1/2 -translate-y-1/2" />
-                  <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white" />
-                </div>
-              </div>
-
-              <div>
-                <h1 className="text-3xl sm:text-4xl font-black tracking-tight bg-gradient-to-r from-pink-400 via-purple-300 to-cyan-300 bg-clip-text text-transparent">
-                  Vybeo
-                </h1>
-                <p className="text-[11px] sm:text-xs tracking-[0.28em] text-gray-500 font-bold">
-                  REAL VYBES
-                </p>
+        <section className="px-5 sm:px-8 md:px-14 lg:px-16 py-6 sm:py-8 lg:py-10 flex flex-col">
+          <div className="flex items-center gap-3 mb-8 sm:mb-10 lg:mb-12">
+            <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 flex items-center justify-center shadow-xl shadow-pink-500/25">
+              <div className="relative w-7 h-7 rounded-full border-[3px] border-white">
+                <div className="absolute top-1/2 left-1/2 w-2.5 h-2.5 rounded-full bg-white -translate-x-1/2 -translate-y-1/2" />
+                <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white" />
               </div>
             </div>
 
-            <button
-              onClick={() => setMode(isLogin ? "register" : "login")}
-              className="hidden sm:inline-flex px-5 py-2.5 rounded-2xl border border-white/10 bg-white/[0.05] hover:bg-white/[0.09] transition-all font-semibold"
-            >
-              {isLogin ? "Join Vybeo" : "Login"}
-            </button>
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-black tracking-tight bg-gradient-to-r from-pink-400 via-purple-300 to-cyan-300 bg-clip-text text-transparent">
+                Vybeo
+              </h1>
+              <p className="text-[11px] sm:text-xs tracking-[0.28em] text-gray-500 font-bold">
+                REAL VYBES
+              </p>
+            </div>
           </div>
 
           <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 bg-white/[0.045] border border-white/10 rounded-full px-4 py-2 text-xs font-black tracking-[0.18em] text-pink-300 mb-6">
+            <div className="inline-flex items-center gap-2 bg-white/[0.045] border border-white/10 rounded-full px-4 py-2 text-[11px] sm:text-xs font-black tracking-[0.18em] text-pink-300 mb-5 sm:mb-6">
               VIBE-FIRST SOCIAL SPACE
             </div>
 
-            <h2 className="text-5xl sm:text-6xl md:text-7xl font-black leading-[1.02] tracking-tight">
+            <h2 className="text-[52px] sm:text-6xl md:text-7xl font-black leading-[0.98] tracking-tight">
               Drop your
               <br />
               <span className="bg-gradient-to-r from-pink-400 via-purple-300 to-cyan-300 bg-clip-text text-transparent">
@@ -229,29 +220,13 @@ function Landing() {
               </span>
             </h2>
 
-            <p className="text-gray-400 text-base sm:text-xl md:text-2xl mt-7 leading-relaxed max-w-2xl">
+            <p className="text-gray-400 text-base sm:text-xl md:text-2xl mt-6 leading-relaxed max-w-2xl">
               Thoughts, moments, drops and rooms — built around your current mood,
               not perfect content.
             </p>
-
-            <div className="flex flex-wrap gap-3 mt-8">
-              <button
-                onClick={() => setMode("register")}
-                className="px-6 py-4 rounded-2xl bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 font-black shadow-xl shadow-pink-500/20 hover:scale-[1.02] transition-all"
-              >
-                Join Vybeo
-              </button>
-
-              <button
-                onClick={() => setMode("login")}
-                className="px-6 py-4 rounded-2xl bg-white/[0.06] border border-white/10 font-bold hover:bg-white/[0.1] transition-all"
-              >
-                Login
-              </button>
-            </div>
           </div>
 
-          <div className="hidden md:grid grid-cols-2 xl:grid-cols-4 gap-4 mt-14">
+          <div className="hidden md:grid grid-cols-2 xl:grid-cols-4 gap-4 mt-10 lg:mt-auto lg:pt-10">
             {[
               ["Vybe Flow", "Real thoughts and moments in one clean feed.", "〰️"],
               ["Vybe Drops", "Daily prompts for honest conversations.", "✦"],
@@ -260,28 +235,28 @@ function Landing() {
             ].map(([title, text, icon]) => (
               <div
                 key={title}
-                className="relative overflow-hidden rounded-[26px] bg-zinc-950/75 border border-white/10 p-5 shadow-xl shadow-black/25"
+                className="relative overflow-hidden rounded-[24px] bg-zinc-950/70 border border-white/10 p-4 lg:p-5 shadow-xl shadow-black/25 min-h-[150px]"
               >
                 <div className="absolute -top-12 -right-12 w-28 h-28 rounded-full bg-pink-500/10 blur-2xl" />
                 <div className="relative">
-                  <div className="w-11 h-11 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center text-xl mb-4">
+                  <div className="w-10 h-10 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center text-lg mb-3">
                     {icon}
                   </div>
-                  <h3 className="font-black text-lg">{title}</h3>
-                  <p className="text-sm text-gray-400 mt-2 leading-relaxed">{text}</p>
+                  <h3 className="font-black text-base lg:text-lg">{title}</h3>
+                  <p className="text-xs lg:text-sm text-gray-400 mt-2 leading-relaxed">{text}</p>
                 </div>
               </div>
             ))}
           </div>
         </section>
 
-        <section className="flex items-center justify-center p-5 sm:p-8 lg:pr-10">
-          <div className="w-full max-w-[460px] relative overflow-hidden bg-zinc-950/85 border border-white/10 backdrop-blur-2xl rounded-[32px] sm:rounded-[40px] p-6 sm:p-8 shadow-[0_0_60px_rgba(0,0,0,0.55)]">
+        <section className="flex items-start lg:items-center justify-center px-5 sm:px-8 lg:pl-0 lg:pr-10 pb-8 lg:py-10">
+          <div className="w-full max-w-[460px] relative overflow-hidden bg-zinc-950/85 border border-white/10 backdrop-blur-2xl rounded-[30px] sm:rounded-[38px] p-5 sm:p-7 lg:p-8 shadow-[0_0_60px_rgba(0,0,0,0.55)]">
             <div className="absolute -top-24 -right-24 w-56 h-56 rounded-full bg-pink-500/10 blur-3xl" />
             <div className="absolute -bottom-24 -left-24 w-56 h-56 rounded-full bg-cyan-500/10 blur-3xl" />
 
             <div className="relative">
-              <div className="mb-6">
+              <div className="mb-5">
                 <p className="text-[11px] tracking-[0.22em] text-pink-300 font-black mb-2">
                   {isLogin ? "LOGIN" : isRegister ? "CREATE SPACE" : isForgot ? "RECOVER" : "RESET"}
                 </p>
@@ -290,13 +265,13 @@ function Landing() {
               </div>
 
               {message && (
-                <div className="mb-5 bg-red-500/15 border border-red-500/30 text-red-200 p-4 rounded-2xl text-sm">
+                <div className="mb-4 bg-red-500/15 border border-red-500/30 text-red-200 p-3.5 rounded-2xl text-sm">
                   {message}
                 </div>
               )}
 
               {success && (
-                <div className="mb-5 bg-green-500/15 border border-green-500/30 text-green-200 p-4 rounded-2xl text-sm">
+                <div className="mb-4 bg-green-500/15 border border-green-500/30 text-green-200 p-3.5 rounded-2xl text-sm">
                   {success}
                 </div>
               )}
@@ -308,12 +283,12 @@ function Landing() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className="w-full p-4 rounded-2xl bg-black/40 border border-white/10 outline-none mb-4 focus:border-pink-500 transition-all"
+                  className="w-full p-4 rounded-2xl bg-black/40 border border-white/10 outline-none mb-3.5 focus:border-pink-500 transition-all"
                 />
               )}
 
               {(isLogin || isRegister) && (
-                <div className="relative mb-4">
+                <div className="relative mb-3.5">
                   <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500">@</span>
                   <input
                     type="text"
@@ -333,7 +308,7 @@ function Landing() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className="w-full p-4 rounded-2xl bg-black/40 border border-white/10 outline-none mb-4 focus:border-pink-500 transition-all"
+                  className="w-full p-4 rounded-2xl bg-black/40 border border-white/10 outline-none mb-3.5 focus:border-pink-500 transition-all"
                 />
               )}
 
@@ -365,7 +340,7 @@ function Landing() {
               )}
 
               {isLogin && (
-                <div className="flex justify-end mt-3 mb-5">
+                <div className="flex justify-end mt-3 mb-4">
                   <button
                     type="button"
                     onClick={() => {
@@ -392,7 +367,7 @@ function Landing() {
                     : handleResetPassword
                 }
                 disabled={loading}
-                className="w-full mt-6 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 p-4 rounded-2xl font-black text-lg hover:scale-[1.02] transition-all duration-300 shadow-[0_0_30px_rgba(236,72,153,0.25)] disabled:opacity-60 disabled:hover:scale-100"
+                className="w-full mt-5 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 p-4 rounded-2xl font-black text-lg hover:scale-[1.02] transition-all duration-300 shadow-[0_0_30px_rgba(236,72,153,0.25)] disabled:opacity-60 disabled:hover:scale-100"
               >
                 {loading
                   ? "Please wait..."
@@ -405,7 +380,7 @@ function Landing() {
                   : "Reset Password"}
               </button>
 
-              <p className="text-center text-gray-400 mt-7 text-sm">
+              <p className="text-center text-gray-400 mt-6 text-sm">
                 {isLogin && "New to Vybeo?"}
                 {isRegister && "Already have a Vybe Space?"}
                 {(isForgot || isReset) && "Remember your password?"}
@@ -424,7 +399,7 @@ function Landing() {
                 </button>
               </p>
 
-              <div className="mt-9 pt-5 border-t border-white/10">
+              <div className="mt-7 pt-5 border-t border-white/10">
                 <div className="flex items-center justify-center gap-4 text-gray-500 text-xs sm:text-sm flex-wrap">
                   <span>〰️ Flow</span>
                   <span>✦ Drops</span>
