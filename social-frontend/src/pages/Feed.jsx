@@ -49,6 +49,8 @@ function Feed() {
   const [activeFlowTab, setActiveFlowTab] = useState("For You");
   const [visiblePosts, setVisiblePosts] = useState(5);
   const moodPickerRef = useRef(null);
+  const captionRef = useRef(null);
+  const loadMoreRef = useRef(null);
 
   const moodChips = ["All", "Deep", "Funny", "Chaos", "Late Night", "Creative", "College"];
   const flowTabs = ["For You", "Tuned In", "Close Circle"];
@@ -162,6 +164,14 @@ useEffect(() => {
     document.removeEventListener("mousedown", handleClickOutside);
   };
 }, []);
+
+useEffect(() => {
+  if (!captionRef.current) return;
+
+  captionRef.current.style.height = "58px";
+  captionRef.current.style.height = `${Math.min(captionRef.current.scrollHeight, 180)}px`;
+}, [caption, composerType]);
+
 
   const updatePostInState = (updatedPost) => {
     setPosts((prevPosts) =>
@@ -312,7 +322,6 @@ useEffect(() => {
 };
 
 
-
 const getHeartAnimationSize = (postKind) => {
   if (postKind === "Thought") {
     return "text-[54px] sm:text-[68px]";
@@ -386,7 +395,7 @@ const formatVybeTime = (date) => {
         authConfig
       );
 
-      setPosts([newPost.data, ...posts]);
+      setPosts((prevPosts) => [newPost.data, ...prevPosts]);
       setCaption("");
       setSelectedFile(null);
       setPreview("");
@@ -697,6 +706,24 @@ const flowPosts = posts.filter((post) => {
 const displayedPosts = flowPosts.slice(0, visiblePosts);
 const hasMorePosts = visiblePosts < flowPosts.length;
 
+useEffect(() => {
+  if (!loadMoreRef.current || !hasMorePosts || initialLoading) return;
+
+  const observer = new IntersectionObserver(
+    ([entry]) => {
+      if (entry.isIntersecting) {
+        setVisiblePosts((prev) => Math.min(prev + 5, flowPosts.length));
+      }
+    },
+    { root: null, rootMargin: "220px", threshold: 0.1 }
+  );
+
+  observer.observe(loadMoreRef.current);
+
+  return () => observer.disconnect();
+}, [hasMorePosts, initialLoading, flowPosts.length, activeMood, activeFlowTab]);
+
+
 
   const trendingTags = useMemo(
   () =>
@@ -795,6 +822,7 @@ const hasMorePosts = visiblePosts < flowPosts.length;
 
   <div ref={moodPickerRef} className="relative flex-1 min-w-0">
     <textarea
+      ref={captionRef}
       value={caption}
       onChange={(e) => setCaption(e.target.value)}
       onKeyDown={(e) => {
@@ -810,8 +838,9 @@ const hasMorePosts = visiblePosts < flowPosts.length;
           ? "Say something about this moment..."
           : "Add a caption to your clip..."
       }
-      rows={2}
-      className="w-full min-w-0 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 pr-24 outline-none focus:border-pink-500 focus:bg-white/[0.07] transition-all text-white placeholder:text-gray-400 resize-none leading-6" style={{ minHeight: "58px", maxHeight: "180px" }}
+      rows={1}
+      className="w-full min-w-0 overflow-y-auto bg-white/5 border border-white/10 rounded-2xl px-4 py-3 pr-24 outline-none focus:border-pink-500 focus:bg-white/[0.07] transition-all text-white placeholder:text-gray-400 resize-none leading-6"
+      style={{ minHeight: "58px", maxHeight: "180px" }}
     />
 
     <button
@@ -869,7 +898,7 @@ const hasMorePosts = visiblePosts < flowPosts.length;
 </div>
 
             {preview && (
-              <div className="mb-4 rounded-2xl overflow-hidden border border-white/10 bg-black aspect-[4/5] max-h-[520px]">
+              <div className="mb-4 rounded-[24px] overflow-hidden border border-white/10 bg-black/70 aspect-[4/5] max-h-[520px] shadow-2xl shadow-black/35">
                 {selectedFile?.type.startsWith("image") ? (
                   <img
                     src={preview}
@@ -983,7 +1012,7 @@ const hasMorePosts = visiblePosts < flowPosts.length;
               return (
                 <div
                   key={post._id}
-                  className="relative bg-zinc-950/95 border border-white/10 rounded-[26px] sm:rounded-[30px] overflow-hidden shadow-xl shadow-black/30 w-full hover:border-pink-500/20 hover:shadow-[0_0_45px_rgba(236,72,153,0.08)] transition-all duration-300"
+                  className="relative bg-zinc-950/95 border border-white/10 rounded-[26px] sm:rounded-[30px] overflow-hidden shadow-xl shadow-black/30 w-full hover:border-pink-500/20 hover:shadow-[0_0_45px_rgba(236,72,153,0.08)] transition-all duration-300 animate-vybe-card"
                 >
                   {heartPostId === post._id && (
                     <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
@@ -1101,7 +1130,7 @@ const hasMorePosts = visiblePosts < flowPosts.length;
   }
   className={`mx-6 mb-6 mt-2 max-w-[92%] break-words whitespace-pre-wrap cursor-pointer select-none transition-all ${
     postKind === "Thought"
-      ? "text-[20px] sm:text-[22px] leading-[1.45] font-bold tracking-[-0.01em] text-white"
+      ? "text-[18px] sm:text-[20px] leading-[1.65] font-semibold tracking-[-0.01em] text-gray-100"
       : "text-[15px] sm:text-[16px] leading-7 text-gray-100"
   }`}
 >
@@ -1118,7 +1147,7 @@ const hasMorePosts = visiblePosts < flowPosts.length;
                         onDoubleClick={() =>
                           handlePostLikeWithAnimation(post._id)
                         }
-                        className="relative w-full aspect-[4/5] max-h-[78vh] bg-black flex items-center justify-center cursor-pointer select-none overflow-hidden"
+                        className="relative mx-3 mb-3 rounded-[24px] w-[calc(100%-24px)] aspect-[4/5] max-h-[78vh] bg-black flex items-center justify-center cursor-pointer select-none overflow-hidden border border-white/5 shadow-2xl shadow-black/30"
                       >
                         {isImageMedia(item) ? (
                           <img
@@ -1130,7 +1159,7 @@ const hasMorePosts = visiblePosts < flowPosts.length;
                               const fallback = e.currentTarget.nextElementSibling;
                               if (fallback) fallback.style.display = "flex";
                             }}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover transition-transform duration-500 hover:scale-[1.015]"
                           />
                         ) : (
                           <video
@@ -1225,7 +1254,7 @@ const hasMorePosts = visiblePosts < flowPosts.length;
                     <div
                       className={`overflow-hidden transition-all duration-300 ease-in-out ${
                         commentsOpen
-                          ? "max-h-[720px] opacity-100 mt-4 border-t border-white/10 pt-4"
+                          ? "max-h-[760px] opacity-100 mt-4 border-t border-white/10 pt-4"
                           : "max-h-0 opacity-0"
                       }`}
                     >
@@ -1246,7 +1275,7 @@ const hasMorePosts = visiblePosts < flowPosts.length;
                       </div>
 
                       {/* COMMENT INPUT */}
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-5">
+                      <div className="sticky top-0 z-10 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-5 bg-zinc-950/95 backdrop-blur-xl pb-3">
                         <input
                           type="text"
                           value={commentText[post._id] || ""}
@@ -1493,13 +1522,11 @@ const hasMorePosts = visiblePosts < flowPosts.length;
           )}
 
           {!initialLoading && flowPosts.length > 0 && hasMorePosts && (
-            <div className="flex justify-center pt-2">
-              <button
-                onClick={() => setVisiblePosts((prev) => prev + 5)}
-                className="px-6 py-3 rounded-2xl bg-white/[0.05] border border-white/10 text-sm font-black text-gray-300 hover:bg-white/[0.08] hover:text-white transition-all shadow-lg shadow-black/20"
-              >
-                Load more vybes
-              </button>
+            <div ref={loadMoreRef} className="flex justify-center py-4">
+              <div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/[0.04] border border-white/10 text-xs font-black text-gray-400 shadow-lg shadow-black/20">
+                <span className="w-2 h-2 rounded-full bg-pink-400 animate-pulse" />
+                Loading more vybes
+              </div>
             </div>
           )}
         </div>
@@ -1529,7 +1556,7 @@ const hasMorePosts = visiblePosts < flowPosts.length;
                     {currentUser?.name || "User"}
                   </h3>
                   <p className="text-sm text-gray-400 truncate">
-                    @{currentUser?.username?.split("@")[0] || currentUserId?.slice(-8) || "user"}
+                    @{currentUser?.username || currentUserId?.slice(-8) || "user"}
                   </p>
                 </div>
               </div>
@@ -1628,6 +1655,19 @@ const hasMorePosts = visiblePosts < flowPosts.length;
         </aside>
       </div>
 
+
+      <style>
+        {`
+          @keyframes vybeCardIn {
+            from { opacity: 0; transform: translateY(14px) scale(0.985); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+          }
+
+          .animate-vybe-card {
+            animation: vybeCardIn 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          }
+        `}
+      </style>
 
       {/* LIKES MODAL */}
       {likesModalPost && (
