@@ -170,8 +170,13 @@ function Feed() {
       setLoadingMoreFeed(true);
     }
 
-    const res = await API.get(`/api/posts?page=${page}&limit=6`);
-    const nextPosts = res.data.posts || [];
+   const res = await API.get(`/api/posts?page=${page}&limit=6`);
+
+const nextPosts = Array.isArray(res.data)
+  ? res.data
+  : Array.isArray(res.data.posts)
+  ? res.data.posts
+  : [];
 
     setPosts((prev) => {
       if (page === 1) return nextPosts;
@@ -183,7 +188,7 @@ function Feed() {
     });
 
     setFeedPage(page);
-    setHasMoreFeed(Boolean(res.data.hasMore));
+    setHasMoreFeed(Boolean(res.data?.hasMore));
   } catch (error) {
     console.log(error.response?.data || error);
   } finally {
