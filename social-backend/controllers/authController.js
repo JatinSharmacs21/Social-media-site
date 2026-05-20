@@ -1,10 +1,10 @@
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
-const { Resend } = require("resend");
+const nodemailer = require("nodemailer");
 const User = require("../models/User");
 const generateToken = require("../utils/generateToken");
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+
 
 const usernameRegex = /^[a-z0-9_]{3,20}$/;
 const strongPasswordRegex =
@@ -16,56 +16,34 @@ const cleanUsername = (username = "") =>
   username.toLowerCase().trim().replace(/^@/, "");
 
 const sendResetEmail = async ({ to, resetUrl }) => {
-  if (!process.env.RESEND_API_KEY) {
-    throw new Error("RESEND_API_KEY missing in backend env");
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    throw new Error("EMAIL_USER or EMAIL_PASS missing in backend env");
   }
 
-  console.log("Trying to send email with Resend...");
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
 
-  const response = await resend.emails.send({
-    from: "Vybeo <onboarding@resend.dev>",
+  await transporter.sendMail({
+    from: `"Vybeo" <${process.env.EMAIL_USER}>`,
     to,
-
     subject: "Reset your Vybeo password",
-
     html: `
       <div style="font-family:Arial,sans-serif;line-height:1.6">
-        
         <h2>Reset your password</h2>
-
-        <p>
-          You requested a password reset for your Vybeo account.
-        </p>
-
-        <p>
-          This link will expire in 15 minutes.
-        </p>
-
-        <a 
-          href="${resetUrl}"
-          style="
-            display:inline-block;
-            background:#ec4899;
-            color:#fff;
-            padding:12px 18px;
-            border-radius:10px;
-            text-decoration:none;
-          "
-        >
+        <p>This link will expire in 15 minutes.</p>
+        <a href="${resetUrl}" style="display:inline-block;background:#ec4899;color:#fff;padding:12px 18px;border-radius:10px;text-decoration:none;">
           Reset Password
         </a>
-
-        <p>
-          If the button does not work, copy this link:
-        </p>
-
+        <p>If button does not work, copy this link:</p>
         <p>${resetUrl}</p>
-
       </div>
     `,
   });
-
-  console.log("Email sent successfully", response);
 };
 
 // REGISTER USER

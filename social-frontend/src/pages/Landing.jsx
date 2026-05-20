@@ -26,7 +26,12 @@ function Landing() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get("resetToken");
+    const tokenFromQuery = params.get("resetToken") || params.get("token");
+const tokenFromPath = window.location.pathname.startsWith("/reset-password/")
+  ? window.location.pathname.split("/reset-password/")[1]
+  : "";
+
+const token = tokenFromQuery || tokenFromPath;
 
     if (token) {
       setResetToken(token);
