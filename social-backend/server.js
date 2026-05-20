@@ -29,9 +29,9 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE"],
-  },
+  origin: ["http://localhost:3000", "https://vybeo.vercel.app"],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+},
 });
 
 app.set("io", io);
@@ -148,10 +148,22 @@ socket.on("drop-pulse", ({ dropId }) => {
   });
 });
 
-app.use(cors({
-  origin: "*", 
-  credentials: true
-}));
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://vybeo.vercel.app",
+];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // TEST ROUTE
@@ -175,8 +187,8 @@ app.get("/profile", protect, async (req, res) => {
   try {
     const user = await User.findById(req.user.id)
       .select("-password")
-      .populate("followers", "name username email profilePic bio")
-      .populate("following", "name username email profilePic bio");
+      .populate("followers", "name username profilePic bio")
+      .populate("following", "name username profilePic bio");
 
     res.send(user);
   } catch (err) {
@@ -217,8 +229,8 @@ app.put("/profile", protect, async (req, res) => {
 
     const user = await User.findByIdAndUpdate(req.user.id, update, { new: true })
       .select("-password")
-      .populate("followers", "name username email profilePic bio")
-      .populate("following", "name username email profilePic bio");
+      .populate("followers", "name username profilePic bio")
+      .populate("following", "name username profilePic bio");
 
     res.send(user);
   } catch (err) {
@@ -235,7 +247,7 @@ app.get("/search", async (req, res) => {
   try {
     const users = await User.find({
       name: { $regex: name, $options: "i" }
-    }).select("name email");
+    }).select("name username profilePic bio");
 
     res.send(users);
   } catch (err) {

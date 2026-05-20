@@ -146,44 +146,51 @@ const loginUser = async (req, res) => {
 };
 
 // FORGOT PASSWORD
+// const forgotPassword = async (req, res) => {
+//   try {
+//     const email = cleanEmail(req.body.email);
+
+//     if (!email) {
+//       return res
+//         .status(400)
+//         .json({ message: "Please enter your registered email" });
+//     }
+
+//     const user = await User.findOne({ email });
+
+//     if (!user) {
+//       return res.json({
+//         message: "If this email exists, password reset link has been sent.",
+//       });
+//     }
+
+//     const resetToken = crypto.randomBytes(32).toString("hex");
+//     const hashedToken = crypto
+//       .createHash("sha256")
+//       .update(resetToken)
+//       .digest("hex");
+
+//     user.resetPasswordToken = hashedToken;
+//     user.resetPasswordExpire = Date.now() + 15 * 60 * 1000;
+//     await user.save({ validateBeforeSave: false });
+
+//     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+//     const resetUrl = `${frontendUrl.replace(/\/$/, "")}/reset-password/${resetToken}`;
+
+//     await sendResetEmail({ to: user.email, resetUrl });
+
+//     res.json({ message: "Password reset link sent to your email." });
+//   } catch (error) {
+//   console.error(error);
+//   res.status(500).json({ message: error.message });
+// }
+// };
+
 const forgotPassword = async (req, res) => {
-  try {
-    const email = cleanEmail(req.body.email);
-
-    if (!email) {
-      return res
-        .status(400)
-        .json({ message: "Please enter your registered email" });
-    }
-
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.json({
-        message: "If this email exists, password reset link has been sent.",
-      });
-    }
-
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    const hashedToken = crypto
-      .createHash("sha256")
-      .update(resetToken)
-      .digest("hex");
-
-    user.resetPasswordToken = hashedToken;
-    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000;
-    await user.save({ validateBeforeSave: false });
-
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-    const resetUrl = `${frontendUrl.replace(/\/$/, "")}/reset-password/${resetToken}`;
-
-    await sendResetEmail({ to: user.email, resetUrl });
-
-    res.json({ message: "Password reset link sent to your email." });
-  } catch (error) {
-  console.error(error);
-  res.status(500).json({ message: error.message });
-}
+  return res.status(503).json({
+    message:
+      "Password reset is temporarily unavailable. Please contact support or try again later.",
+  });
 };
 
 // RESET PASSWORD

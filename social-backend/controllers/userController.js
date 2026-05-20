@@ -18,8 +18,8 @@ const emitRealtimeNotification = async (req, recipientId, data) => {
   }
 };
 
-const publicUserFields = "name username email profilePic bio followers following createdAt";
-const populatedUserFields = "name username email profilePic bio";
+const publicUserFields = "name username profilePic bio followers following createdAt";
+const populatedUserFields = "name username profilePic bio";
 
 const normalizeUsername = (username = "") =>
   username.toString().trim().toLowerCase();

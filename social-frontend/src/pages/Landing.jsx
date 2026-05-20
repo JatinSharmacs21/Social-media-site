@@ -129,10 +129,13 @@ const token = tokenFromQuery || tokenFromPath;
       const res = await API.post("/api/auth/forgot-password", { email });
       setSuccess(res.data?.message || "Password reset link sent to your email.");
     } catch (error) {
-      setMessage(error.response?.data?.message || "Could not send reset link");
-    } finally {
-      setLoading(false);
-    }
+  setMessage(
+    error.response?.data?.message ||
+      "Password reset is temporarily unavailable. Please try again later."
+  );
+} finally {
+  setLoading(false);
+}
   };
 
   const handleResetPassword = async () => {

@@ -22,7 +22,7 @@ const emitRealtimeNotification = async (req, recipientId, data) => {
 
 const getPopulatedPost = async (postId) => {
   return await Post.findById(postId)
-    .populate("user", "name username email profilePic")
+    .populate("user", "name username profilePic")
     .populate("likes", "name username profilePic")
     .populate("comments.user", "name username profilePic")
     .populate("comments.likes", "name username profilePic")
@@ -54,7 +54,7 @@ const getPosts = async (req, res) => {
     const posts = await Post.find({
       postType: { $in: ["normal", null] },
     })
-      .populate("user", "name username email profilePic")
+      .populate("user", "name username profilePic")
       .populate("likes", "name username profilePic")
       .populate("comments.user", "name username profilePic")
       .populate("comments.likes", "name username profilePic")
@@ -862,7 +862,7 @@ const getMyPosts = async (req, res) => {
       user: userId,
       postType: { $in: ["normal", null] },
     })
-      .populate("user", "name username email profilePic")
+      .populate("user", "name username profilePic")
       .populate("likes", "name username profilePic")
       .populate("comments.user", "name username profilePic")
       .populate("comments.likes", "name username profilePic")
@@ -881,7 +881,7 @@ const getUserPosts = async (req, res) => {
       user: req.params.userId,
       postType: { $in: ["normal", null] },
     })
-      .populate("user", "name username email profilePic")
+      .populate("user", "name username profilePic")
       .populate("likes", "name username profilePic")
       .populate("comments.user", "name username profilePic")
       .populate("comments.likes", "name username profilePic")

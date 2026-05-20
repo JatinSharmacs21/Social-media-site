@@ -128,7 +128,7 @@ function Search() {
               </h3>
 
               <p className="text-sm text-gray-400 truncate max-w-[170px] sm:max-w-[220px]">
-                {u.bio || u.email || "No bio yet"}
+                {u.bio || "No bio yet"}
               </p>
 
               <div className="flex gap-3 mt-2 text-[11px] text-gray-500 font-semibold">
