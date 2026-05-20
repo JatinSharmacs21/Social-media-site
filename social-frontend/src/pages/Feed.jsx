@@ -54,6 +54,11 @@ function Feed() {
 
   const [sharePost, setSharePost] = useState(null);
   const [copiedShare, setCopiedShare] = useState(false);
+  const [galleryPost, setGalleryPost] = useState(null);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  const [galleryDirection, setGalleryDirection] = useState("");
+  const [loadedMedia, setLoadedMedia] = useState({});
+  const [commentsSheetPost, setCommentsSheetPost] = useState(null);
 
   const [likesModalPost, setLikesModalPost] = useState(null);
   const [followingUsers, setFollowingUsers] = useState({});
@@ -64,6 +69,9 @@ function Feed() {
   const captionRef = useRef(null);
   const loadMoreRef = useRef(null);
   const mediaInputRef = useRef(null);
+  const galleryTouchStartX = useRef(null);
+  const galleryTouchStartY = useRef(null);
+  const galleryTouchEndX = useRef(null);
 
   const moodChips = ["All", "Deep", "Funny", "Chaos", "Late Night", "Creative", "College"];
   const flowTabs = ["For You", "Tuned In", "Close Circle"];
@@ -263,6 +271,56 @@ useEffect(() => {
     }
   };
 
+  const openMediaGallery = (post, startIndex = 0) => {
+    if (!post?.media || post.media.length === 0) return;
+    setGalleryPost(post);
+    setGalleryIndex(startIndex);
+  };
+
+  const closeMediaGallery = () => {
+    setGalleryPost(null);
+    setGalleryIndex(0);
+  };
+
+  const goToGalleryMedia = (direction) => {
+    const mediaLength = galleryPost?.media?.length || 0;
+    if (mediaLength <= 1) return;
+
+    setGalleryDirection(direction);
+    setGalleryIndex((prev) => {
+      if (direction === "next") return (prev + 1) % mediaLength;
+      return (prev - 1 + mediaLength) % mediaLength;
+    });
+
+    window.setTimeout(() => setGalleryDirection(""), 280);
+  };
+
+  const handleGalleryTouchStart = (event) => {
+    galleryTouchStartX.current = event.touches[0].clientX;
+    galleryTouchStartY.current = event.touches[0].clientY;
+    galleryTouchEndX.current = event.touches[0].clientX;
+  };
+
+  const handleGalleryTouchMove = (event) => {
+    galleryTouchEndX.current = event.touches[0].clientX;
+  };
+
+  const handleGalleryTouchEnd = () => {
+    if (galleryMedia.length <= 1) return;
+    if (galleryTouchStartX.current === null || galleryTouchEndX.current === null) return;
+
+    const swipeDistance = galleryTouchStartX.current - galleryTouchEndX.current;
+    const minSwipeDistance = 48;
+
+    if (Math.abs(swipeDistance) > minSwipeDistance) {
+      goToGalleryMedia(swipeDistance > 0 ? "next" : "prev");
+    }
+
+    galleryTouchStartX.current = null;
+    galleryTouchStartY.current = null;
+    galleryTouchEndX.current = null;
+  };
+
   const toggleSavePost = (postId) => {
     setSavedPosts((prev) => {
       const updated = prev.includes(postId)
@@ -322,6 +380,12 @@ useEffect(() => {
 
   const getMediaUrl = (item) => {
     return item?.url || item?.secure_url || item?.mediaUrl || item?.src || "";
+  };
+
+  const markMediaLoaded = (item) => {
+    const url = getMediaUrl(item);
+    if (!url) return;
+    setLoadedMedia((prev) => ({ ...prev, [url]: true }));
   };
 
   const isImageMedia = (item) => {
@@ -1138,6 +1202,26 @@ useEffect(() => {
 
 
 
+const galleryMedia = galleryPost?.media || [];
+const activeGalleryMedia = galleryMedia[galleryIndex] || null;
+const activeCommentsPost = commentsSheetPost
+  ? posts.find((post) => post._id === commentsSheetPost._id) || commentsSheetPost
+  : null;
+
+useEffect(() => {
+  if (!galleryPost) return;
+
+  const handleKeyDown = (event) => {
+    if (event.key === "Escape") closeMediaGallery();
+    if (event.key === "ArrowRight") goToGalleryMedia("next");
+    if (event.key === "ArrowLeft") goToGalleryMedia("prev");
+  };
+
+  window.addEventListener("keydown", handleKeyDown);
+  return () => window.removeEventListener("keydown", handleKeyDown);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [galleryPost, galleryIndex]);
+
   const trendingTags = useMemo(
   () =>
     ["#DeepVybes", "#LateNight", "#Chaos", "#CollegeLife", "#RealThoughts", "#Creative"]
@@ -1264,8 +1348,8 @@ useEffect(() => {
       }
       rows={1}
       className={`w-full min-w-0 overflow-y-auto no-scrollbar border outline-none transition-all text-white placeholder:text-gray-400 resize-none leading-6 ${
-        selectedFile
-          ? "bg-black/35 border-cyan-400/15 rounded-[22px] px-4 py-3 pr-24 focus:border-cyan-400/40 focus:bg-black/45 shadow-inner shadow-black/30"
+        hasSelectedMedia
+          ? "bg-black/35 border-cyan-400/15 rounded-[22px] px-4 py-3 pr-4 focus:border-cyan-400/40 focus:bg-black/45 shadow-inner shadow-black/30"
           : "bg-white/5 border-white/10 rounded-2xl px-4 py-3 pr-24 focus:border-pink-500 focus:bg-white/[0.07]"
       }`}
       style={{ minHeight: hasSelectedMedia ? "52px" : "58px", maxHeight: "180px" }}
@@ -1274,7 +1358,7 @@ useEffect(() => {
     <button
       type="button"
       onClick={() => setMoodPickerOpen((prev) => !prev)}
-      className={`absolute right-2 top-2 h-9 px-3 rounded-xl border text-xs font-black transition-all ${
+      className={`${hasSelectedMedia ? "hidden" : "absolute"} right-2 top-2 h-9 px-3 rounded-xl border text-xs font-black transition-all ${
         selectedMood !== "All"
           ? `bg-gradient-to-r ${moodMeta[selectedMood]?.style} border-white/20 text-white`
           : "bg-black/40 border-white/10 text-gray-400 hover:text-white hover:bg-white/10"
@@ -1284,8 +1368,26 @@ useEffect(() => {
       {selectedMood === "All" ? "Mood" : selectedMood}
     </button>
 
+    {hasSelectedMedia && (
+      <div className="mt-2 flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/[0.035] px-3 py-2">
+        <span className="text-[10px] font-black tracking-[0.18em] text-gray-500">MOOD</span>
+        <button
+          type="button"
+          onClick={() => setMoodPickerOpen((prev) => !prev)}
+          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-black transition-all ${
+            selectedMood !== "All"
+              ? `bg-gradient-to-r ${moodMeta[selectedMood]?.style} border-white/20 text-white`
+              : "bg-black/35 border-white/10 text-gray-400 hover:text-white"
+          }`}
+        >
+          <span>{moodMeta[selectedMood]?.icon}</span>
+          {selectedMood === "All" ? "Choose mood" : selectedMood}
+        </button>
+      </div>
+    )}
+
     {moodPickerOpen && (
-      <div className="absolute right-0 top-12 z-30 w-[260px] rounded-3xl border border-white/10 bg-zinc-950/95 backdrop-blur-2xl shadow-2xl shadow-black/50 p-3">
+      <div className={`absolute right-0 ${hasSelectedMedia ? "top-[124px]" : "top-12"} z-30 w-[260px] rounded-3xl border border-white/10 bg-zinc-950/95 backdrop-blur-2xl shadow-2xl shadow-black/50 p-3`}>
         <div className="flex items-center justify-between mb-3 px-1">
           <p className="text-[10px] tracking-[0.2em] text-pink-300 font-black">
             SELECT VYBE
@@ -1333,13 +1435,13 @@ useEffect(() => {
                       MEDIA PREVIEW
                     </p>
                     <p className="text-[11px] text-gray-500 mt-0.5 truncate">
-                      Preview your media. Use Edit only when you want crop or filters.
+                      {mediaItems.length > 1 ? "Preview your moments. Tap thumbnails to edit each." : "Preview your moment before dropping."}
                     </p>
                   </div>
 
                   {hasSelectedMedia && (
                     <span className="shrink-0 px-2.5 py-1 rounded-full border border-white/10 bg-white/[0.06] text-[11px] font-bold text-gray-300">
-                      {isSelectedVideo ? "🎬 Clip" : hasMediaEdits() ? "✨ Edited" : "📸 Moment"}
+                      {mediaItems.length > 1 ? `🧱 ${mediaItems.length} Moments` : isSelectedVideo ? "🎬 Clip" : hasMediaEdits() ? "✨ Edited" : "📸 Moment"}
                     </span>
                   )}
                 </div>
@@ -1353,7 +1455,7 @@ useEffect(() => {
                 {activeMedia && (
                   <div className="space-y-3">
                     <div
-                      className={`relative rounded-[24px] overflow-hidden border border-white/10 bg-[#050508] ${getPreviewFrameClass()} shadow-2xl shadow-black/40 transition-all duration-300`}
+                      className={`group relative rounded-[28px] overflow-hidden border border-pink-400/15 bg-[#050508] ${getPreviewFrameClass()} shadow-[0_0_45px_rgba(236,72,153,0.10)] transition-all duration-300`}
                     >
                       {isSelectedImage ? (
                         <>
@@ -1382,11 +1484,42 @@ useEffect(() => {
                         />
                       )}
 
-                      <div className="absolute left-3 top-3 z-20 max-w-[68%]">
+                      <div className="absolute left-3 top-3 z-20 max-w-[58%]">
                         <span className="block truncate px-3 py-1.5 rounded-full bg-black/65 border border-white/10 backdrop-blur-xl text-[10px] font-black text-white shadow-lg">
                           {activeMedia?.file?.name || "Selected media"}
                         </span>
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeSelectedMedia();
+                        }}
+                        className="absolute right-3 bottom-3 z-30 inline-flex items-center gap-1.5 rounded-full border border-red-400/25 bg-red-500/20 px-3 py-1.5 text-[11px] font-black text-red-100 backdrop-blur-xl shadow-lg hover:bg-red-500/30 active:scale-95 transition-all"
+                        title="Remove current media"
+                      >
+                        ✕ Remove
+                      </button>
+
+                      {mediaItems.length > 1 && (
+                        <>
+                          <div className="absolute right-3 top-3 z-20 rounded-full bg-black/65 border border-white/10 backdrop-blur-xl px-3 py-1.5 text-[10px] font-black text-white shadow-lg">
+                            {activeMediaIndex + 1} / {mediaItems.length}
+                          </div>
+
+                          <div className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-black/45 border border-white/10 backdrop-blur-xl px-3 py-2">
+                            {mediaItems.slice(0, 6).map((_, dotIndex) => (
+                              <span
+                                key={dotIndex}
+                                className={`h-1.5 rounded-full transition-all ${
+                                  dotIndex === activeMediaIndex ? "w-5 bg-pink-400" : "w-1.5 bg-white/55"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </>
+                      )}
 
                       {loading && hasSelectedMedia && (
                         <div className="absolute inset-0 z-30 bg-black/70 backdrop-blur-sm flex items-center justify-center px-6">
@@ -1449,7 +1582,7 @@ useEffect(() => {
                         onClick={removeSelectedMedia}
                         className="shrink-0 px-4 py-2.5 rounded-2xl border border-red-400/20 bg-red-500/15 text-xs font-black text-red-100 hover:bg-red-500/25 transition-all"
                       >
-                        Remove
+                        Remove current
                       </button>
                     </div>
 
@@ -1559,7 +1692,21 @@ useEffect(() => {
 
 
                     {mediaItems.length > 1 && (
-                      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+                      <div>
+                        <div className="mb-2 flex items-center justify-between px-1">
+                          <p className="text-[10px] tracking-[0.18em] text-pink-300 font-black">YOUR MOMENTS ({mediaItems.length})</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMediaInputMode("add");
+                              mediaInputRef.current?.click();
+                            }}
+                            className="text-[11px] font-bold text-cyan-300 hover:text-cyan-200"
+                          >
+                            Add more
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
                         {mediaItems.map((item, index) => (
                           <button
                             key={item.id}
@@ -1583,6 +1730,16 @@ useEffect(() => {
                             <span className="absolute bottom-1 right-1 rounded-full bg-black/65 px-1.5 py-0.5 text-[9px] font-black text-white">
                               {index + 1}
                             </span>
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeMediaItem(index);
+                              }}
+                              className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full border border-red-400/25 bg-black/70 text-[10px] font-black text-red-100 backdrop-blur-md hover:bg-red-500/30"
+                              title="Remove this media"
+                            >
+                              ×
+                            </span>
                           </button>
                         ))}
 
@@ -1596,6 +1753,7 @@ useEffect(() => {
                         >
                           +
                         </button>
+                        </div>
                       </div>
                     )}
 
@@ -1699,16 +1857,34 @@ useEffect(() => {
           ) : flowPosts.length === 0 ? (
             <div className="text-center py-20 text-gray-400">
   <div className="w-20 h-20 rounded-full bg-white/[0.05] border border-white/10 flex items-center justify-center text-3xl mx-auto mb-5">
-    ✨
+    {activeFlowTab === "Tuned In" ? "〰️" : activeFlowTab === "Close Circle" ? "🫶" : "✨"}
   </div>
 
   <h2 className="text-2xl font-black mb-2">
-    No Vybes Found
+    {activeFlowTab === "Tuned In"
+      ? "No tuned-in vybes yet"
+      : activeFlowTab === "Close Circle"
+      ? "Your Close Circle is quiet"
+      : "No Vybes Found"}
   </h2>
 
   <p className="text-gray-500 max-w-sm mx-auto leading-relaxed">
-    Try another mood or tune into more people to shape your Flow.
+    {activeFlowTab === "Tuned In"
+      ? "Follow more people to build a Flow that feels like you."
+      : activeFlowTab === "Close Circle"
+      ? "Add people to Close Circle later and their real moments will show here."
+      : "Try another mood or drop your first vybe to shape your Flow."}
   </p>
+
+  {activeFlowTab !== "For You" && (
+    <button
+      type="button"
+      onClick={() => setActiveFlowTab("For You")}
+      className="mt-6 px-5 py-3 rounded-2xl bg-white/[0.06] border border-white/10 text-sm font-black text-white hover:bg-white/[0.1] transition-all"
+    >
+      Explore For You
+    </button>
+  )}
 </div>
           ) : (
             displayedPosts.map((post) => {
@@ -1716,6 +1892,9 @@ useEffect(() => {
               const commentsOpen = openComments[post._id];
               const isSaved = savedPosts.includes(post._id);
               const postKind = getPostKind(post);
+              const mediaList = post.media || [];
+              const firstMedia = mediaList[0];
+              const mediaCount = mediaList.length;
 
               return (
                 <div
@@ -1848,31 +2027,35 @@ useEffect(() => {
                   )}
 
                   {/* MEDIA */}
-                  {post.media &&
-                    post.media.map((item, index) => (
+                  {firstMedia && (
+                    <div className="mx-3 mb-3">
                       <div
-                        key={index}
-                        onDoubleClick={() =>
-                          handlePostLikeWithAnimation(post._id)
-                        }
-                        className="relative mx-3 mb-3 rounded-[24px] w-[calc(100%-24px)] aspect-[4/5] max-h-[78vh] bg-black flex items-center justify-center cursor-pointer select-none overflow-hidden border border-white/5 shadow-2xl shadow-black/30"
+                        onClick={() => openMediaGallery(post, 0)}
+                        onDoubleClick={() => handlePostLikeWithAnimation(post._id)}
+                        className="group relative rounded-[26px] w-full aspect-[4/5] max-h-[78vh] bg-black flex items-center justify-center cursor-pointer select-none overflow-hidden border border-white/10 shadow-2xl shadow-black/35"
                       >
-                        {isImageMedia(item) ? (
+                        {isImageMedia(firstMedia) ? (
+                          <>
+                            {!loadedMedia[getMediaUrl(firstMedia)] && (
+                              <div className="absolute inset-0 z-10 bg-gradient-to-br from-white/[0.07] via-white/[0.025] to-pink-500/[0.08] animate-pulse" />
+                            )}
                           <img
-                            src={getMediaUrl(item)}
+                            src={getMediaUrl(firstMedia)}
                             alt=""
                             loading="lazy"
+                            onLoad={() => markMediaLoaded(firstMedia)}
                             onError={(e) => {
                               e.currentTarget.style.display = "none";
                               const fallback = e.currentTarget.nextElementSibling;
                               if (fallback) fallback.style.display = "flex";
                             }}
-                            className="w-full h-full object-cover transition-transform duration-500 hover:scale-[1.015]"
+                            className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-[1.018] ${loadedMedia[getMediaUrl(firstMedia)] ? "opacity-100" : "opacity-0"}`}
                           />
+                          </>
                         ) : (
                           <video
-                            src={getMediaUrl(item)}
-                            controls
+                            src={getMediaUrl(firstMedia)}
+                            muted
                             playsInline
                             className="w-full h-full object-contain bg-black"
                           />
@@ -1886,8 +2069,40 @@ useEffect(() => {
                             </p>
                           </div>
                         </div>
+
+                        {mediaCount > 1 && (
+                          <>
+                            <div className="absolute right-3 top-3 rounded-full bg-black/60 border border-white/10 backdrop-blur-xl px-3 py-1.5 text-[11px] font-black text-white shadow-lg">
+                              1 / {mediaCount}
+                            </div>
+
+                            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-black/45 border border-white/10 backdrop-blur-xl px-3 py-2">
+                              {mediaList.slice(0, 6).map((_, dotIndex) => (
+                                <span
+                                  key={dotIndex}
+                                  className={`h-1.5 rounded-full transition-all ${
+                                    dotIndex === 0 ? "w-5 bg-pink-400" : "w-1.5 bg-white/55"
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          </>
+                        )}
+
+                        <div className="absolute inset-x-0 bottom-0 translate-y-full group-hover:translate-y-0 transition-transform duration-300 bg-gradient-to-t from-black/85 to-transparent p-4">
+                          <p className="text-xs font-bold text-white/90">
+                            {mediaCount > 1 ? `${mediaCount} moments stacked · Tap to view` : "Tap to view media"}
+                          </p>
+                        </div>
                       </div>
-                    ))}
+
+                      {mediaCount > 1 && (
+                        <p className="mt-2 px-1 text-xs font-bold text-pink-300">
+                          {mediaCount} moments stacked
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* ACTIONS */}
                   <div className="px-4 pt-4 pb-4 border-t border-white/5">
@@ -1895,7 +2110,7 @@ useEffect(() => {
                       <div className="flex items-center gap-2 sm:gap-3">
                         <button
                           onClick={() => handlePostLikeWithAnimation(post._id)}
-                          className={`flex items-center gap-2 rounded-2xl px-2.5 py-2 active:scale-95 hover:bg-white/[0.055] transition-all ${
+                          className={`flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] px-3 py-2 active:scale-95 hover:bg-white/[0.07] transition-all ${
                             isPostLikedByMe(post)
                               ? "text-pink-400"
                               : "text-gray-100 hover:text-pink-400"
@@ -1915,13 +2130,8 @@ useEffect(() => {
                         </button>
 
                         <button
-                          onClick={() =>
-                            setOpenComments((prev) => ({
-                              ...prev,
-                              [post._id]: !prev[post._id],
-                            }))
-                          }
-                          className="flex items-center gap-2 rounded-2xl px-2.5 py-2 text-gray-100 hover:text-indigo-300 hover:bg-white/[0.055] active:scale-95 transition-all"
+                          onClick={() => setCommentsSheetPost(post)}
+                          className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] px-3 py-2 text-gray-200 hover:text-indigo-300 hover:bg-white/[0.07] active:scale-95 transition-all"
                           title="Replies"
                         >
                           <CommentIcon />
@@ -1932,7 +2142,7 @@ useEffect(() => {
 
                         <button
                           onClick={() => setSharePost(post)}
-                          className="rounded-2xl px-2.5 py-2 text-gray-100 hover:text-cyan-300 hover:bg-white/[0.055] active:scale-95 transition-all"
+                          className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-2 text-gray-200 hover:text-cyan-300 hover:bg-white/[0.07] active:scale-95 transition-all"
                           title="Share"
                         >
                           <ShareIcon />
@@ -1941,7 +2151,7 @@ useEffect(() => {
 
                       <button
                         onClick={() => toggleSavePost(post._id)}
-                        className={`rounded-2xl px-2.5 py-2 active:scale-95 hover:bg-white/[0.055] transition-all ${
+                        className={`rounded-full border border-white/10 bg-white/[0.035] px-3 py-2 active:scale-95 hover:bg-white/[0.07] transition-all ${
                           isSaved
                             ? "text-yellow-400"
                             : "text-gray-100 hover:text-yellow-300"
@@ -2384,6 +2594,24 @@ useEffect(() => {
             display: none;
           }
 
+          @keyframes galleryNext {
+            from { opacity: 0.65; transform: translateX(22px) scale(0.985); }
+            to { opacity: 1; transform: translateX(0) scale(1); }
+          }
+
+          @keyframes galleryPrev {
+            from { opacity: 0.65; transform: translateX(-22px) scale(0.985); }
+            to { opacity: 1; transform: translateX(0) scale(1); }
+          }
+
+          .animate-gallery-next {
+            animation: galleryNext 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          }
+
+          .animate-gallery-prev {
+            animation: galleryPrev 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          }
+
           @keyframes uploadFlow {
             0% { transform: translateX(-100%); }
             50% { transform: translateX(20%); }
@@ -2391,6 +2619,260 @@ useEffect(() => {
           }
         `}
       </style>
+
+
+
+      {/* COMMENTS BOTTOM SHEET */}
+      {activeCommentsPost && (
+        <div
+          onClick={() => setCommentsSheetPost(null)}
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full sm:max-w-lg max-h-[86vh] overflow-hidden rounded-t-[32px] sm:rounded-[32px] border border-white/10 bg-zinc-950 shadow-2xl shadow-black/60"
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-white/10 bg-zinc-950/95 p-4 backdrop-blur-xl">
+              <div>
+                <p className="text-[10px] tracking-[0.22em] text-indigo-300 font-black">REPLIES</p>
+                <h3 className="text-lg font-black text-white">{activeCommentsPost.comments?.length || 0} replies</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCommentsSheetPost(null)}
+                className="w-10 h-10 rounded-full bg-white/[0.06] border border-white/10 text-xl text-gray-300 hover:text-white"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="max-h-[58vh] overflow-y-auto no-scrollbar p-4 space-y-3">
+              {activeCommentsPost.comments && activeCommentsPost.comments.length > 0 ? (
+                activeCommentsPost.comments.map((comment) => {
+                  const canDeleteComment =
+                    comment.user?._id === currentUserId || activeCommentsPost.user?._id === currentUserId;
+
+                  return (
+                    <div key={comment._id} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                      <div className="flex items-start gap-3">
+                        <img
+                          onClick={() => openUserProfile(comment.user?._id)}
+                          src={
+                            comment.user?.profilePic ||
+                            "https://ui-avatars.com/api/?name=User&background=8b5cf6&color=fff"
+                          }
+                          alt=""
+                          className="w-9 h-9 rounded-full object-cover border border-white/10 cursor-pointer"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p
+                              onClick={() => openUserProfile(comment.user?._id)}
+                              className="text-sm font-black text-white truncate cursor-pointer hover:text-pink-300"
+                            >
+                              {comment.user?.name || "User"}
+                            </p>
+                            {canDeleteComment && (
+                              <button
+                                type="button"
+                                onClick={() => deleteComment(activeCommentsPost._id, comment._id)}
+                                className="text-xs text-red-300 hover:text-red-200"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                          <p className="mt-1 text-sm leading-relaxed text-gray-300 break-words">{comment.text}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="py-12 text-center text-gray-500">
+                  <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-2xl">💬</div>
+                  <p className="font-black text-gray-300">No replies yet</p>
+                  <p className="mt-1 text-sm">Be the first to reply to this vybe.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-white/10 bg-zinc-950/95 p-4">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={commentText[activeCommentsPost._id] || ""}
+                  onChange={(e) =>
+                    setCommentText((prev) => ({
+                      ...prev,
+                      [activeCommentsPost._id]: e.target.value,
+                    }))
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") addComment(activeCommentsPost._id);
+                  }}
+                  placeholder="Drop a reply..."
+                  className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm outline-none focus:border-indigo-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => addComment(activeCommentsPost._id)}
+                  className="rounded-2xl bg-indigo-500/25 px-4 py-3 text-sm font-black text-indigo-100 hover:bg-indigo-500"
+                >
+                  Reply
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MEDIA GALLERY */}
+      {galleryPost && activeGalleryMedia && (
+        <div
+          onClick={closeMediaGallery}
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xl flex items-center justify-center p-3"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-[520px] max-h-[94vh] rounded-[34px] border border-white/10 bg-zinc-950/95 overflow-hidden shadow-2xl shadow-black/70"
+          >
+            <div className="absolute left-0 right-0 top-0 z-30 flex items-center justify-between p-4 bg-gradient-to-b from-black/70 to-transparent">
+              <button
+                type="button"
+                onClick={closeMediaGallery}
+                className="w-11 h-11 rounded-full bg-black/45 border border-white/10 backdrop-blur-xl text-white text-xl hover:bg-white/10 transition-all"
+              >
+                ←
+              </button>
+
+              <div className="rounded-full bg-black/45 border border-white/10 backdrop-blur-xl px-4 py-2 text-sm font-black text-white">
+                {galleryIndex + 1} / {galleryMedia.length}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSharePost(galleryPost)}
+                className="w-11 h-11 rounded-full bg-black/45 border border-white/10 backdrop-blur-xl text-white text-xl hover:bg-white/10 transition-all"
+              >
+                ⋯
+              </button>
+            </div>
+
+            <div
+              key={`${galleryIndex}-${galleryDirection || "still"}`}
+              className={`relative aspect-[4/5] bg-black flex items-center justify-center touch-pan-y select-none overflow-hidden ${
+                galleryDirection === "next"
+                  ? "animate-gallery-next"
+                  : galleryDirection === "prev"
+                  ? "animate-gallery-prev"
+                  : ""
+              }`}
+              onTouchStart={handleGalleryTouchStart}
+              onTouchMove={handleGalleryTouchMove}
+              onTouchEnd={handleGalleryTouchEnd}
+            >
+              {isImageMedia(activeGalleryMedia) ? (
+                <>
+                  {!loadedMedia[getMediaUrl(activeGalleryMedia)] && (
+                    <div className="absolute inset-0 z-10 bg-gradient-to-br from-white/[0.07] via-white/[0.025] to-pink-500/[0.08] animate-pulse" />
+                  )}
+                <img
+                  src={getMediaUrl(activeGalleryMedia)}
+                  alt=""
+                  onLoad={() => markMediaLoaded(activeGalleryMedia)}
+                  className={`h-full w-full object-cover transition-opacity duration-300 ${loadedMedia[getMediaUrl(activeGalleryMedia)] ? "opacity-100" : "opacity-0"}`}
+                />
+                </>
+              ) : (
+                <video
+                  src={getMediaUrl(activeGalleryMedia)}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="h-full w-full object-contain bg-black"
+                />
+              )}
+
+              {galleryMedia.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => goToGalleryMedia("prev")}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-black/45 border border-white/10 backdrop-blur-xl text-white text-2xl hover:bg-white/10 transition-all"
+                  >
+                    ‹
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => goToGalleryMedia("next")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-black/45 border border-white/10 backdrop-blur-xl text-white text-2xl hover:bg-white/10 transition-all"
+                  >
+                    ›
+                  </button>
+                </>
+              )}
+
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/55 to-transparent p-4 pt-16">
+                <div className="flex items-center gap-3 mb-3">
+                  <img
+                    src={
+                      galleryPost.user?.profilePic ||
+                      "https://ui-avatars.com/api/?name=User&background=8b5cf6&color=fff"
+                    }
+                    alt=""
+                    className="w-10 h-10 rounded-full object-cover border border-white/10"
+                  />
+
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-white truncate">
+                      {galleryPost.user?.name || "User"}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {formatVybeTime(galleryPost.createdAt)}
+                    </p>
+                  </div>
+                </div>
+
+                {(galleryPost.caption || galleryPost.content) && (
+                  <p className="text-sm text-gray-100 leading-relaxed line-clamp-2">
+                    {galleryPost.caption || galleryPost.content}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {galleryMedia.length > 1 && (
+              <div className="p-4 border-t border-white/10 bg-black/35">
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                  {galleryMedia.map((item, index) => (
+                    <button
+                      key={`${getMediaUrl(item)}-${index}`}
+                      type="button"
+                      onClick={() => setGalleryIndex(index)}
+                      className={`relative shrink-0 w-16 h-16 rounded-2xl overflow-hidden border transition-all ${
+                        galleryIndex === index
+                          ? "border-pink-400 shadow-lg shadow-pink-500/25"
+                          : "border-white/10 opacity-65 hover:opacity-100"
+                      }`}
+                    >
+                      {isImageMedia(item) ? (
+                        <img src={getMediaUrl(item)} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <video src={getMediaUrl(item)} className="w-full h-full object-cover" />
+                      )}
+                      <span className="absolute bottom-1 right-1 rounded-full bg-black/65 px-1.5 py-0.5 text-[9px] font-black text-white">
+                        {index + 1}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
 
       {/* MEDIA EDIT MODAL */}
