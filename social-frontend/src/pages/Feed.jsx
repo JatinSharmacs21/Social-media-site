@@ -188,7 +188,9 @@ const nextPosts = Array.isArray(res.data)
     });
 
     setFeedPage(page);
-    setHasMoreFeed(Boolean(res.data?.hasMore));
+    setHasMoreFeed(
+  Array.isArray(res.data) ? nextPosts.length === 6 : Boolean(res.data?.hasMore)
+);
   } catch (error) {
     console.log(error.response?.data || error);
   } finally {
@@ -1150,6 +1152,7 @@ useEffect(() => {
     </svg>
   );
 
+  const safePosts = useMemo(() => (Array.isArray(posts) ? posts : []), [posts]);
   const fallbackUsers = useMemo(
     () =>
       [
@@ -1163,7 +1166,7 @@ useEffect(() => {
   );
 
   const suggestedUsers = useMemo(() => {
-    const users = posts
+    const users = safePosts
       .map((post) => post.user)
       .filter(Boolean)
       .filter((user) => user._id !== currentUserId)
@@ -1174,7 +1177,7 @@ useEffect(() => {
       .slice(0, 5);
 
     return users.length > 0 ? users : fallbackUsers.slice(0, 5);
-  }, [posts, currentUserId, fallbackUsers]);
+  }, [safePosts, currentUserId, fallbackUsers]);
 
 const hasVideoMedia = (post) => {
   return post.media?.some((item) => {
@@ -1190,7 +1193,7 @@ const hasVideoMedia = (post) => {
   });
 };
 
-const flowPosts = posts.filter((post) => {
+const flowPosts = safePosts.filter((post) => {
   if (hasVideoMedia(post)) return false;
 
   if (activeMood !== "All") {
@@ -1221,7 +1224,7 @@ const flowPosts = posts.filter((post) => {
 });
 
 const displayedPosts = flowPosts;
-const hasMorePosts = hasMoreFeed;
+// const hasMorePosts = hasMoreFeed;
 
 useEffect(() => {
   if (!loadMoreRef.current || !hasMoreFeed || initialLoading || loadingMoreFeed) return;
@@ -1245,7 +1248,7 @@ useEffect(() => {
 const galleryMedia = galleryPost?.media || [];
 const activeGalleryMedia = galleryMedia[galleryIndex] || null;
 const activeCommentsPost = commentsSheetPost
-  ? posts.find((post) => post._id === commentsSheetPost._id) || commentsSheetPost
+  ? safePosts.find((post) => post._id === commentsSheetPost._id) || commentsSheetPost
   : null;
 
 useEffect(() => {
