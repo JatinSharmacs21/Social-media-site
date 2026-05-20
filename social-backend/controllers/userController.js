@@ -25,6 +25,8 @@ const normalizeUsername = (username = "") =>
   username.toString().trim().toLowerCase();
 
 const validateUsername = (username) => /^[a-z0-9_]{3,20}$/.test(username);
+const escapeRegex = (value = "") =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // GET MY PROFILE
 const getMyProfile = async (req, res) => {
@@ -125,20 +127,22 @@ const getUserProfile = async (req, res) => {
 // SEARCH USERS BY NAME OR USERNAME
 const searchUsers = async (req, res) => {
   try {
-    const q = (req.query.q || req.query.name || "").trim();
+    const q = (req.query.q || req.query.name || "").trim().slice(0, 40);
 
-    const users = await User.find(
-      q
-        ? {
-            $or: [
-              { name: { $regex: q, $options: "i" } },
-              { username: { $regex: q, $options: "i" } },
-            ],
-          }
-        : {}
-    )
+    if (!q) {
+      return res.json([]);
+    }
+
+    const safeQuery = escapeRegex(q);
+
+    const users = await User.find({
+      $or: [
+        { name: { $regex: safeQuery, $options: "i" } },
+        { username: { $regex: safeQuery, $options: "i" } },
+      ],
+    })
       .select(publicUserFields)
-      .limit(30);
+      .limit(20);
 
     res.json(users);
   } catch (error) {

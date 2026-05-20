@@ -82,11 +82,11 @@ function Reels() {
     const fetchClips = async () => {
       try {
         setLoading(true);
-        const res = await API.get("/api/posts");
+        const res = await API.get("/api/posts?page=1&limit=30");
 
         const videoPosts = [];
 
-        res.data.forEach((post) => {
+        (res.data.posts || []).forEach((post) => {
           const videos =
             post.media?.filter(
               (item) => isVideoMedia(item) && getMediaUrl(item)

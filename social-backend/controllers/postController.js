@@ -51,17 +51,35 @@ const createPost = async (req, res) => {
 
 const getPosts = async (req, res) => {
   try {
-    const posts = await Post.find({
-      postType: { $in: ["normal", null] },
-    })
-      .populate("user", "name username profilePic")
-      .populate("likes", "name username profilePic")
-      .populate("comments.user", "name username profilePic")
-      .populate("comments.likes", "name username profilePic")
-      .populate("comments.replies.user", "name username profilePic")
-      .sort({ createdAt: -1 });
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 6, 1), 20);
+    const skip = (page - 1) * limit;
 
-    res.json(posts);
+    const filter = {
+      postType: { $in: ["normal", null] },
+    };
+
+    const [posts, total] = await Promise.all([
+      Post.find(filter)
+        .populate("user", "name username profilePic")
+        .populate("likes", "name username profilePic")
+        .populate("comments.user", "name username profilePic")
+        .populate("comments.likes", "name username profilePic")
+        .populate("comments.replies.user", "name username profilePic")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+
+      Post.countDocuments(filter),
+    ]);
+
+    res.json({
+      posts,
+      page,
+      limit,
+      total,
+      hasMore: skip + posts.length < total,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

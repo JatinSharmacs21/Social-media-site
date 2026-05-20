@@ -27,6 +27,9 @@ function Feed() {
   const [mediaUploadStage, setMediaUploadStage] = useState("");
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [feedPage, setFeedPage] = useState(1);
+  const [hasMoreFeed, setHasMoreFeed] = useState(true);
+  const [loadingMoreFeed, setLoadingMoreFeed] = useState(false);
 
   const [commentText, setCommentText] = useState({});
   const [replyText, setReplyText] = useState({});
@@ -64,7 +67,6 @@ function Feed() {
   const [followingUsers, setFollowingUsers] = useState({});
   const [activeMood, setActiveMood] = useState("All");
   const [activeFlowTab, setActiveFlowTab] = useState("For You");
-  const [visiblePosts, setVisiblePosts] = useState(5);
   const moodPickerRef = useRef(null);
   const captionRef = useRef(null);
   const loadMoreRef = useRef(null);
@@ -140,18 +142,55 @@ function Feed() {
       Authorization: "Bearer " + token,
     },
   };
+  const PostSkeleton = () => (
+  <div className="bg-zinc-950 border border-white/10 rounded-2xl sm:rounded-3xl overflow-hidden shadow-xl animate-pulse">
+    <div className="flex items-center gap-3 p-4">
+      <div className="w-11 h-11 rounded-full bg-white/10"></div>
+      <div className="flex-1 space-y-2">
+        <div className="h-4 w-32 bg-white/10 rounded"></div>
+        <div className="h-3 w-24 bg-white/10 rounded"></div>
+      </div>
+    </div>
 
-  const fetchPosts = async () => {
-    try {
+    <div className="aspect-[4/5] bg-white/10"></div>
+
+    <div className="p-4 flex gap-5">
+      <div className="h-5 w-12 bg-white/10 rounded"></div>
+      <div className="h-5 w-12 bg-white/10 rounded"></div>
+      <div className="h-5 w-12 bg-white/10 rounded"></div>
+    </div>
+  </div>
+);
+
+ const fetchPosts = async (page = 1) => {
+  try {
+    if (page === 1) {
       setInitialLoading(true);
-      const res = await API.get("/api/posts");
-      setPosts(res.data);
-    } catch (error) {
-      console.log(error.response?.data || error);
-    } finally {
-      setInitialLoading(false);
+    } else {
+      setLoadingMoreFeed(true);
     }
-  };
+
+    const res = await API.get(`/api/posts?page=${page}&limit=6`);
+    const nextPosts = res.data.posts || [];
+
+    setPosts((prev) => {
+      if (page === 1) return nextPosts;
+
+      const existingIds = new Set(prev.map((post) => post._id));
+      const uniquePosts = nextPosts.filter((post) => !existingIds.has(post._id));
+
+      return [...prev, ...uniquePosts];
+    });
+
+    setFeedPage(page);
+    setHasMoreFeed(Boolean(res.data.hasMore));
+  } catch (error) {
+    console.log(error.response?.data || error);
+  } finally {
+    setInitialLoading(false);
+    setLoadingMoreFeed(false);
+  }
+};
 
 
 useEffect(() => {
@@ -179,10 +218,6 @@ useEffect(() => {
 
   loadCurrentUser();
 }, [currentUserId]);
-
-useEffect(() => {
-  setVisiblePosts(5);
-}, [activeMood, activeFlowTab]);
 
 useEffect(() => {
   const handleClickOutside = (event) => {
@@ -1180,25 +1215,25 @@ const flowPosts = posts.filter((post) => {
   return true;
 });
 
-const displayedPosts = flowPosts.slice(0, visiblePosts);
-const hasMorePosts = visiblePosts < flowPosts.length;
+const displayedPosts = flowPosts;
+const hasMorePosts = hasMoreFeed;
 
 useEffect(() => {
-  if (!loadMoreRef.current || !hasMorePosts || initialLoading) return;
+  if (!loadMoreRef.current || !hasMoreFeed || initialLoading || loadingMoreFeed) return;
 
   const observer = new IntersectionObserver(
     ([entry]) => {
       if (entry.isIntersecting) {
-        setVisiblePosts((prev) => Math.min(prev + 5, flowPosts.length));
+        fetchPosts(feedPage + 1);
       }
     },
-    { root: null, rootMargin: "220px", threshold: 0.1 }
+    { root: null, rootMargin: "260px", threshold: 0.1 }
   );
 
   observer.observe(loadMoreRef.current);
 
   return () => observer.disconnect();
-}, [hasMorePosts, initialLoading, flowPosts.length, activeMood, activeFlowTab]);
+}, [hasMoreFeed, initialLoading, loadingMoreFeed, feedPage]);
 
 
 
@@ -1832,27 +1867,8 @@ useEffect(() => {
           {initialLoading ? (
             <div className="space-y-6">
               {[1, 2, 3].map((item) => (
-                <div
-                  key={item}
-                  className="bg-zinc-950 border border-white/10 rounded-2xl sm:rounded-3xl overflow-hidden shadow-xl animate-pulse"
-                >
-                  <div className="flex items-center gap-3 p-4">
-                    <div className="w-11 h-11 rounded-full bg-white/10"></div>
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 w-32 bg-white/10 rounded"></div>
-                      <div className="h-3 w-24 bg-white/10 rounded"></div>
-                    </div>
-                  </div>
-
-                  <div className="aspect-[4/5] bg-white/10"></div>
-
-                  <div className="p-4 flex gap-5">
-                    <div className="h-5 w-12 bg-white/10 rounded"></div>
-                    <div className="h-5 w-12 bg-white/10 rounded"></div>
-                    <div className="h-5 w-12 bg-white/10 rounded"></div>
-                  </div>
-                </div>
-              ))}
+                <PostSkeleton key={item} />
+            ))}
             </div>
           ) : flowPosts.length === 0 ? (
             <div className="text-center py-20 text-gray-400">
@@ -2439,14 +2455,23 @@ useEffect(() => {
             })
           )}
 
-          {!initialLoading && flowPosts.length > 0 && hasMorePosts && (
-            <div ref={loadMoreRef} className="flex justify-center py-4">
-              <div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/[0.04] border border-white/10 text-xs font-black text-gray-400 shadow-lg shadow-black/20">
-                <span className="w-2 h-2 rounded-full bg-pink-400 animate-pulse" />
-                Loading more vybes
-              </div>
-            </div>
-          )}
+          {!initialLoading && posts.length > 0 && hasMoreFeed && (
+  <div ref={loadMoreRef} className="space-y-6 py-2">
+    {loadingMoreFeed ? (
+      <>
+        <PostSkeleton />
+        <PostSkeleton />
+      </>
+    ) : (
+      <div className="flex justify-center py-4">
+        <div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/[0.04] border border-white/10 text-xs font-black text-gray-400 shadow-lg shadow-black/20">
+          <span className="w-2 h-2 rounded-full bg-pink-400 animate-pulse" />
+          Loading more vybes
+        </div>
+      </div>
+    )}
+  </div>
+)}
         </div>
         </div>
 
