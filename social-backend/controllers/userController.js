@@ -128,7 +128,7 @@ const getUserProfile = async (req, res) => {
 // SEARCH USERS BY NAME OR USERNAME
 const searchUsers = async (req, res) => {
   try {
-    const q = (req.query.q || req.query.name || "").trim().slice(0, 40);
+    const q = String(req.query.q || req.query.name || "").trim().slice(0, 40);
 
     if (!q) {
       const suggestedUsers = await User.find({})

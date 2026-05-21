@@ -24,7 +24,7 @@ const getAnonymousName = (userId) => {
 // GET MESSAGES
 const getMessages = async (req, res) => {
   try {
-    const room = req.query.room || "general";
+    const room = String(req.query.room || "general").trim().slice(0, 50);
 
     const messages = await VybeMessage.find({ room })
       .sort({ createdAt: -1 })

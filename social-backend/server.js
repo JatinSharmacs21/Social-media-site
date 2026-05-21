@@ -221,7 +221,20 @@ app.use(
 );
 
 app.use(express.json({ limit: "1mb" }));
-//app.use(mongoSanitize());
+
+const safeMongoSanitize = (req, res, next) => {
+  mongoSanitize.sanitize(req.body, {
+    replaceWith: "_",
+  });
+
+  mongoSanitize.sanitize(req.params, {
+    replaceWith: "_",
+  });
+
+  next();
+};
+
+app.use(safeMongoSanitize);
 app.use(generalLimiter);
 
 // TEST ROUTE
