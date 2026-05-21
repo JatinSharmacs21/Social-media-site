@@ -1578,7 +1578,7 @@ useEffect(() => {
   []
 );
   return (
-    <div className="min-h-screen bg-black text-white px-2.5 sm:px-4 md:px-6 pt-20 md:pt-8 pb-28 md:pb-10">
+    <div className="min-h-screen bg-black text-white px-2.5 sm:px-4 md:px-6 pt-1 sm:pt-4 md:pt-8 pb-28 md:pb-10">
       {actionNotice && (
   <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] w-[92%] max-w-sm">
     <div className="rounded-2xl border border-pink-400/25 bg-zinc-950/95 backdrop-blur-2xl shadow-2xl shadow-pink-500/20 overflow-hidden">
@@ -1608,8 +1608,8 @@ useEffect(() => {
       <div className="w-full max-w-[1080px] mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,590px)_300px] xl:grid-cols-[minmax(0,600px)_320px] gap-8 xl:gap-10 justify-center items-start">
         <div className="w-full max-w-[600px] mx-auto lg:mx-0">
           {/* VYBE FLOW HEADER */}
-          <div className="mb-4 sm:mb-7">
-            <div className="flex items-end justify-between gap-3 mb-3 sm:mb-4">
+          <div className="mb-3 sm:mb-7">
+            <div className="flex items-end justify-between gap-3 mb-2.5 sm:mb-4">
               <div>
                 <p className="text-[11px] tracking-[0.24em] text-pink-300 font-black mb-1">
                   VYBEO
@@ -2185,15 +2185,20 @@ useEffect(() => {
           </form>
 
           {/* FLOW TABS */}
-          <div className="sticky top-[78px] md:static z-20 flex items-center gap-1.5 mb-4 sm:mb-5 bg-zinc-950/92 border border-white/10 rounded-[22px] sm:rounded-3xl p-1.5 shadow-lg shadow-black/30 backdrop-blur-2xl">
+          <div className="sticky top-[8px] md:static z-40 flex items-center gap-1.5 mb-4 sm:mb-5 bg-zinc-950/95 border border-white/10 rounded-[22px] sm:rounded-3xl p-1.5 shadow-lg shadow-black/30 backdrop-blur-2xl pointer-events-auto">
             {flowTabs.map((tab) => (
               <button
                 key={tab}
-                onClick={() => setActiveFlowTab(tab)}
-                className={`flex-1 px-2.5 py-2 rounded-[15px] text-[12px] sm:text-sm font-bold transition-all ${
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setActiveFlowTab(tab);
+                }}
+                className={`relative flex-1 px-2.5 py-2 rounded-[15px] text-[12px] sm:text-sm font-black transition-all active:scale-[0.98] ${
                   activeFlowTab === tab
-                    ? "bg-gradient-to-r from-pink-500/20 to-cyan-500/20 border border-white/10 text-white shadow-lg"
-                    : "text-gray-500 hover:text-white"
+                    ? "bg-gradient-to-r from-pink-500/25 to-cyan-500/20 border border-pink-400/25 text-white shadow-lg shadow-pink-500/10"
+                    : "border border-transparent text-gray-500 hover:text-white hover:bg-white/[0.045]"
                 }`}
               >
                 {tab}
