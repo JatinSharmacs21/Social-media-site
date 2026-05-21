@@ -12,6 +12,7 @@ function Navbar() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [toast, setToast] = useState(null);
   const [mobileVybeOpen, setMobileVybeOpen] = useState(false);
+  const [spaceControlOpen, setSpaceControlOpen] = useState(false);
 
   useEffect(() => {
     const fetchUnreadCount = async () => {
@@ -88,10 +89,13 @@ function Navbar() {
   const isVybeActive =
     location.pathname === "/vybe-drops" || location.pathname === "/vybe-room";
 
+  const isProfilePage = location.pathname.startsWith("/profile");
+
   const go = (path) => {
     navigate(path);
     setSidebarOpen(false);
     setMobileVybeOpen(false);
+    setSpaceControlOpen(false);
 
     if (path === "/notifications") {
       setUnreadCount(0);
@@ -457,6 +461,170 @@ function Navbar() {
     </button>
   );
 
+
+
+  const SpaceControlIcon = () => (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 3.5l1.3 2.8 3 .5-2.1 2.2.5 3-2.7-1.4L9.3 12l.5-3-2.1-2.2 3-.5L12 3.5z" />
+      <path d="M5.5 15.5h13" />
+      <path d="M7.5 19h9" />
+    </svg>
+  );
+
+  const SpaceControlButton = ({ compact = false }) => {
+    if (!isProfilePage) return null;
+
+    return (
+      <button
+        type="button"
+        onClick={() => setSpaceControlOpen(true)}
+        className={`group relative shrink-0 overflow-hidden rounded-2xl border transition-all duration-300 active:scale-[0.96] ${
+          compact
+            ? "flex h-11 w-11 items-center justify-center border-white/10 bg-white/[0.04] text-white shadow-inner shadow-white/5 hover:border-pink-300/25 hover:bg-white/[0.075]"
+            : sidebarOpen
+            ? "flex w-full items-center gap-4 border-white/10 bg-white/[0.035] px-4 py-3 text-white hover:border-pink-300/25 hover:bg-white/[0.065]"
+            : "flex h-12 w-12 items-center justify-center border-white/10 bg-white/[0.035] text-white hover:border-pink-300/25 hover:bg-white/[0.065]"
+        }`}
+        title="Space Control"
+        aria-label="Open Space Control"
+      >
+        <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(236,72,153,0.16),transparent_46%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.12),transparent_44%)] opacity-70 transition group-hover:opacity-100" />
+        <span className={`${compact ? "h-full w-full rounded-2xl" : "h-9 w-9 rounded-xl"} relative flex shrink-0 items-center justify-center border border-white/10 bg-black/25 text-pink-100 transition group-hover:text-cyan-100`}>
+          <SpaceControlIcon />
+        </span>
+
+        {!compact && (
+          <span
+            className={`relative overflow-hidden whitespace-nowrap font-semibold tracking-wide transition-all duration-300 ${
+              sidebarOpen ? "max-w-[170px] translate-x-0 opacity-100" : "max-w-0 -translate-x-2 opacity-0"
+            }`}
+          >
+            Space Control
+          </span>
+        )}
+
+        {!compact && !sidebarOpen && (
+          <span className="pointer-events-none absolute left-[64px] top-1/2 -translate-y-1/2 whitespace-nowrap rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-sm text-white opacity-0 shadow-xl transition-opacity duration-200 group-hover:opacity-100">
+            Space Control
+          </span>
+        )}
+      </button>
+    );
+  };
+
+  const SpaceControlPanel = () => {
+    if (!spaceControlOpen) return null;
+
+    const SectionTitle = ({ children }) => (
+      <p className="px-1 pt-4 pb-2 text-[10px] font-black uppercase tracking-[0.22em] text-pink-200/80">
+        {children}
+      </p>
+    );
+
+    const PanelItem = ({ title, subtitle, danger = false, disabled = false, onClick }) => (
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onClick}
+        className={`group w-full overflow-hidden rounded-[22px] border px-4 py-3 text-left transition-all active:scale-[0.99] ${
+          danger
+            ? disabled
+              ? "cursor-not-allowed border-red-400/10 bg-red-500/[0.045] text-red-200/55"
+              : "border-red-400/15 bg-red-500/[0.075] text-red-100 hover:bg-red-500/[0.12]"
+            : disabled
+            ? "cursor-not-allowed border-white/10 bg-white/[0.025] text-slate-500"
+            : "border-white/10 bg-white/[0.04] text-white hover:border-pink-300/20 hover:bg-white/[0.07]"
+        }`}
+      >
+        <div className="flex min-w-0 items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-black">{title}</p>
+            {subtitle && <p className="mt-0.5 truncate text-[11px] font-semibold text-slate-500">{subtitle}</p>}
+          </div>
+          <span className={`shrink-0 text-lg transition ${disabled ? "text-slate-700" : danger ? "text-red-200" : "text-slate-500 group-hover:text-white"}`}>›</span>
+        </div>
+      </button>
+    );
+
+    return (
+      <>
+        <div
+          onClick={() => setSpaceControlOpen(false)}
+          className="fixed inset-0 z-[90] bg-black/65 backdrop-blur-[3px] animate-vybe-fade"
+        />
+
+        <aside className="fixed bottom-0 right-0 top-0 z-[100] w-full max-w-[420px] animate-space-panel overflow-hidden border-l border-white/10 bg-[linear-gradient(180deg,rgba(8,8,12,0.98),rgba(12,10,18,0.98)_48%,rgba(7,7,10,0.99))] shadow-2xl shadow-black/70 backdrop-blur-2xl sm:top-3 sm:right-3 sm:bottom-3 sm:rounded-[32px] sm:border">
+          <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-pink-500/14 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-cyan-500/10 blur-3xl" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.07),transparent_34%)]" />
+
+          <div className="relative flex h-full min-h-0 flex-col overflow-hidden">
+            <div className="shrink-0 border-b border-white/10 px-4 py-4 sm:px-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-pink-200">Vybeo</p>
+                  <h2 className="mt-1 truncate text-2xl font-black tracking-tight text-white">Space Control</h2>
+                  <p className="mt-1 truncate text-xs font-semibold text-slate-500">Account, safety and your vybes.</p>
+                </div>
+                <button
+                  onClick={() => setSpaceControlOpen(false)}
+                  className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-2xl border border-white/10 bg-white/[0.055] text-xl text-white transition hover:bg-white/[0.09] active:scale-95"
+                  aria-label="Close Space Control"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            <div className="vybe-scrollless min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-2 sm:px-5">
+              <SectionTitle>Account</SectionTitle>
+              <div className="space-y-2 overflow-hidden">
+                <PanelItem
+                  title="Open profile"
+                  subtitle="Go back to your Vybe Space"
+                  onClick={() => go("/profile")}
+                />
+                <PanelItem
+                  title="Logout"
+                  subtitle="Sign out from this device"
+                  danger
+                  onClick={logout}
+                />
+              </div>
+
+              <SectionTitle>Privacy & Safety</SectionTitle>
+              <div className="space-y-2 overflow-hidden">
+                <PanelItem title="Blocked users" subtitle="Coming soon: view and unblock users" disabled />
+                <PanelItem title="Muted users" subtitle="Coming soon: control muted spaces" disabled />
+                <PanelItem title="Report history" subtitle="Coming soon: track reports and reviews" disabled />
+              </div>
+
+              <SectionTitle>Your Vybes</SectionTitle>
+              <div className="space-y-2 overflow-hidden">
+                <PanelItem title="Archived vybes" subtitle="Coming soon: restore hidden posts" disabled />
+                <PanelItem title="Saved vybes" subtitle="Coming soon: revisit saved moments" disabled />
+              </div>
+
+              <SectionTitle>Danger Zone</SectionTitle>
+              <div className="space-y-2 overflow-hidden">
+                <PanelItem title="Delete account" subtitle="Coming soon: permanent account removal" danger disabled />
+              </div>
+            </div>
+          </div>
+        </aside>
+      </>
+    );
+  };
+
+
   if (!token) {
     return (
       <>
@@ -491,25 +659,32 @@ function Navbar() {
     <>
       <NotificationToast />
       <MobileVybeSheet />
+      <SpaceControlPanel />
 
       <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-[76px] backdrop-blur-2xl bg-black/75 border-b border-white/10">
-        <div className="h-full px-4 flex items-center justify-between">
-          <Logo />
+        <div className="h-full px-4 flex items-center justify-between gap-3 overflow-hidden">
+          <div className="min-w-0 shrink">
+            <Logo />
+          </div>
 
-          <button
-            onClick={() => go("/notifications")}
-            className="relative w-11 h-11 rounded-2xl border border-white/10 bg-white/[0.04] flex items-center justify-center hover:bg-white/[0.08] transition-all"
-            aria-label="Open Signals"
-          >
-            <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2">
-              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-              <path d="M10 21h4" />
-            </svg>
+          <div className="flex shrink-0 items-center gap-3">
+            <button
+              onClick={() => go("/notifications")}
+              className="relative w-11 h-11 rounded-2xl border border-white/10 bg-white/[0.04] flex items-center justify-center hover:bg-white/[0.08] transition-all"
+              aria-label="Open Signals"
+            >
+              <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                <path d="M10 21h4" />
+              </svg>
 
-            {unreadCount > 0 && (
-              <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-pink-500 shadow-[0_0_10px_rgba(236,72,153,0.9)]" />
-            )}
-          </button>
+              {unreadCount > 0 && (
+                <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-pink-500 shadow-[0_0_10px_rgba(236,72,153,0.9)]" />
+              )}
+            </button>
+
+            <SpaceControlButton compact />
+          </div>
         </div>
       </header>
 
@@ -531,7 +706,9 @@ function Navbar() {
             ))}
           </div>
 
-          <div className="mt-auto">
+          <div className="mt-auto flex flex-col gap-2">
+            <SpaceControlButton />
+
             <button
               onClick={logout}
               className={`group relative flex items-center rounded-2xl transition-all duration-300 overflow-hidden ${
@@ -589,8 +766,35 @@ function Navbar() {
             animation: vybe-fade 180ms ease-out forwards;
           }
 
+          @keyframes space-panel {
+            from {
+              opacity: 0;
+              transform: translateX(22px) scale(0.98);
+            }
+            to {
+              opacity: 1;
+              transform: translateX(0) scale(1);
+            }
+          }
+
           .animate-vybe-sheet {
             animation: vybe-sheet 240ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+          }
+
+          .animate-space-panel {
+            animation: space-panel 260ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+          }
+
+
+          .vybe-scrollless {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+          }
+
+          .vybe-scrollless::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+            display: none;
           }
         `}
       </style>
