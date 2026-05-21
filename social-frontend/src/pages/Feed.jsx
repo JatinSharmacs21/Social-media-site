@@ -69,6 +69,7 @@ function Feed() {
   const [galleryDirection, setGalleryDirection] = useState("");
   const [loadedMedia, setLoadedMedia] = useState({});
   const [commentsSheetPost, setCommentsSheetPost] = useState(null);
+  const [confirmDeletePost, setConfirmDeletePost] = useState(null);
 
   const [likesModalPost, setLikesModalPost] = useState(null);
   const [followingUsers, setFollowingUsers] = useState({});
@@ -1384,8 +1385,7 @@ const addReply = async (postId, commentId) => {
 
   const deletePost = async (postId) => {
     try {
-      const confirmDelete = window.confirm("Delete this vybe?");
-      if (!confirmDelete) return;
+      if (!postId) return;
 
       await API.delete(`/api/posts/${postId}`, authConfig);
 
@@ -1394,15 +1394,23 @@ const addReply = async (postId, commentId) => {
       );
 
       setOpenMenuId(null);
+      setConfirmDeletePost(null);
+      showNotice("Vybe deleted");
     } catch (error) {
       console.log(error.response?.data || error);
+      showNotice(error.response?.data?.message || "Could not delete vybe");
     }
+  };
+
+  const requestDeletePost = (post) => {
+    setOpenMenuId(null);
+    setConfirmDeletePost(post);
   };
 
   const HeartIcon = ({ filled = true }) => (
     <svg
       viewBox="0 0 24 24"
-      className="w-[28px] h-[28px]"
+      className="w-[23px] h-[23px]"
       fill={filled ? "currentColor" : "none"}
       stroke="currentColor"
       strokeWidth="2.2"
@@ -1414,7 +1422,7 @@ const addReply = async (postId, commentId) => {
   const CommentIcon = () => (
     <svg
       viewBox="0 0 24 24"
-      className="w-[28px] h-[28px]"
+      className="w-[23px] h-[23px]"
       fill="none"
       stroke="currentColor"
       strokeWidth="2.2"
@@ -1426,7 +1434,7 @@ const addReply = async (postId, commentId) => {
   const ShareIcon = () => (
     <svg
       viewBox="0 0 24 24"
-      className="w-[28px] h-[28px]"
+      className="w-[23px] h-[23px]"
       fill="none"
       stroke="currentColor"
       strokeWidth="2.2"
@@ -1440,7 +1448,7 @@ const addReply = async (postId, commentId) => {
   const BookmarkIcon = ({ saved }) => (
     <svg
       viewBox="0 0 24 24"
-      className="w-[28px] h-[28px]"
+      className="w-[23px] h-[23px]"
       fill={saved ? "currentColor" : "none"}
       stroke="currentColor"
       strokeWidth="2"
@@ -1570,7 +1578,7 @@ useEffect(() => {
   []
 );
   return (
-    <div className="min-h-screen bg-black text-white px-2 sm:px-4 md:px-6 pt-4 md:pt-8 pb-24 md:pb-10">
+    <div className="min-h-screen bg-black text-white px-2.5 sm:px-4 md:px-6 pt-20 md:pt-8 pb-28 md:pb-10">
       {actionNotice && (
   <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] w-[92%] max-w-sm">
     <div className="rounded-2xl border border-pink-400/25 bg-zinc-950/95 backdrop-blur-2xl shadow-2xl shadow-pink-500/20 overflow-hidden">
@@ -1600,14 +1608,14 @@ useEffect(() => {
       <div className="w-full max-w-[1080px] mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,590px)_300px] xl:grid-cols-[minmax(0,600px)_320px] gap-8 xl:gap-10 justify-center items-start">
         <div className="w-full max-w-[600px] mx-auto lg:mx-0">
           {/* VYBE FLOW HEADER */}
-          <div className="mb-5 sm:mb-7">
-            <div className="flex items-end justify-between gap-4 mb-4">
+          <div className="mb-4 sm:mb-7">
+            <div className="flex items-end justify-between gap-3 mb-3 sm:mb-4">
               <div>
                 <p className="text-[11px] tracking-[0.24em] text-pink-300 font-black mb-1">
                   VYBEO
                 </p>
 
-                <h1 className="text-2xl sm:text-4xl font-black tracking-tight">
+                <h1 className="text-[26px] sm:text-4xl font-black tracking-tight">
                   Vybe Flow
                 </h1>
 
@@ -1650,17 +1658,17 @@ useEffect(() => {
               e.preventDefault();
               createPost();
             }}
-            className={`relative overflow-visible bg-zinc-950/90 border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-5 mb-5 sm:mb-7 shadow-xl shadow-black/30 w-full transition-all duration-300 ${
+            className={`relative overflow-visible bg-zinc-950/90 border border-white/10 rounded-[24px] sm:rounded-3xl p-3.5 sm:p-5 mb-4 sm:mb-7 shadow-xl shadow-black/30 w-full transition-all duration-300 ${
               selectedMood !== "All" ? "shadow-pink-500/10" : ""
             }`}
           >
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2 mb-3 sm:mb-4">
               {["Thought", "Moment", "Clip"].map((type) => (
                 <button
                   key={type}
                   type="button"
                   onClick={() => setComposerType(type)}
-                  className={`px-4 py-2 rounded-full text-xs sm:text-sm font-bold border transition-all ${
+                  className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-bold border transition-all ${
                     composerType === type
                       ? "bg-gradient-to-r from-pink-500/25 to-cyan-500/20 border-pink-400/30 text-white"
                       : "bg-white/[0.04] border-white/10 text-gray-400 hover:text-white"
@@ -1671,7 +1679,7 @@ useEffect(() => {
               ))}
             </div>
             
-            <div className="flex items-start gap-3 mb-4">
+            <div className="flex items-start gap-2.5 sm:gap-3 mb-3 sm:mb-4">
   <img
     src={
       currentUser?.profilePic ||
@@ -1680,7 +1688,7 @@ useEffect(() => {
       )}&background=8b5cf6&color=fff`
     }
     alt=""
-    className="w-11 h-11 sm:w-12 sm:h-12 rounded-full object-cover border border-white/10 shrink-0"
+    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-white/10 shrink-0"
   />
 
   <div ref={moodPickerRef} className="relative flex-1 min-w-0">
@@ -1718,7 +1726,7 @@ useEffect(() => {
           ? "bg-black/35 border-cyan-400/15 rounded-[22px] px-4 py-3 pr-4 focus:border-cyan-400/40 focus:bg-black/45 shadow-inner shadow-black/30"
           : "bg-white/5 border-white/10 rounded-2xl px-4 py-3 pr-24 focus:border-pink-500 focus:bg-white/[0.07]"
       }`}
-      style={{ minHeight: hasSelectedMedia ? "52px" : "58px", maxHeight: "180px" }}
+      style={{ minHeight: hasSelectedMedia ? "50px" : "52px", maxHeight: "170px" }}
     />
 
     <button
@@ -2152,7 +2160,7 @@ useEffect(() => {
                     setMediaInputMode("add");
                     mediaInputRef.current?.click();
                   }}
-                  className="bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-3 rounded-2xl text-sm font-semibold transition-all"
+                  className="w-full sm:w-auto bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2.5 sm:py-3 rounded-2xl text-sm font-semibold transition-all"
                 >
                   {composerType === "Clip" ? "🎬 Add Clip" : "📎 Add Moment"}
                 </button>
@@ -2161,7 +2169,7 @@ useEffect(() => {
               <button
                 type="submit"
                 disabled={loading}
-                className="ml-auto bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 px-7 py-3 rounded-2xl font-black hover:scale-[1.02] transition-all shadow-lg shadow-pink-500/15 disabled:opacity-60 disabled:hover:scale-100"
+                className="w-full sm:w-auto sm:ml-auto bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 px-7 py-2.5 sm:py-3 rounded-2xl font-black hover:scale-[1.02] transition-all shadow-lg shadow-pink-500/15 disabled:opacity-60 disabled:hover:scale-100"
               >
                 {loading
                   ? hasSelectedMedia
@@ -2177,12 +2185,12 @@ useEffect(() => {
           </form>
 
           {/* FLOW TABS */}
-          <div className="flex items-center gap-2 mb-5 bg-zinc-950/90 border border-white/10 rounded-3xl p-1.5 shadow-lg shadow-black/20 backdrop-blur-xl">
+          <div className="sticky top-[78px] md:static z-20 flex items-center gap-1.5 mb-4 sm:mb-5 bg-zinc-950/92 border border-white/10 rounded-[22px] sm:rounded-3xl p-1.5 shadow-lg shadow-black/30 backdrop-blur-2xl">
             {flowTabs.map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveFlowTab(tab)}
-                className={`flex-1 px-3 py-2 rounded-xl text-sm font-bold transition-all ${
+                className={`flex-1 px-2.5 py-2 rounded-[15px] text-[12px] sm:text-sm font-bold transition-all ${
                   activeFlowTab === tab
                     ? "bg-gradient-to-r from-pink-500/20 to-cyan-500/20 border border-white/10 text-white shadow-lg"
                     : "text-gray-500 hover:text-white"
@@ -2194,9 +2202,9 @@ useEffect(() => {
           </div>
 
         {/* POSTS */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {initialLoading ? (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {[1, 2, 3].map((item) => (
                 <PostSkeleton key={item} />
             ))}
@@ -2246,7 +2254,7 @@ useEffect(() => {
               return (
                 <div
                   key={post._id}
-                  className="relative bg-zinc-950/95 border border-white/10 rounded-[26px] sm:rounded-[30px] overflow-hidden shadow-xl shadow-black/30 w-full hover:border-pink-500/20 hover:shadow-[0_0_45px_rgba(236,72,153,0.08)] transition-all duration-300 animate-vybe-card"
+                  className="relative bg-zinc-950/95 border border-white/10 rounded-[24px] sm:rounded-[30px] overflow-hidden shadow-xl shadow-black/30 w-full hover:border-pink-500/20 hover:shadow-[0_0_45px_rgba(236,72,153,0.08)] transition-all duration-300 animate-vybe-card"
                 >
                   {heartPostId === post._id && (
                     <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
@@ -2268,7 +2276,7 @@ useEffect(() => {
                   )}
 
                   {/* HEADER */}
-                  <div className="flex items-center justify-between p-4 pb-3 relative">
+                  <div className="flex items-center justify-between p-3.5 sm:p-4 pb-2.5 sm:pb-3 relative">
                     <div
                       onClick={() => openUserProfile(post.user?._id)}
                       className="flex items-center gap-3 min-w-0 cursor-pointer"
@@ -2280,7 +2288,7 @@ useEffect(() => {
                         }
                         alt=""
                         loading="lazy"
-                        className="w-11 h-11 sm:w-12 sm:h-12 rounded-full object-cover border border-white/10 shrink-0"
+                        className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-white/10 shrink-0"
                       />
 
                       <div className="min-w-0">
@@ -2304,23 +2312,23 @@ useEffect(() => {
                               openMenuId === post._id ? null : post._id
                             )
                           }
-                          className="text-gray-400 hover:text-white text-xl px-2"
+                          className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.035] text-lg text-gray-400 transition hover:bg-white/[0.07] hover:text-white active:scale-95"
                         >
                           ⋮
                         </button>
 
                         {openMenuId === post._id && (
-                          <div className="absolute right-0 top-8 bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden w-36 z-20 shadow-xl">
+                          <div className="absolute right-0 top-10 z-30 w-40 overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/95 shadow-2xl shadow-black/50 backdrop-blur-2xl">
                             <button
                               onClick={() => startEditPost(post)}
-                              className="block w-full text-left px-4 py-3 hover:bg-white/10 text-sm"
+                              className="block w-full px-4 py-3 text-left text-sm font-bold text-gray-200 transition hover:bg-white/[0.07] hover:text-white"
                             >
                               Edit vybe
                             </button>
 
                             <button
-                              onClick={() => deletePost(post._id)}
-                              className="block w-full text-left px-4 py-3 hover:bg-red-500/10 text-red-400 text-sm"
+                              onClick={() => requestDeletePost(post)}
+                              className="block w-full px-4 py-3 text-left text-sm font-bold text-red-300 transition hover:bg-red-500/10"
                             >
                               Delete vybe
                             </button>
@@ -2362,7 +2370,7 @@ useEffect(() => {
   onDoubleClick={() =>
     handlePostLikeWithAnimation(post._id)
   }
-  className={`mx-6 mb-6 mt-2 max-w-[92%] break-words whitespace-pre-wrap cursor-pointer select-none transition-all ${
+  className={`mx-4 sm:mx-6 mb-4 sm:mb-6 mt-1 sm:mt-2 max-w-[94%] break-words whitespace-pre-wrap cursor-pointer select-none transition-all ${
     postKind === "Thought"
       ? "text-[18px] sm:text-[20px] leading-[1.65] font-semibold tracking-[-0.01em] text-gray-100"
       : "text-[15px] sm:text-[16px] leading-7 text-gray-100"
@@ -2375,11 +2383,11 @@ useEffect(() => {
 
                   {/* MEDIA */}
                   {firstMedia && (
-                    <div className="mx-3 mb-3">
+                    <div className="mx-2.5 sm:mx-3 mb-2.5 sm:mb-3">
                       <div
                         onClick={() => openMediaGallery(post, 0)}
                         onDoubleClick={() => handlePostLikeWithAnimation(post._id)}
-                        className="group relative rounded-[26px] w-full aspect-[4/5] max-h-[78vh] bg-black flex items-center justify-center cursor-pointer select-none overflow-hidden border border-white/10 shadow-2xl shadow-black/35"
+                        className="group relative rounded-[22px] sm:rounded-[26px] w-full aspect-[4/5] max-h-[70vh] sm:max-h-[78vh] bg-black flex items-center justify-center cursor-pointer select-none overflow-hidden border border-white/10 shadow-2xl shadow-black/35"
                       >
                         {isImageMedia(firstMedia) ? (
                           <>
@@ -2452,12 +2460,12 @@ useEffect(() => {
                   )}
 
                   {/* ACTIONS */}
-                  <div className="px-4 pt-4 pb-4 border-t border-white/5">
-                    <div className="flex items-center justify-between gap-3 mb-2">
-                      <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="px-3 sm:px-4 pt-3 sm:pt-4 pb-3 sm:pb-4 border-t border-white/5">
+                    <div className="flex items-center justify-between gap-2 sm:gap-3 mb-2">
+                      <div className="flex items-center gap-1.5 sm:gap-3">
                         <button
                           onClick={() => handlePostLikeWithAnimation(post._id)}
-                          className={`flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] px-3 py-2 active:scale-95 hover:bg-white/[0.07] transition-all ${
+                          className={`flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] px-2.5 sm:px-3 py-1.5 sm:py-2 active:scale-95 hover:bg-white/[0.07] transition-all ${
                             isPostLikedByMe(post)
                               ? "text-pink-400"
                               : "text-gray-100 hover:text-pink-400"
@@ -2470,7 +2478,7 @@ useEffect(() => {
     e.stopPropagation();
     setLikesModalPost(post);
   }}
-  className="text-[13px] font-semibold hover:underline cursor-pointer"
+  className="text-[12px] sm:text-[13px] font-semibold hover:underline cursor-pointer"
 >
   {post.likes?.length || 0} Felt
 </span>
@@ -2478,11 +2486,11 @@ useEffect(() => {
 
                         <button
                           onClick={() => setCommentsSheetPost(post)}
-                          className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] px-3 py-2 text-gray-200 hover:text-indigo-300 hover:bg-white/[0.07] active:scale-95 transition-all"
+                          className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] px-2.5 sm:px-3 py-1.5 sm:py-2 text-gray-200 hover:text-indigo-300 hover:bg-white/[0.07] active:scale-95 transition-all"
                           title="Replies"
                         >
                           <CommentIcon />
-                          <span className="text-[13px] font-semibold">
+                          <span className="text-[12px] sm:text-[13px] font-semibold">
                             {post.comments?.length || 0} Replies
                           </span>
                         </button>
@@ -2973,6 +2981,16 @@ useEffect(() => {
             50% { transform: translateX(20%); }
             100% { transform: translateX(160%); }
           }
+
+          @keyframes vybeSheetUp {
+            from { opacity: 0; transform: translateY(18px) scale(0.985); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+          }
+
+          .animate-vybe-sheet {
+            animation: vybeSheetUp 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          }
+
         `}
       </style>
 
@@ -2982,34 +3000,52 @@ useEffect(() => {
       {activeCommentsPost && (
         <div
           onClick={() => setCommentsSheetPost(null)}
-          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full sm:max-w-lg max-h-[86vh] overflow-hidden rounded-t-[32px] sm:rounded-[32px] border border-white/10 bg-zinc-950 shadow-2xl shadow-black/60"
+            className="w-full sm:max-w-xl max-h-[88vh] overflow-hidden rounded-t-[30px] sm:rounded-[32px] border border-white/10 bg-zinc-950/98 shadow-2xl shadow-black/70 animate-vybe-sheet"
           >
-            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-white/10 bg-zinc-950/95 p-4 backdrop-blur-xl">
-              <div>
-                <p className="text-[10px] tracking-[0.22em] text-indigo-300 font-black">REPLIES</p>
-                <h3 className="text-lg font-black text-white">{activeCommentsPost.comments?.length || 0} replies</h3>
+            <div className="relative overflow-hidden border-b border-white/10 bg-zinc-950/95 p-4 backdrop-blur-2xl">
+              <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-pink-500/14 blur-3xl" />
+              <div className="pointer-events-none absolute -left-16 -bottom-16 h-40 w-40 rounded-full bg-cyan-500/10 blur-3xl" />
+              <div className="relative flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] tracking-[0.22em] text-pink-300 font-black">VYBE REPLIES</p>
+                  <h3 className="mt-0.5 truncate text-lg font-black text-white">
+                    {activeCommentsPost.comments?.length || 0} replies
+                  </h3>
+                  {(activeCommentsPost.caption || activeCommentsPost.content) && (
+                    <p className="mt-1 line-clamp-1 text-xs font-semibold text-gray-500">
+                      {activeCommentsPost.caption || activeCommentsPost.content}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCommentsSheetPost(null)}
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[0.055] text-xl text-gray-300 transition hover:bg-white/[0.09] hover:text-white active:scale-95"
+                >
+                  ×
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setCommentsSheetPost(null)}
-                className="w-10 h-10 rounded-full bg-white/[0.06] border border-white/10 text-xl text-gray-300 hover:text-white"
-              >
-                ×
-              </button>
             </div>
 
-            <div className="max-h-[58vh] overflow-y-auto no-scrollbar p-4 space-y-3">
+            <div className="max-h-[56vh] overflow-y-auto no-scrollbar px-3.5 py-3.5 sm:px-4 sm:py-4 space-y-2.5">
               {activeCommentsPost.comments && activeCommentsPost.comments.length > 0 ? (
                 activeCommentsPost.comments.map((comment) => {
                   const canDeleteComment =
                     comment.user?._id === currentUserId || activeCommentsPost.user?._id === currentUserId;
 
                   return (
-                    <div key={comment._id} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                    <div
+                      key={comment._id}
+                      className={`rounded-[22px] border p-3.5 transition-all ${
+                        comment.isTemp
+                          ? "border-pink-300/25 bg-pink-500/[0.07] opacity-85"
+                          : "border-white/10 bg-white/[0.04] hover:border-white/15 hover:bg-white/[0.06]"
+                      }`}
+                    >
                       <div className="flex items-start gap-3">
                         <img
                           onClick={() => openUserProfile(comment.user?._id)}
@@ -3024,21 +3060,24 @@ useEffect(() => {
                           <div className="flex items-center justify-between gap-2">
                             <p
                               onClick={() => openUserProfile(comment.user?._id)}
-                              className="text-sm font-black text-white truncate cursor-pointer hover:text-pink-300"
+                              className="truncate text-sm font-black text-white cursor-pointer hover:text-pink-300"
                             >
                               {comment.user?.name || "User"}
                             </p>
-                            {canDeleteComment && (
+                            {canDeleteComment && !comment.isTemp && (
                               <button
                                 type="button"
                                 onClick={() => deleteComment(activeCommentsPost._id, comment._id)}
-                                className="text-xs text-red-300 hover:text-red-200"
+                                className="shrink-0 rounded-full border border-red-400/15 bg-red-500/10 px-2.5 py-1 text-[10px] font-black text-red-200 transition hover:bg-red-500/18"
                               >
                                 Delete
                               </button>
                             )}
                           </div>
-                          <p className="mt-1 text-sm leading-relaxed text-gray-300 break-words">{comment.text}</p>
+                          <p className="mt-1.5 break-words text-sm leading-relaxed text-gray-300">{comment.text}</p>
+                          {comment.isTemp && (
+                            <p className="mt-1 text-[10px] font-bold text-pink-200/70">Sending...</p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -3046,14 +3085,14 @@ useEffect(() => {
                 })
               ) : (
                 <div className="py-12 text-center text-gray-500">
-                  <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-2xl">💬</div>
-                  <p className="font-black text-gray-300">No replies yet</p>
-                  <p className="mt-1 text-sm">Be the first to reply to this vybe.</p>
+                  <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-[22px] border border-white/10 bg-white/[0.04] text-2xl">💬</div>
+                  <p className="font-black text-gray-200">No replies yet</p>
+                  <p className="mt-1 text-sm">Be the first one to join this vybe.</p>
                 </div>
               )}
             </div>
 
-            <div className="border-t border-white/10 bg-zinc-950/95 p-4">
+            <div className="border-t border-white/10 bg-zinc-950/95 p-3.5 sm:p-4">
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -3067,15 +3106,64 @@ useEffect(() => {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") addComment(activeCommentsPost._id);
                   }}
-                  placeholder="Drop a reply..."
-                  className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm outline-none focus:border-indigo-400"
+                  placeholder="Drop a clean reply..."
+                  className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm outline-none transition focus:border-pink-400/45 focus:bg-white/[0.07]"
                 />
                 <button
                   type="button"
                   onClick={() => addComment(activeCommentsPost._id)}
-                  className="rounded-2xl bg-indigo-500/25 px-4 py-3 text-sm font-black text-indigo-100 hover:bg-indigo-500"
+                  className="rounded-2xl bg-gradient-to-r from-pink-500/85 via-purple-500/85 to-cyan-500/85 px-4 py-3 text-sm font-black text-white shadow-lg shadow-pink-500/15 transition active:scale-95"
                 >
                   Reply
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRM MODAL */}
+      {confirmDeletePost && (
+        <div
+          onClick={() => setConfirmDeletePost(null)}
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-3 backdrop-blur-sm sm:items-center"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-sm overflow-hidden rounded-[28px] border border-white/10 bg-zinc-950/98 p-4 shadow-2xl shadow-black/70 animate-vybe-sheet"
+          >
+            <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-red-500/12 blur-3xl" />
+            <div className="pointer-events-none absolute -left-16 -bottom-16 h-40 w-40 rounded-full bg-pink-500/10 blur-3xl" />
+
+            <div className="relative">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-red-200">Delete Vybe</p>
+              <h3 className="mt-1 text-xl font-black text-white">Remove this from your Flow?</h3>
+              <p className="mt-2 text-sm leading-relaxed text-gray-400">
+                This action will delete the vybe from your profile and feed. You can’t undo this later.
+              </p>
+
+              {(confirmDeletePost.caption || confirmDeletePost.content) && (
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.035] p-3">
+                  <p className="line-clamp-2 text-sm text-gray-300">
+                    {confirmDeletePost.caption || confirmDeletePost.content}
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-5 grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeletePost(null)}
+                  className="rounded-2xl border border-white/10 bg-white/[0.055] px-4 py-3 text-sm font-black text-white transition hover:bg-white/[0.09] active:scale-95"
+                >
+                  Keep it
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deletePost(confirmDeletePost._id)}
+                  className="rounded-2xl border border-red-400/20 bg-red-500/15 px-4 py-3 text-sm font-black text-red-100 transition hover:bg-red-500/25 active:scale-95"
+                >
+                  Delete
                 </button>
               </div>
             </div>
