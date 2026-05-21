@@ -59,8 +59,30 @@ io.use((socket, next) => {
     next();
   }
 });
-// Realtime notification users: userId -> socket.id
+// Realtime notification users: userId -> Set(socket.id)
 const onlineUsers = new Map();
+
+const addOnlineSocket = (userId, socketId) => {
+  const id = userId.toString();
+
+  if (!onlineUsers.has(id)) {
+    onlineUsers.set(id, new Set());
+  }
+
+  onlineUsers.get(id).add(socketId);
+};
+
+const removeOnlineSocket = (userId, socketId) => {
+  const id = userId?.toString();
+  if (!id || !onlineUsers.has(id)) return;
+
+  const sockets = onlineUsers.get(id);
+  sockets.delete(socketId);
+
+  if (sockets.size === 0) {
+    onlineUsers.delete(id);
+  }
+};
 
 // Vybe room users count
 const vybeOnlineUsers = new Set();
@@ -77,7 +99,7 @@ io.on("connection", (socket) => {
 
   const id = socket.user.id.toString();
   socket.userId = id;
-  onlineUsers.set(id, socket.id);
+  addOnlineSocket(id, socket.id);
 
   console.log("Realtime user registered:", id);
 });
@@ -154,21 +176,14 @@ socket.on("leave-vybe-room", ({ room = "general" }) => {
   );
 });
 
-  socket.on("disconnect", () => {
-    if (socket.userId) {
-      onlineUsers.delete(socket.userId);
-      vybeOnlineUsers.delete(socket.userId);
-    } else {
-      for (const [userId, socketId] of onlineUsers.entries()) {
-        if (socketId === socket.id) {
-          onlineUsers.delete(userId);
-          break;
-        }
-      }
-    }
+socket.on("disconnect", () => {
+  if (socket.userId) {
+    removeOnlineSocket(socket.userId, socket.id);
+    vybeOnlineUsers.delete(socket.userId);
+  }
 
-    console.log("Socket disconnected:", socket.id);
-  });
+  console.log("Socket disconnected:", socket.id);
+});
 });
 
 const allowedOrigins = [

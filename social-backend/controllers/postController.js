@@ -14,13 +14,29 @@ const emitRealtimeNotification = async (req, recipientId, data) => {
 
     if (!io || !onlineUsers || !recipientId) return;
 
-    const receiverSocketId = onlineUsers.get(recipientId.toString());
+    const receiverSockets = onlineUsers.get(recipientId.toString());
 
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("new-notification", data);
-    }
+if (receiverSockets && receiverSockets.size > 0) {
+  receiverSockets.forEach((socketId) => {
+    io.to(socketId).emit("new-notification", data);
+  });
+}
   } catch (error) {
     console.log("Socket notification error:", error.message);
+  }
+};
+
+const emitPostUpdated = async (req, postId, event = "post-updated") => {
+  try {
+    const io = req.app.get("io");
+    if (!io || !postId) return;
+
+    const updatedPost = await getPopulatedPost(postId);
+    if (!updatedPost) return;
+
+    io.emit(event, updatedPost);
+  } catch (error) {
+    console.log("Post realtime update error:", error.message);
   }
 };
 
@@ -47,7 +63,13 @@ const createPost = async (req, res) => {
     });
 
     const populatedPost = await getPopulatedPost(post._id);
-    res.status(201).json(populatedPost);
+
+const io = req.app.get("io");
+if (io) {
+  io.emit("post-created", populatedPost);
+}
+
+res.status(201).json(populatedPost);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -519,7 +541,13 @@ const toggleLikePost = async (req, res) => {
     await post.save();
 
     const updatedPost = await getPopulatedPost(post._id);
-    res.json(updatedPost);
+
+const io = req.app.get("io");
+if (io) {
+  io.emit("post-updated", updatedPost);
+}
+
+res.json(updatedPost);
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: error.message });
@@ -571,10 +599,17 @@ const deletePost = async (req, res) => {
 
     await post.deleteOne();
 
-    res.json({
-      message: "Post deleted successfully",
-      postId: req.params.postId,
-    });
+const io = req.app.get("io");
+if (io) {
+  io.emit("post-deleted", {
+    postId: req.params.postId,
+  });
+}
+
+res.json({
+  message: "Post deleted successfully",
+  postId: req.params.postId,
+});
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -633,7 +668,13 @@ const addComment = async (req, res) => {
     }
 
     const updatedPost = await getPopulatedPost(post._id);
-    res.json(updatedPost);
+
+const io = req.app.get("io");
+if (io) {
+  io.emit("post-updated", updatedPost);
+}
+
+res.json(updatedPost);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -666,7 +707,13 @@ const deleteComment = async (req, res) => {
     await post.save();
 
     const updatedPost = await getPopulatedPost(post._id);
-    res.json(updatedPost);
+
+const io = req.app.get("io");
+if (io) {
+  io.emit("post-updated", updatedPost);
+}
+
+res.json(updatedPost);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -698,7 +745,13 @@ const toggleCommentLike = async (req, res) => {
     await post.save();
 
     const updatedPost = await getPopulatedPost(post._id);
-    res.json(updatedPost);
+
+const io = req.app.get("io");
+if (io) {
+  io.emit("post-updated", updatedPost);
+}
+
+res.json(updatedPost);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -761,7 +814,13 @@ const addReply = async (req, res) => {
     }
 
     const updatedPost = await getPopulatedPost(post._id);
-    res.json(updatedPost);
+
+const io = req.app.get("io");
+if (io) {
+  io.emit("post-updated", updatedPost);
+}
+
+res.json(updatedPost);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -798,7 +857,13 @@ const deleteReply = async (req, res) => {
     await post.save();
 
     const updatedPost = await getPopulatedPost(post._id);
-    res.json(updatedPost);
+
+const io = req.app.get("io");
+if (io) {
+  io.emit("post-updated", updatedPost);
+}
+
+res.json(updatedPost);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

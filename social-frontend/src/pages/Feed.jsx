@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import API from "../services/api";
 import { useNavigate } from "react-router-dom";
+import { io } from "socket.io-client";
 
 function Feed() {
   const navigate = useNavigate();
@@ -45,6 +46,11 @@ function Feed() {
   const [selectedMood, setSelectedMood] = useState("All");
   const [moodPickerOpen, setMoodPickerOpen] = useState(false);
 
+  const socketUrl =
+  process.env.REACT_APP_SOCKET_URL ||
+  process.env.REACT_APP_API_URL ||
+  "http://localhost:5000";
+
   const [heartPostId, setHeartPostId] = useState(null);
   const [heartCommentId, setHeartCommentId] = useState(null);
 
@@ -71,6 +77,7 @@ function Feed() {
   const moodPickerRef = useRef(null);
   const captionRef = useRef(null);
   const loadMoreRef = useRef(null);
+  const feedSocketRef = useRef(null);
   const mediaInputRef = useRef(null);
   const galleryTouchStartX = useRef(null);
   const galleryTouchStartY = useRef(null);
@@ -278,6 +285,75 @@ useEffect(() => {
       )
     );
   };
+
+  useEffect(() => {
+  if (!token) return;
+
+  const socket = io(socketUrl, {
+    transports: ["websocket", "polling"],
+    auth: {
+      token,
+    },
+  });
+
+  feedSocketRef.current = socket;
+
+  socket.on("connect", () => {
+    socket.emit("register-user");
+  });
+
+  socket.on("post-created", (newPost) => {
+    setPosts((prevPosts) => {
+      const alreadyExists = prevPosts.some((post) => post._id === newPost._id);
+      if (alreadyExists) return prevPosts;
+
+      return [newPost, ...prevPosts];
+    });
+  });
+
+  socket.on("post-updated", (updatedPost) => {
+    setPosts((prevPosts) =>
+      prevPosts.map((post) =>
+        post._id === updatedPost._id ? updatedPost : post
+      )
+    );
+
+    setCommentsSheetPost((current) =>
+      current?._id === updatedPost._id ? updatedPost : current
+    );
+
+    setLikesModalPost((current) =>
+      current?._id === updatedPost._id ? updatedPost : current
+    );
+
+    setGalleryPost((current) =>
+      current?._id === updatedPost._id ? updatedPost : current
+    );
+  });
+
+  socket.on("post-deleted", ({ postId }) => {
+    setPosts((prevPosts) => prevPosts.filter((post) => post._id !== postId));
+
+    setCommentsSheetPost((current) =>
+      current?._id === postId ? null : current
+    );
+
+    setLikesModalPost((current) =>
+      current?._id === postId ? null : current
+    );
+
+    setGalleryPost((current) =>
+      current?._id === postId ? null : current
+    );
+  });
+
+  return () => {
+    socket.off("post-created");
+    socket.off("post-updated");
+    socket.off("post-deleted");
+    socket.disconnect();
+  };
+}, [token, socketUrl]);
 
   const openUserProfile = (userId) => {
     if (!userId) return;
