@@ -18,6 +18,9 @@ const emitRealtimeNotification = async (req, recipientId, data) => {
   }
 };
 
+  const escapeRegex = (value = "") =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const publicUserFields = "name username profilePic bio followers following createdAt";
 const populatedUserFields = "name username profilePic bio";
 
@@ -125,23 +128,31 @@ const getUserProfile = async (req, res) => {
 // SEARCH USERS BY NAME OR USERNAME
 const searchUsers = async (req, res) => {
   try {
-    const q = (req.query.q || req.query.name || "").trim();
+    const q = (req.query.q || req.query.name || "").trim().slice(0, 40);
 
-    const users = await User.find(
-      q
-        ? {
-            $or: [
-              { name: { $regex: q, $options: "i" } },
-              { username: { $regex: q, $options: "i" } },
-            ],
-          }
-        : {}
-    )
+    if (!q) {
+      const suggestedUsers = await User.find({})
+        .select(publicUserFields)
+        .sort({ createdAt: -1 })
+        .limit(12);
+
+      return res.json(suggestedUsers);
+    }
+
+    const safeQuery = escapeRegex(q);
+
+    const users = await User.find({
+      $or: [
+        { name: { $regex: safeQuery, $options: "i" } },
+        { username: { $regex: safeQuery, $options: "i" } },
+      ],
+    })
       .select(publicUserFields)
-      .limit(30);
+      .limit(20);
 
     res.json(users);
   } catch (error) {
+    console.error("Search users error:", error);
     res.status(500).json({ message: error.message });
   }
 };

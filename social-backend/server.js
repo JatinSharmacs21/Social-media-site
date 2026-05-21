@@ -2,11 +2,15 @@ const express = require("express");
 const dotenv = require("dotenv");
 dotenv.config();
 const cors = require("cors");
+const helmet = require("helmet");
+const mongoSanitize = require("express-mongo-sanitize");
+const rateLimit = require("express-rate-limit");
 const notificationRoutes = require("./routes/notificationRoutes");
 const vybeRoomRoutes = require("./routes/vybeRoomRoutes");
 
 const http = require("http");
 const { Server } = require("socket.io");
+const jwt = require("jsonwebtoken");
 
 const connectDB = require("./config/db");
 
@@ -33,6 +37,28 @@ const io = new Server(server, {
 
 app.set("io", io);
 
+io.use((socket, next) => {
+  try {
+    const token =
+      socket.handshake.auth?.token ||
+      socket.handshake.headers?.authorization?.replace("Bearer ", "");
+
+    if (!token) {
+      socket.user = null;
+      return next();
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    socket.user = {
+      id: decoded.id,
+    };
+
+    next();
+  } catch (error) {
+    socket.user = null;
+    next();
+  }
+});
 // Realtime notification users: userId -> socket.id
 const onlineUsers = new Map();
 
@@ -46,15 +72,15 @@ io.on("connection", (socket) => {
 
   // Frontend Navbar emits this after login.
   // This helps backend send realtime notification to one specific user.
-  socket.on("register-user", (userId) => {
-    if (!userId) return;
+ socket.on("register-user", () => {
+  if (!socket.user?.id) return;
 
-    const id = userId.toString();
-    socket.userId = id;
-    onlineUsers.set(id, socket.id);
+  const id = socket.user.id.toString();
+  socket.userId = id;
+  onlineUsers.set(id, socket.id);
 
-    console.log("Realtime user registered:", id);
-  });
+  console.log("Realtime user registered:", id);
+});
 
   socket.on("join-drop", (dropId) => {
   if (!dropId) return;
@@ -95,18 +121,18 @@ socket.on("drop-pulse", ({ dropId }) => {
   });
 });
 
-  socket.on("join-vybe-room", ({ room = "general", userId }) => {
-    socket.join(`vybe-room-${room}`);
+socket.on("join-vybe-room", ({ room = "general" }) => {
+  socket.join(`vybe-room-${room}`);
 
-    if (userId) {
-      vybeOnlineUsers.add(userId);
-    }
+  if (socket.user?.id) {
+    vybeOnlineUsers.add(socket.user.id.toString());
+  }
 
-    io.to(`vybe-room-${room}`).emit(
-      "vybe-online-users",
-      vybeOnlineUsers.size
-    );
-  });
+  io.to(`vybe-room-${room}`).emit(
+    "vybe-online-users",
+    vybeOnlineUsers.size
+  );
+});
 
   socket.on("vybe-typing", ({ room, typing }) => {
     socket.to(`vybe-room-${room}`).emit(
@@ -115,18 +141,18 @@ socket.on("drop-pulse", ({ dropId }) => {
     );
   });
 
-  socket.on("leave-vybe-room", ({ room = "general", userId }) => {
-    socket.leave(`vybe-room-${room}`);
+socket.on("leave-vybe-room", ({ room = "general" }) => {
+  socket.leave(`vybe-room-${room}`);
 
-    if (userId) {
-      vybeOnlineUsers.delete(userId);
-    }
+  if (socket.user?.id) {
+    vybeOnlineUsers.delete(socket.user.id.toString());
+  }
 
-    io.to(`vybe-room-${room}`).emit(
-      "vybe-online-users",
-      vybeOnlineUsers.size
-    );
-  });
+  io.to(`vybe-room-${room}`).emit(
+    "vybe-online-users",
+    vybeOnlineUsers.size
+  );
+});
 
   socket.on("disconnect", () => {
     if (socket.userId) {
@@ -150,6 +176,38 @@ const allowedOrigins = [
   "https://vybeo.vercel.app",
 ];
 
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    message: "Too many requests. Please try again later.",
+  },
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    message: "Too many auth attempts. Please try again later.",
+  },
+});
+
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    message: "Too many uploads. Please slow down.",
+  },
+});
+
+app.use(helmet());
+
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -161,7 +219,10 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
+
+app.use(express.json({ limit: "1mb" }));
+//app.use(mongoSanitize());
+app.use(generalLimiter);
 
 // TEST ROUTE
 app.get("/", (req, res) => {
@@ -170,10 +231,10 @@ app.get("/", (req, res) => {
 
 
 // AUTH ROUTES
-app.use("/api/auth", authRoutes);
+app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/upload", uploadRoutes);
+app.use("/api/upload", uploadLimiter, uploadRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/vybe-room", vybeRoomRoutes);
 

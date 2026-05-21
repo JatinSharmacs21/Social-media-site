@@ -32,20 +32,29 @@ function Navbar() {
   useEffect(() => {
     if (!token) return;
 
-    const userId = localStorage.getItem("userId");
-    if (!userId) return;
+    // const userId = localStorage.getItem("userId");
+    // if (!userId) return;
+
+    // const socketUrl =
+    //   process.env.REACT_APP_SOCKET_URL ||
+    //   process.env.REACT_APP_API_URL ||
+    //   "https://social-backend-waow.onrender.com";
 
     const socketUrl =
-      process.env.REACT_APP_SOCKET_URL ||
-      process.env.REACT_APP_API_URL ||
-      "https://social-backend-waow.onrender.com";
+    (process.env.REACT_APP_SOCKET_URL ||
+    process.env.REACT_APP_API_URL ||
+    API.defaults?.baseURL ||
+    "http://localhost:5000").replace("/api", "");
 
     const socket = io(socketUrl, {
-      transports: ["websocket", "polling"],
-    });
+    transports: ["websocket", "polling"],
+    auth: {
+      token,
+    },
+  });
 
     socket.on("connect", () => {
-      socket.emit("register-user", userId);
+      socket.emit("register-user");
     });
 
     socket.on("new-notification", (data) => {

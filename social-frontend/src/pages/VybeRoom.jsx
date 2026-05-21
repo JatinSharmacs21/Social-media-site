@@ -4,7 +4,6 @@ import API from "../services/api";
 
 function VybeRoom() {
   const token = localStorage.getItem("token");
-  const currentUserId = localStorage.getItem("userId");
   const room = "general";
 
   const [messages, setMessages] = useState([]);
@@ -89,16 +88,18 @@ function VybeRoom() {
 
     const socket = io(socketUrl, {
       transports: ["websocket", "polling"],
-    });
+      auth: {
+      token,
+    },
+});
 
     socketRef.current = socket;
 
     socket.on("connect", () => {
       setConnected(true);
       socket.emit("join-vybe-room", {
-        room,
-        userId: currentUserId,
-      });
+      room,
+});
     });
 
     socket.on("disconnect", () => {
@@ -129,9 +130,8 @@ function VybeRoom() {
 
     return () => {
       socket.emit("leave-vybe-room", {
-        room,
-        userId: currentUserId,
-      });
+      room,
+  });
       socket.disconnect();
 
       if (typingTimeoutRef.current) {

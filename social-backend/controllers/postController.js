@@ -1,7 +1,11 @@
 const Post = require("../models/Post");
 const Notification = require("../models/Notification");
 
+const MAX_COMMENT_LENGTH = 300;
+
 const getUserId = (req) => req.user?._id || req.user?.id;
+
+const cleanTextInput = (value = "") => value.trim();
 
 const emitRealtimeNotification = async (req, recipientId, data) => {
   try {
@@ -88,12 +92,7 @@ const getPosts = async (req, res) => {
 const getVybeDrops = async (req, res) => {
   try {
     const drops = await Post.aggregate([
-      {
-        $match: {
-          postType: "drop",
-        },
-      },
-
+      { $match: { postType: "drop" } },
       {
         $lookup: {
           from: "posts",
@@ -102,66 +101,41 @@ const getVybeDrops = async (req, res) => {
           as: "replies",
         },
       },
-
       {
         $addFields: {
-          replyCount: {
-            $size: "$replies",
-          },
-
+          replyCount: { $size: "$replies" },
           reactionCount: {
             $sum: {
               $map: {
                 input: "$replies",
                 as: "reply",
-                in: {
-                  $size: {
-                    $ifNull: ["$$reply.vybeReactions", []],
-                  },
-                },
+                in: { $size: { $ifNull: ["$$reply.vybeReactions", []] } },
               },
             },
           },
-
           threadReplyCount: {
             $sum: {
               $map: {
                 input: "$replies",
                 as: "reply",
-                in: {
-                  $size: {
-                    $ifNull: ["$$reply.threadReplies", []],
-                  },
-                },
+                in: { $size: { $ifNull: ["$$reply.threadReplies", []] } },
               },
             },
           },
-
-          lastReplyAt: {
-            $max: "$replies.createdAt",
-          },
+          lastReplyAt: { $max: "$replies.createdAt" },
         },
       },
-
       {
         $addFields: {
           hoursSinceCreated: {
-            $divide: [
-              {
-                $subtract: [new Date(), "$createdAt"],
-              },
-              1000 * 60 * 60,
-            ],
+            $divide: [{ $subtract: [new Date(), "$createdAt"] }, 1000 * 60 * 60],
           },
-
           hoursSinceLastReply: {
             $cond: [
               "$lastReplyAt",
               {
                 $divide: [
-                  {
-                    $subtract: [new Date(), "$lastReplyAt"],
-                  },
+                  { $subtract: [new Date(), "$lastReplyAt"] },
                   1000 * 60 * 60,
                 ],
               },
@@ -170,7 +144,6 @@ const getVybeDrops = async (req, res) => {
           },
         },
       },
-
       {
         $addFields: {
           trendingScore: {
@@ -178,37 +151,14 @@ const getVybeDrops = async (req, res) => {
               { $multiply: ["$replyCount", 5] },
               { $multiply: ["$reactionCount", 2] },
               { $multiply: ["$threadReplyCount", 4] },
-              {
-                $cond: [
-                  { $lte: ["$hoursSinceLastReply", 24] },
-                  15,
-                  0,
-                ],
-              },
-              {
-                $cond: [
-                  { $lte: ["$hoursSinceCreated", 48] },
-                  8,
-                  0,
-                ],
-              },
+              { $cond: [{ $lte: ["$hoursSinceLastReply", 24] }, 15, 0] },
+              { $cond: [{ $lte: ["$hoursSinceCreated", 48] }, 8, 0] },
             ],
           },
         },
       },
-
-      {
-        $sort: {
-          trendingScore: -1,
-          createdAt: -1,
-        },
-      },
-
-      {
-        $project: {
-          replies: 0,
-        },
-      },
+      { $sort: { trendingScore: -1, createdAt: -1 } },
+      { $project: { replies: 0 } },
     ]);
 
     await Post.populate(drops, {
@@ -219,9 +169,7 @@ const getVybeDrops = async (req, res) => {
     res.json(drops);
   } catch (error) {
     console.log("Get Vybe Drops error:", error);
-    res.status(500).json({
-      message: "Failed to fetch Vybe Drops",
-    });
+    res.status(500).json({ message: "Failed to fetch Vybe Drops" });
   }
 };
 
@@ -246,13 +194,18 @@ const replyToVybeDrop = async (req, res) => {
   try {
     const userId = getUserId(req);
     const { caption, isAnonymous } = req.body;
+    const cleanCaption = cleanTextInput(caption);
 
-    if (!userId) {
-      return res.status(401).json({ message: "Not authorized" });
+    if (!userId) return res.status(401).json({ message: "Not authorized" });
+
+    if (!cleanCaption) {
+      return res.status(400).json({ message: "Reply is required" });
     }
 
-    if (!caption || !caption.trim()) {
-      return res.status(400).json({ message: "Reply is required" });
+    if (cleanCaption.length > MAX_COMMENT_LENGTH) {
+      return res.status(400).json({
+        message: `Reply cannot exceed ${MAX_COMMENT_LENGTH} characters`,
+      });
     }
 
     const drop = await Post.findById(req.params.dropId);
@@ -263,7 +216,7 @@ const replyToVybeDrop = async (req, res) => {
 
     const reply = await Post.create({
       user: userId,
-      caption: caption.trim(),
+      caption: cleanCaption,
       postType: "dropReply",
       drop: drop._id,
       vybeTag: drop.vybeTag,
@@ -300,7 +253,7 @@ const replyToVybeDrop = async (req, res) => {
 
 const reactToVybeReply = async (req, res) => {
   try {
-    const userId = req.user?._id || req.user?.id;
+    const userId = getUserId(req);
     const { type } = req.body;
 
     const allowed = ["felt", "deep", "funny", "chaos", "relatable"];
@@ -324,12 +277,8 @@ const reactToVybeReply = async (req, res) => {
       (r) => r.user.toString() !== userId.toString()
     );
 
-    // same reaction par click kare to remove, different par click kare to replace
     if (!existingReaction || existingReaction.type !== type) {
-      reply.vybeReactions.push({
-        user: userId,
-        type,
-      });
+      reply.vybeReactions.push({ user: userId, type });
     }
 
     await reply.save();
@@ -358,11 +307,9 @@ const reactToVybeReply = async (req, res) => {
 
 const deleteVybeDropReply = async (req, res) => {
   try {
-    const userId = req.user?._id || req.user?.id;
+    const userId = getUserId(req);
 
-    if (!userId) {
-      return res.status(401).json({ message: "Not authorized" });
-    }
+    if (!userId) return res.status(401).json({ message: "Not authorized" });
 
     const reply = await Post.findById(req.params.replyId);
 
@@ -417,15 +364,20 @@ const deleteVybeDropReply = async (req, res) => {
 
 const addNestedVybeReply = async (req, res) => {
   try {
-    const userId = req.user?._id || req.user?.id;
+    const userId = getUserId(req);
     const { text, isAnonymous } = req.body;
+    const cleanText = cleanTextInput(text);
 
-    if (!userId) {
-      return res.status(401).json({ message: "Not authorized" });
+    if (!userId) return res.status(401).json({ message: "Not authorized" });
+
+    if (!cleanText) {
+      return res.status(400).json({ message: "Reply cannot be empty" });
     }
 
-    if (!text || !text.trim()) {
-      return res.status(400).json({ message: "Reply cannot be empty" });
+    if (cleanText.length > MAX_COMMENT_LENGTH) {
+      return res.status(400).json({
+        message: `Reply cannot exceed ${MAX_COMMENT_LENGTH} characters`,
+      });
     }
 
     const parentReply = await Post.findById(req.params.replyId);
@@ -436,7 +388,7 @@ const addNestedVybeReply = async (req, res) => {
 
     parentReply.threadReplies.push({
       user: userId,
-      text: text.trim(),
+      text: cleanText,
       isAnonymous: Boolean(isAnonymous),
       parentReply: parentReply._id,
       path: `${parentReply._id}`,
@@ -468,11 +420,9 @@ const addNestedVybeReply = async (req, res) => {
 
 const deleteNestedVybeReply = async (req, res) => {
   try {
-    const userId = req.user?._id || req.user?.id;
+    const userId = getUserId(req);
 
-    if (!userId) {
-      return res.status(401).json({ message: "Not authorized" });
-    }
+    if (!userId) return res.status(401).json({ message: "Not authorized" });
 
     const parentReply = await Post.findById(req.params.replyId);
 
@@ -526,9 +476,7 @@ const toggleLikePost = async (req, res) => {
     const userId = getUserId(req);
     const post = await Post.findById(req.params.postId);
 
-    if (!post) {
-      return res.status(404).json({ message: "Post not found" });
-    }
+    if (!post) return res.status(404).json({ message: "Post not found" });
 
     const userLiked = post.likes.some(
       (like) => like.toString() === userId.toString()
@@ -581,13 +529,11 @@ const toggleLikePost = async (req, res) => {
 const updatePost = async (req, res) => {
   try {
     const userId = getUserId(req);
-    const { caption } = req.body;
+    const cleanCaption = cleanTextInput(req.body.caption || "");
 
     const post = await Post.findById(req.params.postId);
 
-    if (!post) {
-      return res.status(404).json({ message: "Post not found" });
-    }
+    if (!post) return res.status(404).json({ message: "Post not found" });
 
     if (post.user.toString() !== userId.toString()) {
       return res.status(403).json({
@@ -595,10 +541,10 @@ const updatePost = async (req, res) => {
       });
     }
 
-    post.caption = caption;
+    post.caption = cleanCaption;
 
     if (post.content !== undefined) {
-      post.content = caption;
+      post.content = cleanCaption;
     }
 
     await post.save();
@@ -615,9 +561,7 @@ const deletePost = async (req, res) => {
     const userId = getUserId(req);
     const post = await Post.findById(req.params.postId);
 
-    if (!post) {
-      return res.status(404).json({ message: "Post not found" });
-    }
+    if (!post) return res.status(404).json({ message: "Post not found" });
 
     if (post.user.toString() !== userId.toString()) {
       return res.status(403).json({
@@ -639,23 +583,25 @@ const deletePost = async (req, res) => {
 const addComment = async (req, res) => {
   try {
     const userId = getUserId(req);
-    const { text } = req.body;
+    const cleanText = cleanTextInput(req.body.text || "");
 
-    if (!text || !text.trim()) {
+    if (!cleanText) {
+      return res.status(400).json({ message: "Comment cannot be empty" });
+    }
+
+    if (cleanText.length > MAX_COMMENT_LENGTH) {
       return res.status(400).json({
-        message: "Comment cannot be empty",
+        message: `Comment cannot exceed ${MAX_COMMENT_LENGTH} characters`,
       });
     }
 
     const post = await Post.findById(req.params.postId);
 
-    if (!post) {
-      return res.status(404).json({ message: "Post not found" });
-    }
+    if (!post) return res.status(404).json({ message: "Post not found" });
 
     post.comments.push({
       user: userId,
-      text: text.trim(),
+      text: cleanText,
     });
 
     await post.save();
@@ -698,15 +644,11 @@ const deleteComment = async (req, res) => {
     const userId = getUserId(req);
     const post = await Post.findById(req.params.postId);
 
-    if (!post) {
-      return res.status(404).json({ message: "Post not found" });
-    }
+    if (!post) return res.status(404).json({ message: "Post not found" });
 
     const comment = post.comments.id(req.params.commentId);
 
-    if (!comment) {
-      return res.status(404).json({ message: "Comment not found" });
-    }
+    if (!comment) return res.status(404).json({ message: "Comment not found" });
 
     const isCommentOwner = comment.user.toString() === userId.toString();
     const isPostOwner = post.user.toString() === userId.toString();
@@ -735,15 +677,11 @@ const toggleCommentLike = async (req, res) => {
     const userId = getUserId(req);
     const post = await Post.findById(req.params.postId);
 
-    if (!post) {
-      return res.status(404).json({ message: "Post not found" });
-    }
+    if (!post) return res.status(404).json({ message: "Post not found" });
 
     const comment = post.comments.id(req.params.commentId);
 
-    if (!comment) {
-      return res.status(404).json({ message: "Comment not found" });
-    }
+    if (!comment) return res.status(404).json({ message: "Comment not found" });
 
     const alreadyLiked = comment.likes.some(
       (like) => like.toString() === userId.toString()
@@ -769,29 +707,29 @@ const toggleCommentLike = async (req, res) => {
 const addReply = async (req, res) => {
   try {
     const userId = getUserId(req);
-    const { text } = req.body;
+    const cleanText = cleanTextInput(req.body.text || "");
 
-    if (!text || !text.trim()) {
+    if (!cleanText) {
+      return res.status(400).json({ message: "Reply cannot be empty" });
+    }
+
+    if (cleanText.length > MAX_COMMENT_LENGTH) {
       return res.status(400).json({
-        message: "Reply cannot be empty",
+        message: `Reply cannot exceed ${MAX_COMMENT_LENGTH} characters`,
       });
     }
 
     const post = await Post.findById(req.params.postId);
 
-    if (!post) {
-      return res.status(404).json({ message: "Post not found" });
-    }
+    if (!post) return res.status(404).json({ message: "Post not found" });
 
     const comment = post.comments.id(req.params.commentId);
 
-    if (!comment) {
-      return res.status(404).json({ message: "Comment not found" });
-    }
+    if (!comment) return res.status(404).json({ message: "Comment not found" });
 
     comment.replies.push({
       user: userId,
-      text: text.trim(),
+      text: cleanText,
     });
 
     await post.save();
@@ -834,21 +772,15 @@ const deleteReply = async (req, res) => {
     const userId = getUserId(req);
     const post = await Post.findById(req.params.postId);
 
-    if (!post) {
-      return res.status(404).json({ message: "Post not found" });
-    }
+    if (!post) return res.status(404).json({ message: "Post not found" });
 
     const comment = post.comments.id(req.params.commentId);
 
-    if (!comment) {
-      return res.status(404).json({ message: "Comment not found" });
-    }
+    if (!comment) return res.status(404).json({ message: "Comment not found" });
 
     const reply = comment.replies.id(req.params.replyId);
 
-    if (!reply) {
-      return res.status(404).json({ message: "Reply not found" });
-    }
+    if (!reply) return res.status(404).json({ message: "Reply not found" });
 
     const isReplyOwner = reply.user.toString() === userId.toString();
     const isPostOwner = post.user.toString() === userId.toString();

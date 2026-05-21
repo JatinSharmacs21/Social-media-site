@@ -19,6 +19,7 @@ function Feed() {
   const [mediaInputMode, setMediaInputMode] = useState("add");
   const [mediaEditModalOpen, setMediaEditModalOpen] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [actionNotice, setActionNotice] = useState("");
   const [mediaFilter, setMediaFilter] = useState("Original");
   const [mediaAspect, setMediaAspect] = useState("Original");
   const [mediaZoom, setMediaZoom] = useState(1);
@@ -142,6 +143,15 @@ function Feed() {
       Authorization: "Bearer " + token,
     },
   };
+
+  const showNotice = (message) => {
+  setActionNotice(message);
+
+  setTimeout(() => {
+    setActionNotice("");
+  }, 3000);
+};
+
   const PostSkeleton = () => (
   <div className="bg-zinc-950 border border-white/10 rounded-2xl sm:rounded-3xl overflow-hidden shadow-xl animate-pulse">
     <div className="flex items-center gap-3 p-4">
@@ -973,6 +983,7 @@ useEffect(() => {
       }));
     } catch (error) {
       console.log(error.response?.data || error);
+      showNotice(error.response?.data?.message || "Could not add comment");
     }
   };
 
@@ -1040,6 +1051,7 @@ useEffect(() => {
       }));
     } catch (error) {
       console.log(error.response?.data || error);
+      showNotice(error.response?.data?.message || "Could not add reply");
     }
   };
 
@@ -1274,6 +1286,32 @@ useEffect(() => {
 );
   return (
     <div className="min-h-screen bg-black text-white px-2 sm:px-4 md:px-6 pt-4 md:pt-8 pb-24 md:pb-10">
+      {actionNotice && (
+  <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] w-[92%] max-w-sm">
+    <div className="rounded-2xl border border-pink-400/25 bg-zinc-950/95 backdrop-blur-2xl shadow-2xl shadow-pink-500/20 overflow-hidden">
+      <div className="h-1 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500" />
+
+      <div className="p-4 flex items-start gap-3">
+        <div className="w-10 h-10 rounded-2xl bg-pink-500/15 flex items-center justify-center shrink-0">
+          ⚠️
+        </div>
+
+        <div className="flex-1">
+          <p className="text-sm font-black text-white">Notice</p>
+          <p className="text-sm text-gray-300 mt-1">{actionNotice}</p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setActionNotice("")}
+          className="text-gray-500 hover:text-white transition"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       <div className="w-full max-w-[1080px] mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,590px)_300px] xl:grid-cols-[minmax(0,600px)_320px] gap-8 xl:gap-10 justify-center items-start">
         <div className="w-full max-w-[600px] mx-auto lg:mx-0">
           {/* VYBE FLOW HEADER */}
