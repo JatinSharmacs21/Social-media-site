@@ -286,6 +286,22 @@ useEffect(() => {
     );
   };
 
+  const updatePostEverywhere = (updatedPost) => {
+  updatePostInState(updatedPost);
+
+  setCommentsSheetPost((current) =>
+    current?._id === updatedPost._id ? updatedPost : current
+  );
+
+  setLikesModalPost((current) =>
+    current?._id === updatedPost._id ? updatedPost : current
+  );
+
+  setGalleryPost((current) =>
+    current?._id === updatedPost._id ? updatedPost : current
+  );
+};
+
   useEffect(() => {
   if (!token) return;
 
@@ -1014,14 +1030,58 @@ useEffect(() => {
     }
   };
 
-  const likePost = async (id) => {
-    try {
-      const res = await API.put(`/api/posts/like/${id}`, {}, authConfig);
-      updatePostInState(res.data);
-    } catch (error) {
-      console.log(error.response?.data || error);
+const likePost = async (id) => {
+  const userForLike =
+    currentUser || {
+      _id: currentUserId,
+      name: "You",
+      profilePic: "",
+    };
+
+  let previousPost = null;
+
+  setPosts((prevPosts) =>
+    prevPosts.map((post) => {
+      if (post._id !== id) return post;
+
+      previousPost = post;
+
+      const alreadyLiked = post.likes?.some((like) => {
+        if (typeof like === "string") return like === currentUserId;
+        return like?._id === currentUserId;
+      });
+
+      const nextPost = {
+        ...post,
+        likes: alreadyLiked
+          ? (post.likes || []).filter((like) => {
+              if (typeof like === "string") return like !== currentUserId;
+              return like?._id !== currentUserId;
+            })
+          : [...(post.likes || []), userForLike],
+      };
+
+      setLikesModalPost((current) =>
+        current?._id === id ? nextPost : current
+      );
+
+      return nextPost;
+    })
+  );
+
+  try {
+    const res = await API.put(`/api/posts/like/${id}`, {}, authConfig);
+    updatePostEverywhere(res.data);
+  } catch (error) {
+    console.log(error.response?.data || error);
+
+    if (previousPost) {
+      updatePostEverywhere(previousPost);
     }
-  };
+
+    showNotice(error.response?.data?.message || "Could not update like");
+  }
+};
 
   const handlePostLikeWithAnimation = (postId) => {
     likePost(postId);
@@ -1032,36 +1092,82 @@ useEffect(() => {
     }, 900);
   };
 
-  const addComment = async (postId) => {
-    try {
-      const text = commentText[postId];
+const addComment = async (postId) => {
+  const text = commentText[postId];
 
-      if (!text || !text.trim()) return;
+  if (!text || !text.trim()) return;
 
-      const res = await API.post(
-        `/api/posts/comment/${postId}`,
-        {
-          text: text.trim(),
-        },
-        authConfig
+  const tempComment = {
+    _id: `temp-comment-${Date.now()}`,
+    text: text.trim(),
+    user:
+      currentUser || {
+        _id: currentUserId,
+        name: "You",
+        profilePic: "",
+      },
+    likes: [],
+    replies: [],
+    createdAt: new Date().toISOString(),
+    isTemp: true,
+  };
+
+  let previousPost = null;
+
+  setPosts((prevPosts) =>
+    prevPosts.map((post) => {
+      if (post._id !== postId) return post;
+
+      previousPost = post;
+
+      const nextPost = {
+        ...post,
+        comments: [...(post.comments || []), tempComment],
+      };
+
+      setCommentsSheetPost((current) =>
+        current?._id === postId ? nextPost : current
       );
 
-      updatePostInState(res.data);
+      return nextPost;
+    })
+  );
 
-      setCommentText((prev) => ({
-        ...prev,
-        [postId]: "",
-      }));
+  setCommentText((prev) => ({
+    ...prev,
+    [postId]: "",
+  }));
 
-      setOpenComments((prev) => ({
-        ...prev,
-        [postId]: true,
-      }));
-    } catch (error) {
-      console.log(error.response?.data || error);
-      showNotice(error.response?.data?.message || "Could not add comment");
+  setOpenComments((prev) => ({
+    ...prev,
+    [postId]: true,
+  }));
+
+  try {
+    const res = await API.post(
+      `/api/posts/comment/${postId}`,
+      {
+        text: text.trim(),
+      },
+      authConfig
+    );
+
+    updatePostEverywhere(res.data);
+  } catch (error) {
+    console.log(error.response?.data || error);
+
+    if (previousPost) {
+      updatePostEverywhere(previousPost);
     }
-  };
+
+    setCommentText((prev) => ({
+      ...prev,
+      [postId]: text,
+    }));
+
+    showNotice(error.response?.data?.message || "Could not add comment");
+  }
+};
 
   const deleteComment = async (postId, commentId) => {
     try {
@@ -1076,19 +1182,70 @@ useEffect(() => {
     }
   };
 
-  const likeComment = async (postId, commentId) => {
-    try {
-      const res = await API.put(
-        `/api/posts/comment/like/${postId}/${commentId}`,
-        {},
-        authConfig
+const likeComment = async (postId, commentId) => {
+  const userForLike =
+    currentUser || {
+      _id: currentUserId,
+      name: "You",
+      profilePic: "",
+    };
+
+  let previousPost = null;
+
+  setPosts((prevPosts) =>
+    prevPosts.map((post) => {
+      if (post._id !== postId) return post;
+
+      previousPost = post;
+
+      const nextPost = {
+        ...post,
+        comments: (post.comments || []).map((comment) => {
+          if (comment._id !== commentId) return comment;
+
+          const alreadyLiked = comment.likes?.some((like) => {
+            if (typeof like === "string") return like === currentUserId;
+            return like?._id === currentUserId;
+          });
+
+          return {
+            ...comment,
+            likes: alreadyLiked
+              ? (comment.likes || []).filter((like) => {
+                  if (typeof like === "string") return like !== currentUserId;
+                  return like?._id !== currentUserId;
+                })
+              : [...(comment.likes || []), userForLike],
+          };
+        }),
+      };
+
+      setCommentsSheetPost((current) =>
+        current?._id === postId ? nextPost : current
       );
 
-      updatePostInState(res.data);
-    } catch (error) {
-      console.log(error.response?.data || error);
+      return nextPost;
+    })
+  );
+
+  try {
+    const res = await API.put(
+      `/api/posts/comment/like/${postId}/${commentId}`,
+      {},
+      authConfig
+    );
+
+    updatePostEverywhere(res.data);
+  } catch (error) {
+    console.log(error.response?.data || error);
+
+    if (previousPost) {
+      updatePostEverywhere(previousPost);
     }
-  };
+
+    showNotice(error.response?.data?.message || "Could not update comment like");
+  }
+};
 
   const handleCommentLikeWithAnimation = (postId, commentId) => {
     likeComment(postId, commentId);
@@ -1099,37 +1256,89 @@ useEffect(() => {
     }, 800);
   };
 
-  const addReply = async (postId, commentId) => {
-    try {
-      const key = `${postId}-${commentId}`;
-      const text = replyText[key];
+const addReply = async (postId, commentId) => {
+  const key = `${postId}-${commentId}`;
+  const text = replyText[key];
 
-      if (!text || !text.trim()) return;
+  if (!text || !text.trim()) return;
 
-      const res = await API.post(
-        `/api/posts/comment/reply/${postId}/${commentId}`,
-        {
-          text: text.trim(),
-        },
-        authConfig
+  const tempReply = {
+    _id: `temp-reply-${Date.now()}`,
+    text: text.trim(),
+    user:
+      currentUser || {
+        _id: currentUserId,
+        name: "You",
+        profilePic: "",
+      },
+    likes: [],
+    createdAt: new Date().toISOString(),
+    isTemp: true,
+  };
+
+  let previousPost = null;
+
+  setPosts((prevPosts) =>
+    prevPosts.map((post) => {
+      if (post._id !== postId) return post;
+
+      previousPost = post;
+
+      const nextPost = {
+        ...post,
+        comments: (post.comments || []).map((comment) =>
+          comment._id === commentId
+            ? {
+                ...comment,
+                replies: [...(comment.replies || []), tempReply],
+              }
+            : comment
+        ),
+      };
+
+      setCommentsSheetPost((current) =>
+        current?._id === postId ? nextPost : current
       );
 
-      updatePostInState(res.data);
+      return nextPost;
+    })
+  );
 
-      setReplyText((prev) => ({
-        ...prev,
-        [key]: "",
-      }));
+  setReplyText((prev) => ({
+    ...prev,
+    [key]: "",
+  }));
 
-      setReplyingTo((prev) => ({
-        ...prev,
-        [key]: false,
-      }));
-    } catch (error) {
-      console.log(error.response?.data || error);
-      showNotice(error.response?.data?.message || "Could not add reply");
+  setReplyingTo((prev) => ({
+    ...prev,
+    [key]: false,
+  }));
+
+  try {
+    const res = await API.post(
+      `/api/posts/comment/reply/${postId}/${commentId}`,
+      {
+        text: text.trim(),
+      },
+      authConfig
+    );
+
+    updatePostEverywhere(res.data);
+  } catch (error) {
+    console.log(error.response?.data || error);
+
+    if (previousPost) {
+      updatePostEverywhere(previousPost);
     }
-  };
+
+    setReplyText((prev) => ({
+      ...prev,
+      [key]: text,
+    }));
+
+    showNotice(error.response?.data?.message || "Could not add reply");
+  }
+};
 
   const deleteReply = async (postId, commentId, replyId) => {
     try {
