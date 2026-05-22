@@ -45,6 +45,7 @@ function Feed() {
   const [composerType, setComposerType] = useState("Thought");
   const [selectedMood, setSelectedMood] = useState("All");
   const [moodPickerOpen, setMoodPickerOpen] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
 
   const socketUrl =
   process.env.REACT_APP_SOCKET_URL ||
@@ -68,6 +69,9 @@ function Feed() {
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [galleryDirection, setGalleryDirection] = useState("");
   const [loadedMedia, setLoadedMedia] = useState({});
+  const [feedMediaIndexes, setFeedMediaIndexes] = useState({});
+  const feedMediaTouchStartX = useRef(null);
+  const feedMediaTouchEndX = useRef(null);
   const [commentsSheetPost, setCommentsSheetPost] = useState(null);
   const [confirmDeletePost, setConfirmDeletePost] = useState(null);
 
@@ -416,12 +420,6 @@ useEffect(() => {
     }
   };
 
-  const openMediaGallery = (post, startIndex = 0) => {
-    if (!post?.media || post.media.length === 0) return;
-    setGalleryPost(post);
-    setGalleryIndex(startIndex);
-  };
-
   const closeMediaGallery = () => {
     setGalleryPost(null);
     setGalleryIndex(0);
@@ -531,6 +529,50 @@ useEffect(() => {
     const url = getMediaUrl(item);
     if (!url) return;
     setLoadedMedia((prev) => ({ ...prev, [url]: true }));
+  };
+
+  const getFeedMediaIndex = (post) => {
+    const mediaLength = post?.media?.length || 0;
+    if (mediaLength <= 0) return 0;
+    const savedIndex = feedMediaIndexes[post._id] || 0;
+    return Math.min(Math.max(savedIndex, 0), mediaLength - 1);
+  };
+
+  const slideFeedMedia = (postId, mediaLength, direction) => {
+    if (!postId || mediaLength <= 1) return;
+
+    setFeedMediaIndexes((prev) => {
+      const currentIndex = prev[postId] || 0;
+      const nextIndex =
+        direction === "next"
+          ? (currentIndex + 1) % mediaLength
+          : (currentIndex - 1 + mediaLength) % mediaLength;
+
+      return { ...prev, [postId]: nextIndex };
+    });
+  };
+
+  const handleFeedMediaTouchStart = (event) => {
+    feedMediaTouchStartX.current = event.touches[0].clientX;
+    feedMediaTouchEndX.current = event.touches[0].clientX;
+  };
+
+  const handleFeedMediaTouchMove = (event) => {
+    feedMediaTouchEndX.current = event.touches[0].clientX;
+  };
+
+  const handleFeedMediaTouchEnd = (postId, mediaLength) => {
+    if (mediaLength <= 1) return;
+    if (feedMediaTouchStartX.current === null || feedMediaTouchEndX.current === null) return;
+
+    const swipeDistance = feedMediaTouchStartX.current - feedMediaTouchEndX.current;
+
+    if (Math.abs(swipeDistance) > 45) {
+      slideFeedMedia(postId, mediaLength, swipeDistance > 0 ? "next" : "prev");
+    }
+
+    feedMediaTouchStartX.current = null;
+    feedMediaTouchEndX.current = null;
   };
 
   const isImageMedia = (item) => {
@@ -1016,6 +1058,7 @@ useEffect(() => {
       setComposerType("Thought");
       setSelectedMood("All");
       setMoodPickerOpen(false);
+      setComposerOpen(false);
       setMediaEditModalOpen(false);
       resetMediaEditor();
 
@@ -1410,7 +1453,7 @@ const addReply = async (postId, commentId) => {
   const HeartIcon = ({ filled = true }) => (
     <svg
       viewBox="0 0 24 24"
-      className="w-[23px] h-[23px]"
+      className="w-[20px] h-[20px]"
       fill={filled ? "currentColor" : "none"}
       stroke="currentColor"
       strokeWidth="2.2"
@@ -1422,7 +1465,7 @@ const addReply = async (postId, commentId) => {
   const CommentIcon = () => (
     <svg
       viewBox="0 0 24 24"
-      className="w-[23px] h-[23px]"
+      className="w-[20px] h-[20px]"
       fill="none"
       stroke="currentColor"
       strokeWidth="2.2"
@@ -1434,7 +1477,7 @@ const addReply = async (postId, commentId) => {
   const ShareIcon = () => (
     <svg
       viewBox="0 0 24 24"
-      className="w-[23px] h-[23px]"
+      className="w-[20px] h-[20px]"
       fill="none"
       stroke="currentColor"
       strokeWidth="2.2"
@@ -1448,7 +1491,7 @@ const addReply = async (postId, commentId) => {
   const BookmarkIcon = ({ saved }) => (
     <svg
       viewBox="0 0 24 24"
-      className="w-[23px] h-[23px]"
+      className="w-[20px] h-[20px]"
       fill={saved ? "currentColor" : "none"}
       stroke="currentColor"
       strokeWidth="2"
@@ -1578,7 +1621,7 @@ useEffect(() => {
   []
 );
   return (
-    <div className="min-h-screen bg-black text-white px-2.5 sm:px-4 md:px-6 pt-1 sm:pt-4 md:pt-8 pb-28 md:pb-10">
+    <div className="min-h-screen bg-black text-white px-2.5 sm:px-4 md:px-6 pt-0 sm:pt-3 md:pt-7 pb-28 md:pb-10">
       {actionNotice && (
   <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] w-[92%] max-w-sm">
     <div className="rounded-2xl border border-pink-400/25 bg-zinc-950/95 backdrop-blur-2xl shadow-2xl shadow-pink-500/20 overflow-hidden">
@@ -1608,14 +1651,14 @@ useEffect(() => {
       <div className="w-full max-w-[1080px] mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,590px)_300px] xl:grid-cols-[minmax(0,600px)_320px] gap-8 xl:gap-10 justify-center items-start">
         <div className="w-full max-w-[600px] mx-auto lg:mx-0">
           {/* VYBE FLOW HEADER */}
-          <div className="mb-3 sm:mb-7">
-            <div className="flex items-end justify-between gap-3 mb-2.5 sm:mb-4">
+          <div className="mb-2.5 sm:mb-6">
+            <div className="flex items-end justify-between gap-3 mb-2 sm:mb-3">
               <div>
                 <p className="text-[11px] tracking-[0.24em] text-pink-300 font-black mb-1">
                   VYBEO
                 </p>
 
-                <h1 className="text-[26px] sm:text-4xl font-black tracking-tight">
+                <h1 className="text-[24px] sm:text-[34px] font-black tracking-tight">
                   Vybe Flow
                 </h1>
 
@@ -1639,7 +1682,7 @@ useEffect(() => {
                 <button
                   key={mood}
                   onClick={() => setActiveMood(mood)}
-                  className={`shrink-0 px-4 py-2 rounded-full border text-sm font-semibold transition-all ${
+                  className={`shrink-0 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border text-[13px] sm:text-sm font-semibold transition-all ${
                     activeMood === mood
                       ? `bg-gradient-to-r ${moodMeta[mood]?.style} border-white/20 text-white shadow-lg shadow-pink-500/10`
                       : "bg-white/[0.04] border-white/10 text-gray-400 hover:text-white hover:bg-white/[0.07]"
@@ -1658,28 +1701,72 @@ useEffect(() => {
               e.preventDefault();
               createPost();
             }}
-            className={`relative overflow-visible bg-zinc-950/90 border border-white/10 rounded-[24px] sm:rounded-3xl p-3.5 sm:p-5 mb-4 sm:mb-7 shadow-xl shadow-black/30 w-full transition-all duration-300 ${
+            className={`relative overflow-visible bg-zinc-950/90 border border-white/10 rounded-[22px] sm:rounded-[28px] p-2.5 sm:p-4 mb-3.5 sm:mb-6 shadow-xl shadow-black/30 w-full transition-all duration-300 ${
               selectedMood !== "All" ? "shadow-pink-500/10" : ""
             }`}
           >
-            <div className="flex items-center gap-2 mb-3 sm:mb-4">
-              {["Thought", "Moment", "Clip"].map((type) => (
+            {!composerOpen && !hasSelectedMedia && !caption.trim() && (
+              <button
+                type="button"
+                onClick={() => setComposerOpen(true)}
+                className="group relative flex w-full items-center gap-3 overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.035] px-3 py-2.5 text-left transition hover:border-pink-400/25 hover:bg-white/[0.055] active:scale-[0.99]"
+              >
+                <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-pink-500 via-purple-500 to-cyan-400 opacity-75" />
+                <img
+                  src={
+                    currentUser?.profilePic ||
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                      currentUser?.name || "User"
+                    )}&background=8b5cf6&color=fff`
+                  }
+                  alt=""
+                  className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 rounded-2xl border border-white/10 object-cover shadow-lg shadow-purple-500/10"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] sm:text-[14px] font-black text-white">Drop a vybe...</p>
+                  <p className="mt-0.5 text-[10px] sm:text-[11px] font-bold text-gray-500">Thought • Moment • Clip</p>
+                </div>
+                <span className="rounded-full border border-pink-400/20 bg-pink-500/10 px-3 py-1.5 text-[10px] sm:text-[11px] font-black text-pink-100 shadow-lg shadow-pink-500/10 transition group-hover:border-cyan-300/25 group-hover:text-white">
+                  + Start
+                </span>
+              </button>
+            )}
+
+            {(composerOpen || hasSelectedMedia || caption.trim()) && (
+              <>
+            <div className="flex items-center justify-between gap-2 mb-2.5 sm:mb-3">
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                {["Thought", "Moment", "Clip"].map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setComposerType(type)}
+                    className={`shrink-0 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full text-xs sm:text-sm font-bold border transition-all ${
+                      composerType === type
+                        ? "bg-gradient-to-r from-pink-500/25 to-cyan-500/20 border-pink-400/30 text-white"
+                        : "bg-white/[0.04] border-white/10 text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+
+              {!hasSelectedMedia && !caption.trim() && (
                 <button
-                  key={type}
                   type="button"
-                  onClick={() => setComposerType(type)}
-                  className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-bold border transition-all ${
-                    composerType === type
-                      ? "bg-gradient-to-r from-pink-500/25 to-cyan-500/20 border-pink-400/30 text-white"
-                      : "bg-white/[0.04] border-white/10 text-gray-400 hover:text-white"
-                  }`}
+                  onClick={() => {
+                    setComposerOpen(false);
+                    setMoodPickerOpen(false);
+                  }}
+                  className="shrink-0 rounded-full border border-white/10 bg-black/35 px-3 py-1.5 text-[11px] font-black text-gray-400 transition hover:border-pink-400/25 hover:bg-white/[0.055] hover:text-white"
                 >
-                  {type}
+                  Hide
                 </button>
-              ))}
+              )}
             </div>
             
-            <div className="flex items-start gap-2.5 sm:gap-3 mb-3 sm:mb-4">
+            <div className="flex items-start gap-2.5 sm:gap-3 mb-2.5 sm:mb-3">
   <img
     src={
       currentUser?.profilePic ||
@@ -1688,7 +1775,7 @@ useEffect(() => {
       )}&background=8b5cf6&color=fff`
     }
     alt=""
-    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-white/10 shrink-0"
+    className="w-9 h-9 sm:w-11 sm:h-11 rounded-full object-cover border border-white/10 shrink-0"
   />
 
   <div ref={moodPickerRef} className="relative flex-1 min-w-0">
@@ -2182,7 +2269,9 @@ useEffect(() => {
                   : "Drop Clip"}
               </button>
             </div>
-          </form>
+                        </>
+            )}
+</form>
 
           {/* FLOW TABS */}
           <div className="sticky top-[8px] md:static z-40 flex items-center gap-1.5 mb-4 sm:mb-5 bg-zinc-950/95 border border-white/10 rounded-[22px] sm:rounded-3xl p-1.5 shadow-lg shadow-black/30 backdrop-blur-2xl pointer-events-auto">
@@ -2253,13 +2342,14 @@ useEffect(() => {
               const isSaved = savedPosts.includes(post._id);
               const postKind = getPostKind(post);
               const mediaList = post.media || [];
-              const firstMedia = mediaList[0];
+              const activeFeedMediaIndex = getFeedMediaIndex(post);
+              const firstMedia = mediaList[activeFeedMediaIndex] || mediaList[0];
               const mediaCount = mediaList.length;
 
               return (
                 <div
                   key={post._id}
-                  className="relative bg-zinc-950/95 border border-white/10 rounded-[24px] sm:rounded-[30px] overflow-hidden shadow-xl shadow-black/30 w-full hover:border-pink-500/20 hover:shadow-[0_0_45px_rgba(236,72,153,0.08)] transition-all duration-300 animate-vybe-card"
+                  className="relative bg-zinc-950/95 border border-white/10 rounded-[22px] sm:rounded-[28px] overflow-hidden shadow-xl shadow-black/25 w-full hover:border-pink-500/20 hover:shadow-[0_0_36px_rgba(236,72,153,0.07)] transition-all duration-300 animate-vybe-card"
                 >
                   {heartPostId === post._id && (
                     <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
@@ -2281,7 +2371,7 @@ useEffect(() => {
                   )}
 
                   {/* HEADER */}
-                  <div className="flex items-center justify-between p-3.5 sm:p-4 pb-2.5 sm:pb-3 relative">
+                  <div className="flex items-center justify-between p-3 sm:p-3.5 pb-2 relative">
                     <div
                       onClick={() => openUserProfile(post.user?._id)}
                       className="flex items-center gap-3 min-w-0 cursor-pointer"
@@ -2293,7 +2383,7 @@ useEffect(() => {
                         }
                         alt=""
                         loading="lazy"
-                        className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-white/10 shrink-0"
+                        className="w-9 h-9 sm:w-11 sm:h-11 rounded-full object-cover border border-white/10 shrink-0"
                       />
 
                       <div className="min-w-0">
@@ -2317,7 +2407,7 @@ useEffect(() => {
                               openMenuId === post._id ? null : post._id
                             )
                           }
-                          className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.035] text-lg text-gray-400 transition hover:bg-white/[0.07] hover:text-white active:scale-95"
+                          className="grid h-8 w-8 place-items-center rounded-full border border-white/10 bg-white/[0.035] text-base text-gray-400 transition hover:bg-white/[0.07] hover:text-white active:scale-95"
                         >
                           ⋮
                         </button>
@@ -2375,10 +2465,10 @@ useEffect(() => {
   onDoubleClick={() =>
     handlePostLikeWithAnimation(post._id)
   }
-  className={`mx-4 sm:mx-6 mb-4 sm:mb-6 mt-1 sm:mt-2 max-w-[94%] break-words whitespace-pre-wrap cursor-pointer select-none transition-all ${
+  className={`mx-3.5 sm:mx-5 mb-3 sm:mb-4 mt-0.5 max-w-[94%] break-words whitespace-pre-wrap cursor-pointer select-none transition-all ${
     postKind === "Thought"
-      ? "text-[18px] sm:text-[20px] leading-[1.65] font-semibold tracking-[-0.01em] text-gray-100"
-      : "text-[15px] sm:text-[16px] leading-7 text-gray-100"
+      ? "rounded-[20px] border border-pink-400/10 bg-gradient-to-br from-white/[0.055] via-white/[0.025] to-cyan-500/[0.04] px-4 py-4 text-[17px] sm:text-[19px] leading-[1.55] font-semibold tracking-[-0.01em] text-gray-100"
+      : "text-[14px] sm:text-[15px] leading-6 text-gray-100"
   }`}
 >
                         {post.caption || post.content}
@@ -2388,11 +2478,13 @@ useEffect(() => {
 
                   {/* MEDIA */}
                   {firstMedia && (
-                    <div className="mx-2.5 sm:mx-3 mb-2.5 sm:mb-3">
+                    <div className="mx-2.5 sm:mx-3 mb-2 sm:mb-3">
                       <div
-                        onClick={() => openMediaGallery(post, 0)}
                         onDoubleClick={() => handlePostLikeWithAnimation(post._id)}
-                        className="group relative rounded-[22px] sm:rounded-[26px] w-full aspect-[4/5] max-h-[70vh] sm:max-h-[78vh] bg-black flex items-center justify-center cursor-pointer select-none overflow-hidden border border-white/10 shadow-2xl shadow-black/35"
+                        onTouchStart={handleFeedMediaTouchStart}
+                        onTouchMove={handleFeedMediaTouchMove}
+                        onTouchEnd={() => handleFeedMediaTouchEnd(post._id, mediaCount)}
+                        className="group relative rounded-[20px] sm:rounded-[24px] w-full aspect-[4/5] max-h-[520px] sm:max-h-[620px] bg-black flex items-center justify-center select-none overflow-hidden border border-white/10 shadow-xl shadow-black/30"
                       >
                         {isImageMedia(firstMedia) ? (
                           <>
@@ -2433,7 +2525,7 @@ useEffect(() => {
                         {mediaCount > 1 && (
                           <>
                             <div className="absolute right-3 top-3 rounded-full bg-black/60 border border-white/10 backdrop-blur-xl px-3 py-1.5 text-[11px] font-black text-white shadow-lg">
-                              1 / {mediaCount}
+                              {activeFeedMediaIndex + 1} / {mediaCount}
                             </div>
 
                             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-black/45 border border-white/10 backdrop-blur-xl px-3 py-2">
@@ -2441,7 +2533,7 @@ useEffect(() => {
                                 <span
                                   key={dotIndex}
                                   className={`h-1.5 rounded-full transition-all ${
-                                    dotIndex === 0 ? "w-5 bg-pink-400" : "w-1.5 bg-white/55"
+                                    dotIndex === activeFeedMediaIndex ? "w-5 bg-pink-400" : "w-1.5 bg-white/55"
                                   }`}
                                 />
                               ))}
@@ -2451,26 +2543,30 @@ useEffect(() => {
 
                         <div className="absolute inset-x-0 bottom-0 translate-y-full group-hover:translate-y-0 transition-transform duration-300 bg-gradient-to-t from-black/85 to-transparent p-4">
                           <p className="text-xs font-bold text-white/90">
-                            {mediaCount > 1 ? `${mediaCount} moments stacked · Tap to view` : "Tap to view media"}
+                            {mediaCount > 1 ? `${mediaCount} moments stacked` : "Double tap to feel"}
                           </p>
                         </div>
                       </div>
 
                       {mediaCount > 1 && (
-                        <p className="mt-2 px-1 text-xs font-bold text-pink-300">
-                          {mediaCount} moments stacked
-                        </p>
+                        <div className="mt-2 flex items-center justify-between gap-2 px-1">
+                          <p className="text-[12px] font-black text-pink-300">{mediaCount} moments stacked</p>
+                          <div className="hidden sm:flex items-center gap-1.5">
+                            <button type="button" onClick={() => slideFeedMedia(post._id, mediaCount, "prev")} className="h-7 w-7 rounded-full border border-white/10 bg-white/[0.035] text-sm text-white/85 hover:bg-white/[0.08] active:scale-95 transition">‹</button>
+                            <button type="button" onClick={() => slideFeedMedia(post._id, mediaCount, "next")} className="h-7 w-7 rounded-full border border-white/10 bg-white/[0.035] text-sm text-white/85 hover:bg-white/[0.08] active:scale-95 transition">›</button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   )}
 
                   {/* ACTIONS */}
-                  <div className="px-3 sm:px-4 pt-3 sm:pt-4 pb-3 sm:pb-4 border-t border-white/5">
-                    <div className="flex items-center justify-between gap-2 sm:gap-3 mb-2">
-                      <div className="flex items-center gap-1.5 sm:gap-3">
+                  <div className="px-3 sm:px-4 pt-2.5 sm:pt-3 pb-3 sm:pb-4 border-t border-white/5">
+                    <div className="flex items-center justify-between gap-2 sm:gap-3">
+                      <div className="flex items-center gap-1.5 sm:gap-2">
                         <button
                           onClick={() => handlePostLikeWithAnimation(post._id)}
-                          className={`flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] px-2.5 sm:px-3 py-1.5 sm:py-2 active:scale-95 hover:bg-white/[0.07] transition-all ${
+                          className={`flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] px-2.5 sm:px-3 py-1.5 active:scale-95 hover:bg-white/[0.07] transition-all ${
                             isPostLikedByMe(post)
                               ? "text-pink-400"
                               : "text-gray-100 hover:text-pink-400"
@@ -2483,7 +2579,7 @@ useEffect(() => {
     e.stopPropagation();
     setLikesModalPost(post);
   }}
-  className="text-[12px] sm:text-[13px] font-semibold hover:underline cursor-pointer"
+  className="text-[11px] sm:text-[12px] font-bold hover:underline cursor-pointer"
 >
   {post.likes?.length || 0} Felt
 </span>
@@ -2491,18 +2587,18 @@ useEffect(() => {
 
                         <button
                           onClick={() => setCommentsSheetPost(post)}
-                          className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] px-2.5 sm:px-3 py-1.5 sm:py-2 text-gray-200 hover:text-indigo-300 hover:bg-white/[0.07] active:scale-95 transition-all"
+                          className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] px-2.5 sm:px-3 py-1.5 text-gray-200 hover:text-indigo-300 hover:bg-white/[0.07] active:scale-95 transition-all"
                           title="Replies"
                         >
                           <CommentIcon />
-                          <span className="text-[12px] sm:text-[13px] font-semibold">
+                          <span className="text-[11px] sm:text-[12px] font-bold">
                             {post.comments?.length || 0} Replies
                           </span>
                         </button>
 
                         <button
                           onClick={() => setSharePost(post)}
-                          className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-2 text-gray-200 hover:text-cyan-300 hover:bg-white/[0.07] active:scale-95 transition-all"
+                          className="rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1.5 text-gray-200 hover:text-cyan-300 hover:bg-white/[0.07] active:scale-95 transition-all"
                           title="Share"
                         >
                           <ShareIcon />
@@ -2511,7 +2607,7 @@ useEffect(() => {
 
                       <button
                         onClick={() => toggleSavePost(post._id)}
-                        className={`rounded-full border border-white/10 bg-white/[0.035] px-3 py-2 active:scale-95 hover:bg-white/[0.07] transition-all ${
+                        className={`rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1.5 active:scale-95 hover:bg-white/[0.07] transition-all ${
                           isSaved
                             ? "text-yellow-400"
                             : "text-gray-100 hover:text-yellow-300"
@@ -3009,9 +3105,9 @@ useEffect(() => {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full sm:max-w-xl max-h-[88vh] overflow-hidden rounded-t-[30px] sm:rounded-[32px] border border-white/10 bg-zinc-950/98 shadow-2xl shadow-black/70 animate-vybe-sheet"
+            className="w-full sm:max-w-xl max-h-[82dvh] overflow-hidden rounded-t-[28px] sm:rounded-[30px] border border-white/10 bg-zinc-950/98 shadow-2xl shadow-black/70 animate-vybe-sheet"
           >
-            <div className="relative overflow-hidden border-b border-white/10 bg-zinc-950/95 p-4 backdrop-blur-2xl">
+            <div className="relative overflow-hidden border-b border-white/10 bg-zinc-950/95 p-3.5 sm:p-4 backdrop-blur-2xl">
               <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-pink-500/14 blur-3xl" />
               <div className="pointer-events-none absolute -left-16 -bottom-16 h-40 w-40 rounded-full bg-cyan-500/10 blur-3xl" />
               <div className="relative flex items-center justify-between gap-3">
@@ -3036,7 +3132,7 @@ useEffect(() => {
               </div>
             </div>
 
-            <div className="max-h-[56vh] overflow-y-auto no-scrollbar px-3.5 py-3.5 sm:px-4 sm:py-4 space-y-2.5">
+            <div className="max-h-[48dvh] sm:max-h-[52vh] overflow-y-auto no-scrollbar px-3.5 py-3 sm:px-4 sm:py-4 space-y-2.5">
               {activeCommentsPost.comments && activeCommentsPost.comments.length > 0 ? (
                 activeCommentsPost.comments.map((comment) => {
                   const canDeleteComment =
@@ -3097,7 +3193,7 @@ useEffect(() => {
               )}
             </div>
 
-            <div className="border-t border-white/10 bg-zinc-950/95 p-3.5 sm:p-4">
+            <div className="border-t border-white/10 bg-zinc-950/95 p-3 sm:p-4">
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -3112,12 +3208,12 @@ useEffect(() => {
                     if (e.key === "Enter") addComment(activeCommentsPost._id);
                   }}
                   placeholder="Drop a clean reply..."
-                  className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm outline-none transition focus:border-pink-400/45 focus:bg-white/[0.07]"
+                  className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-2.5 text-sm outline-none transition focus:border-pink-400/45 focus:bg-white/[0.07]"
                 />
                 <button
                   type="button"
                   onClick={() => addComment(activeCommentsPost._id)}
-                  className="rounded-2xl bg-gradient-to-r from-pink-500/85 via-purple-500/85 to-cyan-500/85 px-4 py-3 text-sm font-black text-white shadow-lg shadow-pink-500/15 transition active:scale-95"
+                  className="rounded-2xl bg-gradient-to-r from-pink-500/85 via-purple-500/85 to-cyan-500/85 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-pink-500/15 transition active:scale-95"
                 >
                   Reply
                 </button>
@@ -3332,12 +3428,12 @@ useEffect(() => {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto no-scrollbar rounded-t-[34px] sm:rounded-[34px] border border-white/10 bg-zinc-950 shadow-2xl shadow-black/60"
+            className="w-full sm:max-w-2xl max-h-[92dvh] overflow-y-auto no-scrollbar rounded-t-[30px] sm:rounded-[34px] border border-white/10 bg-zinc-950 pb-[calc(env(safe-area-inset-bottom)+18px)] shadow-2xl shadow-black/60"
           >
             <div className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-white/10 bg-zinc-950/95 backdrop-blur-xl px-4 py-4">
               <div>
                 <p className="text-[10px] tracking-[0.22em] text-pink-300 font-black">EDIT MEDIA</p>
-                <h3 className="text-xl font-black text-white">Crop & filters</h3>
+                <h3 className="text-lg sm:text-xl font-black text-white">Crop & filters</h3>
               </div>
 
               <button
@@ -3349,7 +3445,7 @@ useEffect(() => {
               </button>
             </div>
 
-            <div className="p-4 space-y-4">
+            <div className="p-3.5 sm:p-4 space-y-4">
               <div className={`relative overflow-hidden rounded-[28px] border border-white/10 bg-black ${getPreviewFrameClass(mediaAspect)} shadow-2xl shadow-black/40`}>
                 <img
                   src={activePreviewSrc}
