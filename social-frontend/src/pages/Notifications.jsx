@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import API from "../services/api";
 import { useNavigate } from "react-router-dom";
+import logger from "../utils/logger";
 
 function Notifications() {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ function Notifications() {
 
         await API.put("/api/notifications/read", {}, authConfig);
       } catch (error) {
-        console.log(error.response?.data || error);
+        logger.error(error.response?.data || error);
       } finally {
         setLoading(false);
       }
@@ -49,7 +50,7 @@ function Notifications() {
         prev.filter((notification) => notification._id !== id)
       );
     } catch (error) {
-      console.log(error.response?.data || error);
+      logger.error(error.response?.data || error);
     }
   };
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { io } from "socket.io-client";
+import { SOCKET_URL } from "../config/env";
 
 function useFeedSocket({
   token,
@@ -13,12 +14,7 @@ function useFeedSocket({
   useEffect(() => {
     if (!token) return;
 
-    const socketUrl =
-      process.env.REACT_APP_SOCKET_URL ||
-      process.env.REACT_APP_API_URL ||
-      "http://localhost:5000";
-
-    const socket = io(socketUrl, {
+    const socket = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
       auth: {
         token,

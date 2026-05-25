@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../services/api";
+import logger from "../utils/logger";
 
 function Search() {
   const navigate = useNavigate();
@@ -60,7 +61,7 @@ function Search() {
           setUsers([]);
         }
       } catch (err) {
-        console.log(err.response?.data || err);
+        logger.error(err.response?.data || err);
         setUsers([]);
       } finally {
         setLoading(false);
@@ -95,7 +96,7 @@ function Search() {
         prev.map((u) => (u._id === userId ? updatedUser : u))
       );
     } catch (err) {
-      console.log(err.response?.data || err);
+      logger.error(err.response?.data || err);
     } finally {
       setFollowLoading(null);
     }

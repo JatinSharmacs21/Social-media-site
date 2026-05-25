@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import API from "../services/api";
 import { useNavigate } from "react-router-dom";
+import logger from "../utils/logger";
 
 function Reels() {
   const navigate = useNavigate();
@@ -107,7 +108,7 @@ function Reels() {
           setActiveReelId(videoPosts[0].reelId);
         }
       } catch (error) {
-        console.log(error.response?.data || error);
+        logger.error(error.response?.data || error);
       } finally {
         setLoading(false);
       }
@@ -198,7 +199,7 @@ function Reels() {
       setEditingClip(null);
       setEditCaption("");
     } catch (error) {
-      console.log(error.response?.data || error);
+      logger.error(error.response?.data || error);
     } finally {
       setSavingEdit(false);
     }
@@ -216,7 +217,7 @@ function Reels() {
       setClips((prev) => prev.filter((reel) => reel._id !== clip._id));
       setOpenMenuId(null);
     } catch (error) {
-      console.log(error.response?.data || error);
+      logger.error(error.response?.data || error);
     }
   };
 
@@ -230,7 +231,7 @@ function Reels() {
         setHeartReelId(null);
       }, 850);
     } catch (error) {
-      console.log(error.response?.data || error);
+      logger.error(error.response?.data || error);
     }
   };
 
@@ -260,7 +261,7 @@ function Reels() {
         [postId]: true,
       }));
     } catch (error) {
-      console.log(error.response?.data || error);
+      logger.error(error.response?.data || error);
     }
   };
 
@@ -282,7 +283,7 @@ function Reels() {
         setCopiedShare(false);
       }, 1500);
     } catch (error) {
-      console.log("Copy failed:", error);
+      logger.error("Copy failed:", error);
     }
   };
 
@@ -302,7 +303,7 @@ function Reels() {
         await copyShareLink();
       }
     } catch (error) {
-      console.log("Share cancelled:", error);
+      logger.error("Share cancelled:", error);
     }
   };
 

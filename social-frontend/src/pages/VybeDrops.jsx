@@ -1,11 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import API from "../services/api";
+import logger from "../utils/logger";
+import { SOCKET_URL } from "../config/env";
 
-const socketUrl =
-  process.env.REACT_APP_SOCKET_URL ||
-  process.env.REACT_APP_API_URL ||
-  "http://localhost:5000";
 
 const tagStyles = {
   all: { gradient: "from-pink-500 to-indigo-500", label: "All", icon: "🔥" },
@@ -95,7 +93,7 @@ function VybeDrops() {
   }, []);
 
   useEffect(() => {
-    socketRef.current = io(socketUrl, {
+    socketRef.current = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
     });
 
@@ -156,7 +154,7 @@ socketRef.current.on("drop-pulse-update", ({ dropId, count }) => {
       const res = await API.get("/api/posts/drops");
       setDrops(res.data || []);
     } catch (err) {
-      console.log("Drops error:", err.response?.data || err.message);
+      logger.error("Drops error:", err.response?.data || err.message);
     } finally {
       setLoading(false);
     }
@@ -168,7 +166,7 @@ socketRef.current.on("drop-pulse-update", ({ dropId, count }) => {
       const res = await API.get(`/api/posts/drops/${dropId}/replies`);
       setRepliesByDrop((prev) => ({ ...prev, [dropId]: res.data || [] }));
     } catch (err) {
-      console.log("Replies error:", err.response?.data || err.message);
+      logger.error("Replies error:", err.response?.data || err.message);
     } finally {
       setLoadingReplies((prev) => ({ ...prev, [dropId]: false }));
     }
@@ -287,7 +285,7 @@ const openThread = async (dropId) => {
       await fetchReplies(dropId);
       await fetchDrops();
     } catch (err) {
-      console.log("Reply error:", err.response?.data || err.message);
+      logger.error("Reply error:", err.response?.data || err.message);
       alert(err.response?.data?.message || "Reply failed");
     } finally {
       setSubmitting(false);
@@ -313,7 +311,7 @@ const openThread = async (dropId) => {
 
       updateReplyInState(dropId, res.data);
     } catch (err) {
-      console.log("Reaction error:", err.response?.data || err.message);
+      logger.error("Reaction error:", err.response?.data || err.message);
       alert(err.response?.data?.message || "Reaction failed");
     } finally {
       setReactingId(null);
@@ -338,7 +336,7 @@ const deleteDropReply = async () => {
     setDeleteTarget(null);
     await fetchDrops();
   } catch (err) {
-    console.log("Delete reply error:", err.response?.data || err.message);
+    logger.error("Delete reply error:", err.response?.data || err.message);
     alert(err.response?.data?.message || "Delete failed");
   } finally {
     setDeleting(false);
@@ -380,7 +378,7 @@ const deleteDropReply = async () => {
 
       closeNestedComposer();
     } catch (err) {
-      console.log("Nested reply error:", err.response?.data || err.message);
+      logger.error("Nested reply error:", err.response?.data || err.message);
       alert(err.response?.data?.message || "Thread reply failed");
     } finally {
       setNestedSubmitting(false);
@@ -395,7 +393,7 @@ const deleteDropReply = async () => {
 
       updateReplyInState(dropId, res.data);
     } catch (err) {
-      console.log("Delete nested error:", err.response?.data || err.message);
+      logger.error("Delete nested error:", err.response?.data || err.message);
       alert(err.response?.data?.message || "Delete failed");
     }
   };

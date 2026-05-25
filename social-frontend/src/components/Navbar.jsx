@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { useNavigate, useLocation } from "react-router-dom";
 import API from "../services/api";
+import logger from "../utils/logger";
+import { SOCKET_URL } from "../config/env";
 
 function Navbar() {
   const navigate = useNavigate();
@@ -21,7 +23,7 @@ function Navbar() {
         const res = await API.get("/api/notifications/unread-count");
         setUnreadCount(res.data.count || 0);
       } catch (error) {
-        console.log(error.response?.data || error);
+        logger.error(error.response?.data || error);
       }
     };
 
@@ -33,26 +35,12 @@ function Navbar() {
   useEffect(() => {
     if (!token) return;
 
-    // const userId = localStorage.getItem("userId");
-    // if (!userId) return;
-
-    // const socketUrl =
-    //   process.env.REACT_APP_SOCKET_URL ||
-    //   process.env.REACT_APP_API_URL ||
-    //   "https://social-backend-waow.onrender.com";
-
-    const socketUrl =
-    (process.env.REACT_APP_SOCKET_URL ||
-    process.env.REACT_APP_API_URL ||
-    API.defaults?.baseURL ||
-    "http://localhost:5000").replace("/api", "");
-
-    const socket = io(socketUrl, {
-    transports: ["websocket", "polling"],
-    auth: {
-      token,
-    },
-  });
+    const socket = io(SOCKET_URL, {
+      transports: ["websocket", "polling"],
+      auth: {
+        token,
+      },
+    });
 
     socket.on("connect", () => {
       socket.emit("register-user");

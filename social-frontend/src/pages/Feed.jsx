@@ -39,6 +39,7 @@ import useFeedGallery from "../hooks/useFeedGallery";
 import usePostActions from "../hooks/usePostActions";
 import useFeedPosts from "../hooks/useFeedPosts";
 import useFeedSocket from "../hooks/useFeedSocket";
+import logger from "../utils/logger";
 
 function Feed() {
   const navigate = useNavigate();
@@ -277,7 +278,7 @@ useEffect(() => {
         setCopiedShare(false);
       }, 1500);
     } catch (error) {
-      console.log("Copy failed:", error);
+      logger.error("Copy failed:", error);
     }
   };
 
@@ -297,7 +298,7 @@ useEffect(() => {
         await copyShareLink();
       }
     } catch (error) {
-      console.log("Share cancelled or failed:", error);
+      logger.error("Share cancelled or failed:", error);
     }
   };
 
@@ -432,7 +433,7 @@ useEffect(() => {
         mediaInputRef.current.value = "";
       }
     } catch (error) {
-      console.log(error.response?.data || error);
+      logger.error(error.response?.data || error);
       setUploadError(error.response?.data?.message || "Could not upload your vybe. Please try again.");
     } finally {
       setLoading(false);

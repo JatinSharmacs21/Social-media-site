@@ -1,4 +1,5 @@
 import API from "../services/api";
+import logger from "../utils/logger";
 import {
   isPostLikedByUser,
   isCommentLikedByUser,
@@ -82,7 +83,7 @@ function usePostActions({
         [user._id]: res.data?.following ?? !prev[user._id],
       }));
     } catch (error) {
-      console.log(error.response?.data || error);
+      logger.error(error.response?.data || error);
 
       setFollowingUsers((prev) => ({
         ...prev,
@@ -131,7 +132,7 @@ function usePostActions({
       const res = await API.put(`/api/posts/like/${id}`, {}, authConfig);
       updatePostEverywhere(res.data);
     } catch (error) {
-      console.log(error.response?.data || error);
+      logger.error(error.response?.data || error);
 
       if (previousPost) {
         updatePostEverywhere(previousPost);
@@ -212,7 +213,7 @@ function usePostActions({
 
       updatePostEverywhere(res.data);
     } catch (error) {
-      console.log(error.response?.data || error);
+      logger.error(error.response?.data || error);
 
       if (previousPost) {
         updatePostEverywhere(previousPost);
@@ -236,7 +237,7 @@ function usePostActions({
 
       updatePostInState(res.data);
     } catch (error) {
-      console.log(error.response?.data || error);
+      logger.error(error.response?.data || error);
     }
   };
 
@@ -292,7 +293,7 @@ function usePostActions({
 
       updatePostEverywhere(res.data);
     } catch (error) {
-      console.log(error.response?.data || error);
+      logger.error(error.response?.data || error);
 
       if (previousPost) {
         updatePostEverywhere(previousPost);
@@ -380,7 +381,7 @@ function usePostActions({
 
       updatePostEverywhere(res.data);
     } catch (error) {
-      console.log(error.response?.data || error);
+      logger.error(error.response?.data || error);
 
       if (previousPost) {
         updatePostEverywhere(previousPost);
@@ -404,7 +405,7 @@ function usePostActions({
 
       updatePostInState(res.data);
     } catch (error) {
-      console.log(error.response?.data || error);
+      logger.error(error.response?.data || error);
     }
   };
 
@@ -433,7 +434,7 @@ function usePostActions({
       setEditingPostId(null);
       setEditCaption("");
     } catch (error) {
-      console.log(error.response?.data || error);
+      logger.error(error.response?.data || error);
     }
   };
 
@@ -451,7 +452,7 @@ function usePostActions({
       setConfirmDeletePost(null);
       showNotice("Vybe deleted");
     } catch (error) {
-      console.log(error.response?.data || error);
+      logger.error(error.response?.data || error);
       showNotice(error.response?.data?.message || "Could not delete vybe");
     }
   };

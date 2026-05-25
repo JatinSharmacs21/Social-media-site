@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import API from "../services/api";
+import logger from "../utils/logger";
 
 function useFeedPosts({ currentUserId }) {
   const [posts, setPosts] = useState([]);
@@ -43,7 +44,7 @@ function useFeedPosts({ currentUserId }) {
           : Boolean(res.data?.hasMore)
       );
     } catch (error) {
-      console.log(error.response?.data || error);
+      logger.error(error.response?.data || error);
     } finally {
       setInitialLoading(false);
       setLoadingMoreFeed(false);
@@ -60,7 +61,7 @@ function useFeedPosts({ currentUserId }) {
         const res = await API.get(`/api/users/${currentUserId}`);
         setCurrentUser(res.data);
       } catch (error) {
-        console.log(error.response?.data || error);
+        logger.error(error.response?.data || error);
 
         const localUser = localStorage.getItem("user");
         if (localUser) {

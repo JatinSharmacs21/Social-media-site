@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import API from "../services/api";
+import logger from "../utils/logger";
+import { SOCKET_URL } from "../config/env";
 
 function VybeRoom() {
   const token = localStorage.getItem("token");
@@ -53,7 +55,7 @@ function VybeRoom() {
       const res = await API.get("/api/vybe-room", authConfig);
       setMessages(res.data);
     } catch (error) {
-      console.log(error.response?.data || error);
+      logger.error(error.response?.data || error);
     } finally {
       setLoading(false);
     }
@@ -83,10 +85,7 @@ function VybeRoom() {
   useEffect(() => {
     fetchMessages();
 
-    const socketUrl =
-      API.defaults?.baseURL?.replace("/api", "") || "http://localhost:5000";
-
-    const socket = io(socketUrl, {
+    const socket = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
       auth: {
       token,
@@ -166,7 +165,7 @@ function VybeRoom() {
       addMessageIfMissing(res.data);
       scrollToBottom();
     } catch (error) {
-      console.log(error.response?.data || error);
+      logger.error(error.response?.data || error);
     }
   };
 
@@ -194,7 +193,7 @@ function VybeRoom() {
       setReplyingTo(null);
       scrollToBottom();
     } catch (error) {
-      console.log(error.response?.data || error);
+      logger.error(error.response?.data || error);
     }
   };
 
@@ -210,7 +209,7 @@ function VybeRoom() {
 
       updateMessageInState(res.data);
     } catch (error) {
-      console.log(error.response?.data || error);
+      logger.error(error.response?.data || error);
     }
   };
 

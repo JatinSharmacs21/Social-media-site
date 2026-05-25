@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import logger from "../utils/logger";
 
 function useFeedMedia({ mediaFilterOptions, setComposerType }) {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -291,7 +292,7 @@ useEffect(() => {
 
       setEditedPreview(nextUrl);
     } catch (error) {
-      console.log("Preview render failed:", error);
+      logger.error("Preview render failed:", error);
     }
   };
 

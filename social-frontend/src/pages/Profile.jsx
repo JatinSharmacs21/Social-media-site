@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import API from "../services/api";
+import logger from "../utils/logger";
 
 function Profile() {
   const { userId: profileIdentifier } = useParams();
@@ -287,7 +288,7 @@ function Profile() {
       const res = await API.put(`/api/users/follow/${user._id}`, {}, authConfig);
       setUser(res.data.user);
     } catch (err) {
-      console.log(err.response?.data || err);
+      logger.error(err.response?.data || err);
     }
   };
 
@@ -302,7 +303,7 @@ function Profile() {
       const res = await API.put(`/api/posts/like/${postId}`, {}, authConfig);
       updatePostInState(res.data);
     } catch (err) {
-      console.log(err.response?.data || err);
+      logger.error(err.response?.data || err);
       if (previousPost) updatePostInState(previousPost);
     }
   };
@@ -345,7 +346,7 @@ function Profile() {
 
       updatePostInState(res.data);
     } catch (err) {
-      console.log(err.response?.data || err);
+      logger.error(err.response?.data || err);
       updatePostInState(previousPost);
       setCommentText(text);
     }
@@ -365,7 +366,7 @@ function Profile() {
       const res = await API.delete(`/api/posts/comment/${postId}/${commentId}`, authConfig);
       updatePostInState(res.data);
     } catch (err) {
-      console.log(err.response?.data || err);
+      logger.error(err.response?.data || err);
       if (previousPost) updatePostInState(previousPost);
     }
   };
@@ -408,7 +409,7 @@ function Profile() {
       setEditDraft("");
       showNotice("Vybe updated");
     } catch (err) {
-      console.log(err.response?.data || err);
+      logger.error(err.response?.data || err);
       if (previousPost) updatePostInState(previousPost);
       showNotice(err.response?.data?.message || "Post edit endpoint missing or failed");
     } finally {
@@ -441,7 +442,7 @@ function Profile() {
       setConfirmDeletePost(null);
       showNotice("Vybe deleted");
     } catch (err) {
-      console.log(err.response?.data || err);
+      logger.error(err.response?.data || err);
       setPosts(previousPosts);
       showNotice(err.response?.data?.message || "Post delete failed");
     } finally {

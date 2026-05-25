@@ -12,6 +12,7 @@ const http = require("http");
 const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
 
+const logger = require("./utils/logger");
 const connectDB = require("./config/db");
 
 const authRoutes = require("./routes/authRoutes");
@@ -25,14 +26,34 @@ const userRoutes = require("./routes/userRoutes");
 
 connectDB();
 
+const parseOrigins = (value) =>
+  (value || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://vybeo.vercel.app",
+  ...parseOrigins(process.env.CLIENT_URL),
+  ...parseOrigins(process.env.FRONTEND_URL),
+  ...parseOrigins(process.env.CORS_ORIGINS),
+];
+
+const isAllowedOrigin = (origin) => !origin || allowedOrigins.includes(origin);
+
 const app = express();
 const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-  origin: ["http://localhost:3000", "https://vybeo.vercel.app"],
-  methods: ["GET", "POST", "PUT", "DELETE"],
-},
+    origin: (origin, callback) => {
+      if (isAllowedOrigin(origin)) return callback(null, true);
+      return callback(new Error("Not allowed by CORS"));
+    },
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  },
 });
 
 app.set("io", io);
@@ -90,7 +111,7 @@ const vybeOnlineUsers = new Set();
 app.set("onlineUsers", onlineUsers);
 
 io.on("connection", (socket) => {
-  console.log("Socket connected:", socket.id);
+  logger.info("Socket connected:", socket.id);
 
   // Frontend Navbar emits this after login.
   // This helps backend send realtime notification to one specific user.
@@ -101,7 +122,7 @@ io.on("connection", (socket) => {
   socket.userId = id;
   addOnlineSocket(id, socket.id);
 
-  console.log("Realtime user registered:", id);
+  logger.info("Realtime user registered:", id);
 });
 
   socket.on("join-drop", (dropId) => {
@@ -182,14 +203,9 @@ socket.on("disconnect", () => {
     vybeOnlineUsers.delete(socket.userId);
   }
 
-  console.log("Socket disconnected:", socket.id);
+  logger.info("Socket disconnected:", socket.id);
 });
 });
-
-const allowedOrigins = [
-  "http://localhost:3000",
-  "https://vybeo.vercel.app",
-];
 
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -226,9 +242,7 @@ app.use(helmet());
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
+      if (isAllowedOrigin(origin)) return callback(null, true);
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
@@ -273,13 +287,13 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  logger.info(`Server running on port ${PORT}`);
 });
 
 process.on("uncaughtException", (err) => {
-  console.log("UNCAUGHT EXCEPTION:", err);
+  logger.error("UNCAUGHT EXCEPTION:", err);
 });
 
 process.on("unhandledRejection", (err) => {
-  console.log("UNHANDLED REJECTION:", err);
+  logger.error("UNHANDLED REJECTION:", err);
 });
