@@ -10,7 +10,7 @@ function useFeedPosts({ currentUserId }) {
   const [hasMoreFeed, setHasMoreFeed] = useState(true);
   const [loadingMoreFeed, setLoadingMoreFeed] = useState(false);
 
-  const fetchPosts = useCallback(async (page = 1) => {
+  const fetchPosts = useCallback(async (page = 1, mood = "All") => {
     try {
       if (page === 1) {
         setInitialLoading(true);
@@ -18,7 +18,8 @@ function useFeedPosts({ currentUserId }) {
         setLoadingMoreFeed(true);
       }
 
-      const res = await API.get(`/api/posts?page=${page}&limit=6`);
+      const moodQuery = mood && mood !== "All" ? `&mood=${encodeURIComponent(mood)}` : "";
+      const res = await API.get(`/api/posts?page=${page}&limit=6${moodQuery}`);
 
       const nextPosts = Array.isArray(res.data)
         ? res.data

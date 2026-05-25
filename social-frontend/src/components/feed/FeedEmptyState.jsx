@@ -1,37 +1,36 @@
 import React from "react";
 
 function FeedEmptyState({ activeFlowTab, onExploreForYou }) {
+  const isTunedIn = activeFlowTab === "Tuned In";
+  const isCloseCircle = activeFlowTab === "Close Circle";
+
   return (
-    <div className="text-center py-20 text-gray-400">
-      <div className="w-20 h-20 rounded-full bg-white/[0.05] border border-white/10 flex items-center justify-center text-3xl mx-auto mb-5">
-        {activeFlowTab === "Tuned In" ? "〰️" : activeFlowTab === "Close Circle" ? "🫶" : "✨"}
+    <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-zinc-950/85 px-5 py-14 text-center text-gray-400 shadow-xl shadow-black/25 sm:px-8 sm:py-16">
+      <div className="pointer-events-none absolute -left-24 -top-24 h-56 w-56 rounded-full bg-pink-500/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-24 -bottom-24 h-56 w-56 rounded-full bg-cyan-500/10 blur-3xl" />
+      <div className="relative">
+        <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.05] text-3xl shadow-lg shadow-black/20">
+          {isTunedIn ? "〰️" : isCloseCircle ? "🫶" : "✨"}
+        </div>
+
+        <h2 className="mb-2 text-2xl font-black text-white">
+          {isTunedIn ? "No tuned-in vybes yet" : isCloseCircle ? "Your Close Circle is quiet" : "No vybes found"}
+        </h2>
+
+        <p className="mx-auto max-w-sm text-sm leading-relaxed text-gray-500 sm:text-base">
+          {isTunedIn
+            ? "Follow more people to build a flow that actually feels like you."
+            : isCloseCircle
+            ? "Close Circle will be perfect for real moments from trusted people."
+            : "Try another mood or drop your first vybe to shape the flow."}
+        </p>
+
+        {activeFlowTab !== "For You" && (
+          <button type="button" onClick={onExploreForYou} className="mt-6 rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-3 text-sm font-black text-white transition-all hover:bg-white/[0.1] active:scale-95">
+            Explore For You
+          </button>
+        )}
       </div>
-
-      <h2 className="text-2xl font-black mb-2">
-        {activeFlowTab === "Tuned In"
-          ? "No tuned-in vybes yet"
-          : activeFlowTab === "Close Circle"
-          ? "Your Close Circle is quiet"
-          : "No Vybes Found"}
-      </h2>
-
-      <p className="text-gray-500 max-w-sm mx-auto leading-relaxed">
-        {activeFlowTab === "Tuned In"
-          ? "Follow more people to build a Flow that feels like you."
-          : activeFlowTab === "Close Circle"
-          ? "Add people to Close Circle later and their real moments will show here."
-          : "Try another mood or drop your first vybe to shape your Flow."}
-      </p>
-
-      {activeFlowTab !== "For You" && (
-        <button
-          type="button"
-          onClick={onExploreForYou}
-          className="mt-6 px-5 py-3 rounded-2xl bg-white/[0.06] border border-white/10 text-sm font-black text-white hover:bg-white/[0.1] transition-all"
-        >
-          Explore For You
-        </button>
-      )}
     </div>
   );
 }

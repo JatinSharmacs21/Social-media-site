@@ -167,6 +167,7 @@ function Feed() {
   const moodPickerRef = useRef(null);
   const captionRef = useRef(null);
   const loadMoreRef = useRef(null);
+  const postingRef = useRef(false);
 
   const authConfig = {
     headers: {
@@ -366,9 +367,12 @@ useEffect(() => {
 
 
   const createPost = async () => {
+    if (postingRef.current || loading) return;
+
     try {
       if (!caption.trim() && mediaItems.length === 0) return;
 
+      postingRef.current = true;
       setLoading(true);
       setUploadError("");
 
@@ -413,7 +417,10 @@ useEffect(() => {
         authConfig
       );
 
-      setPosts((prevPosts) => [newPost.data, ...prevPosts]);
+      setPosts((prevPosts) => {
+        const exists = prevPosts.some((post) => post._id === newPost.data?._id);
+        return exists ? prevPosts : [newPost.data, ...prevPosts];
+      });
       setCaption("");
 
       mediaItems.forEach((item) => revokeMediaItemUrls(item));
@@ -436,6 +443,7 @@ useEffect(() => {
       logger.error(error.response?.data || error);
       setUploadError(error.response?.data?.message || "Could not upload your vybe. Please try again.");
     } finally {
+      postingRef.current = false;
       setLoading(false);
       setMediaUploadStage("");
     }
@@ -510,7 +518,7 @@ useEffect(() => {
   const observer = new IntersectionObserver(
     ([entry]) => {
       if (entry.isIntersecting) {
-        fetchPosts(feedPage + 1);
+        fetchPosts(feedPage + 1, activeMood);
       }
     },
     { root: null, rootMargin: "260px", threshold: 0.1 }
@@ -519,9 +527,11 @@ useEffect(() => {
   observer.observe(loadMoreRef.current);
 
   return () => observer.disconnect();
-}, [hasMoreFeed, initialLoading, loadingMoreFeed, feedPage, fetchPosts]);
+}, [hasMoreFeed, initialLoading, loadingMoreFeed, feedPage, fetchPosts, activeMood]);
 
-
+useEffect(() => {
+  fetchPosts(1, activeMood);
+}, [activeMood, fetchPosts]);
 
   const trendingTags = useMemo(
   () =>
@@ -713,6 +723,14 @@ useEffect(() => {
         addComment={addComment}
         commentText={commentText}
         setCommentText={setCommentText}
+        replyingTo={replyingTo}
+        setReplyingTo={setReplyingTo}
+        replyText={replyText}
+        setReplyText={setReplyText}
+        addReply={addReply}
+        deleteReply={deleteReply}
+        handleCommentLikeWithAnimation={handleCommentLikeWithAnimation}
+        heartCommentId={heartCommentId}
       />
 
       <ConfirmDeleteModal

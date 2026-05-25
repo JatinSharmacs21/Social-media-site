@@ -81,9 +81,16 @@ const getPosts = async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 6, 1), 20);
     const skip = (page - 1) * limit;
 
+    const allowedMoods = ["All", "Deep", "Funny", "Chaos", "Late Night", "Creative", "College"];
+    const requestedMood = typeof req.query.mood === "string" ? req.query.mood.trim() : "All";
+
     const filter = {
       postType: { $in: ["normal", null] },
     };
+
+    if (requestedMood && requestedMood !== "All" && allowedMoods.includes(requestedMood)) {
+      filter.mood = requestedMood;
+    }
 
     const [posts, total] = await Promise.all([
       Post.find(filter)

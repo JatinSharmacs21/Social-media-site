@@ -58,7 +58,7 @@ function FeedComposer({
     <form
             onSubmit={(e) => {
               e.preventDefault();
-              createPost();
+              if (!loading) createPost();
             }}
             className={`relative overflow-visible bg-zinc-950/90 border border-white/10 rounded-[22px] sm:rounded-[28px] p-2.5 sm:p-4 mb-3.5 sm:mb-6 shadow-xl shadow-black/30 w-full transition-all duration-300 ${
               selectedMood !== "All" ? "shadow-pink-500/10" : ""
@@ -143,7 +143,7 @@ function FeedComposer({
       onKeyDown={(e) => {
         if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault();
-          createPost();
+          if (!loading) createPost();
         }
       }}
       placeholder={

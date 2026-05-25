@@ -1,4 +1,4 @@
-export const moodChips = ["All", "Chill", "Happy", "Sad", "Excited", "Angry", "Loved"];
+export const moodChips = ["All", "Deep", "Funny", "Chaos", "Late Night", "Creative", "College"];
 
 export const flowTabs = ["For You", "Tuned In", "Close Circle"];
 
@@ -25,40 +25,40 @@ export const moodMeta = {
     placeholder: "Drop a real thought...",
     keywords: [],
   },
-  Chill: {
-    icon: "😌",
-    style: "from-cyan-500/25 to-blue-500/20",
-    placeholder: "Drop a calm vybe...",
-    keywords: ["chill", "calm", "peace", "relax"],
+  Deep: {
+    icon: "🌙",
+    style: "from-indigo-500/30 to-purple-500/20",
+    placeholder: "Drop something deep...",
+    keywords: ["deep", "thought", "life", "real", "night", "feel"],
   },
-  Happy: {
-    icon: "😊",
-    style: "from-yellow-500/25 to-pink-500/20",
-    placeholder: "Share what made you smile...",
-    keywords: ["happy", "smile", "joy", "good"],
+  Funny: {
+    icon: "😂",
+    style: "from-yellow-500/25 to-orange-500/20",
+    placeholder: "Drop the funny moment...",
+    keywords: ["funny", "laugh", "lol", "meme", "joke", "crazy"],
   },
-  Sad: {
-    icon: "😔",
-    style: "from-blue-500/25 to-purple-500/20",
-    placeholder: "Say what feels heavy...",
-    keywords: ["sad", "low", "hurt", "miss"],
+  Chaos: {
+    icon: "🔥",
+    style: "from-red-500/25 to-pink-500/20",
+    placeholder: "Drop the chaos...",
+    keywords: ["chaos", "wild", "random", "mess", "crazy", "drama"],
   },
-  Excited: {
-    icon: "⚡",
-    style: "from-pink-500/25 to-orange-500/20",
-    placeholder: "Drop the hype...",
-    keywords: ["excited", "hype", "energy", "crazy"],
+  "Late Night": {
+    icon: "🖤",
+    style: "from-zinc-500/30 to-blue-500/20",
+    placeholder: "Late night thoughts?",
+    keywords: ["late", "night", "sleep", "alone", "miss", "overthink"],
   },
-  Angry: {
-    icon: "😤",
-    style: "from-red-500/25 to-orange-500/20",
-    placeholder: "Vent it out...",
-    keywords: ["angry", "mad", "annoyed", "rage"],
+  Creative: {
+    icon: "🎨",
+    style: "from-cyan-500/25 to-pink-500/20",
+    placeholder: "Drop your creative vybe...",
+    keywords: ["creative", "art", "design", "music", "edit", "idea"],
   },
-  Loved: {
-    icon: "💜",
-    style: "from-purple-500/25 to-pink-500/20",
-    placeholder: "Share the love...",
-    keywords: ["love", "loved", "heart", "miss you"],
+  College: {
+    icon: "🎓",
+    style: "from-emerald-500/25 to-cyan-500/20",
+    placeholder: "Drop the college scene...",
+    keywords: ["college", "class", "exam", "hostel", "campus", "friends"],
   },
 };
