@@ -27,9 +27,23 @@ function Navbar() {
       }
     };
 
+    const syncNotificationCount = (event) => {
+      if (typeof event.detail?.count === "number") {
+        setUnreadCount(Math.max(event.detail.count, 0));
+        return;
+      }
+
+      fetchUnreadCount();
+    };
+
     fetchUnreadCount();
+    window.addEventListener("vybeo:notifications-count", syncNotificationCount);
+
     const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("vybeo:notifications-count", syncNotificationCount);
+    };
   }, [token, location.pathname]);
 
   useEffect(() => {
@@ -69,6 +83,7 @@ function Navbar() {
     localStorage.removeItem("userId");
     localStorage.removeItem("user");
     localStorage.removeItem("username");
+    localStorage.removeItem("userName");
     navigate("/");
   };
 
@@ -85,9 +100,6 @@ function Navbar() {
     setMobileVybeOpen(false);
     setSpaceControlOpen(false);
 
-    if (path === "/notifications") {
-      setUnreadCount(0);
-    }
   };
 
   const navItems = [
