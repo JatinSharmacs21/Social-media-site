@@ -7,6 +7,35 @@ const getUserId = (req) => req.user?._id || req.user?.id;
 
 const cleanTextInput = (value = "") => value.trim();
 
+const getPostKind = (post) => {
+  const media = Array.isArray(post?.media) ? post.media : [];
+  if (media.some((item) => item?.type === "video")) return "clip";
+  if (media.some((item) => item?.type === "image")) return "moment";
+  return "thought";
+};
+
+const buildNotificationMessage = (senderName, action, post) => {
+  const kind = getPostKind(post);
+
+  if (action === "felt") return `${senderName} felt your ${kind}`;
+  if (action === "comment") return `${senderName} commented on your ${kind}`;
+  if (action === "reply") return `${senderName} replied to your comment`;
+
+  return `${senderName} sent you a signal`;
+};
+
+const buildNotificationPostPayload = (post) => {
+  if (!post?._id) return null;
+
+  return {
+    _id: post._id,
+    caption: post.caption || "",
+    media: post.media || [],
+    postType: post.postType || "normal",
+    mood: post.mood || "All",
+  };
+};
+
 const emitRealtimeNotification = async (req, recipientId, data) => {
   try {
     const io = req.app.get("io");
@@ -113,6 +142,20 @@ const getPosts = async (req, res) => {
       total,
       hasMore: skip + posts.length < total,
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getPostById = async (req, res) => {
+  try {
+    const post = await getPopulatedPost(req.params.postId);
+
+    if (!post || (post.postType && post.postType !== "normal")) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    res.json(post);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -519,12 +562,13 @@ const toggleLikePost = async (req, res) => {
       post.likes.push(userId);
 
       if (post.user.toString() !== userId.toString()) {
+        const message = buildNotificationMessage(req.user.name || req.user.username || "Someone", "felt", post);
         const notification = await Notification.create({
           recipient: post.user,
           sender: userId,
           type: "like",
           post: post._id,
-          message: "liked your post",
+          message,
         });
 
         await emitRealtimeNotification(req, post.user, {
@@ -537,8 +581,8 @@ const toggleLikePost = async (req, res) => {
             profilePic: req.user.profilePic,
           },
           type: "like",
-          post: post._id,
-          message: `${req.user.name || "Someone"} liked your post`,
+          post: buildNotificationPostPayload(post),
+          message,
           createdAt: notification.createdAt,
           isRead: false,
         });
@@ -649,12 +693,13 @@ const addComment = async (req, res) => {
     await post.save();
 
     if (post.user.toString() !== userId.toString()) {
+      const message = buildNotificationMessage(req.user.name || req.user.username || "Someone", "comment", post);
       const notification = await Notification.create({
         recipient: post.user,
         sender: userId,
         type: "comment",
         post: post._id,
-        message: "commented on your post",
+        message,
       });
 
       await emitRealtimeNotification(req, post.user, {
@@ -667,8 +712,8 @@ const addComment = async (req, res) => {
           profilePic: req.user.profilePic,
         },
         type: "comment",
-        post: post._id,
-        message: `${req.user.name || "Someone"} commented on your post`,
+        post: buildNotificationPostPayload(post),
+        message,
         createdAt: notification.createdAt,
         isRead: false,
       });
@@ -795,12 +840,13 @@ const addReply = async (req, res) => {
     await post.save();
 
     if (comment.user.toString() !== userId.toString()) {
+      const message = buildNotificationMessage(req.user.name || req.user.username || "Someone", "reply", post);
       const notification = await Notification.create({
         recipient: comment.user,
         sender: userId,
         type: "reply",
         post: post._id,
-        message: "replied to your comment",
+        message,
       });
 
       await emitRealtimeNotification(req, comment.user, {
@@ -813,8 +859,8 @@ const addReply = async (req, res) => {
           profilePic: req.user.profilePic,
         },
         type: "reply",
-        post: post._id,
-        message: `${req.user.name || "Someone"} replied to your comment`,
+        post: buildNotificationPostPayload(post),
+        message,
         createdAt: notification.createdAt,
         isRead: false,
       });
@@ -919,6 +965,7 @@ const getUserPosts = async (req, res) => {
 module.exports = {
   createPost,
   getPosts,
+  getPostById,
   toggleLikePost,
   updatePost,
   deletePost,

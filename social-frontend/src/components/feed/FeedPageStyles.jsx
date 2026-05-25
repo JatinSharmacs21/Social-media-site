@@ -40,6 +40,10 @@ function FeedPageStyles() {
 
         .animate-vybe-sheet { animation: vybeSheetUp 240ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 
+        .vybe-target-post {
+          box-shadow: 0 0 0 1px rgba(236, 72, 153, 0.65), 0 0 38px rgba(236, 72, 153, 0.18);
+        }
+
         @keyframes heartPremium {
           0% { opacity: 0; transform: scale(0.55) rotate(-8deg); }
           35% { opacity: 1; transform: scale(1.12) rotate(5deg); }

@@ -6,6 +6,7 @@ const { protect } = require("../middleware/authMiddleware");
 const {
   createPost,
   getPosts,
+  getPostById,
   toggleLikePost,
   updatePost,
   deletePost,
@@ -60,6 +61,9 @@ router.get("/my-posts", protect, getMyPosts);
 
 // USER POSTS
 router.get("/user/:userId", getUserPosts);
+
+// SINGLE POST
+router.get("/:postId", getPostById);
 
 // LIKE / UNLIKE POST
 router.put("/like/:postId", protect, toggleLikePost);

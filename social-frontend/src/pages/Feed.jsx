@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import API from "../services/api";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   moodChips,
   flowTabs,
@@ -43,6 +43,7 @@ import logger from "../utils/logger";
 
 function Feed() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const token = localStorage.getItem("token");
   const currentUserId = localStorage.getItem("userId");
@@ -258,6 +259,57 @@ useEffect(() => {
     setLikesModalPost,
     setGalleryPost,
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const targetPostId = params.get("post");
+    const openTarget = params.get("open");
+
+    if (!targetPostId) return;
+
+    let cancelled = false;
+
+    const focusTargetPost = async () => {
+      let targetPost = posts.find((post) => post?._id === targetPostId);
+
+      if (!targetPost) {
+        try {
+          const res = await API.get(`/api/posts/${targetPostId}`);
+          if (cancelled || !res.data?._id) return;
+
+          targetPost = res.data;
+          setPosts((prev) => {
+            if (prev.some((post) => post?._id === targetPostId)) return prev;
+            return [res.data, ...prev];
+          });
+        } catch (error) {
+          logger.error("Target post load failed:", error.response?.data || error);
+          showNotice("Post nahi mila ya delete ho chuka hai.");
+          return;
+        }
+      }
+
+      window.setTimeout(() => {
+        const element = document.getElementById(`feed-post-${targetPostId}`);
+        element?.scrollIntoView({ behavior: "smooth", block: "center" });
+        element?.classList.add("vybe-target-post");
+
+        window.setTimeout(() => {
+          element?.classList.remove("vybe-target-post");
+        }, 1800);
+      }, 120);
+
+      if (openTarget === "comments" && targetPost) {
+        setCommentsSheetPost(targetPost);
+      }
+    };
+
+    focusTargetPost();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [location.search, posts, setPosts]);
 
   const openUserProfile = (userId) => {
     if (!userId) return;
@@ -630,8 +682,8 @@ useEffect(() => {
             />
           ) : (
             displayedPosts.map((post) => (
+              <div key={post._id} id={`feed-post-${post._id}`} className="scroll-mt-24 rounded-[30px] transition-all duration-500">
               <PostCard
-                key={post._id}
                 post={post}
                 currentUserId={currentUserId}
                 openComments={openComments}
@@ -674,6 +726,7 @@ useEffect(() => {
                 handleCommentLikeWithAnimation={handleCommentLikeWithAnimation}
                 setSharePost={setSharePost}
               />
+              </div>
             ))
           )}
 

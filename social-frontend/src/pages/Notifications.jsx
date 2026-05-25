@@ -165,6 +165,13 @@ function Notifications() {
     }
   };
 
+  const getPostKind = (post) => {
+    const media = Array.isArray(post?.media) ? post.media : [];
+    if (media.some((item) => item?.type === "video")) return "clip";
+    if (media.some((item) => item?.type === "image")) return "moment";
+    return "thought";
+  };
+
   const openNotification = async (notification) => {
     if (!notification) return;
 
@@ -178,7 +185,8 @@ function Notifications() {
     }
 
     if (notification?.post?._id) {
-      navigate(`/feed?post=${notification.post._id}`);
+      const open = notification.type === "comment" || notification.type === "reply" ? "comments" : "post";
+      navigate(`/feed?post=${notification.post._id}&open=${open}`);
       return;
     }
 
@@ -197,9 +205,9 @@ function Notifications() {
 
   const getSignalLabel = (type) => {
     if (type === "like") return "Felt";
-    if (type === "comment") return "Comment";
+    if (type === "comment") return "Commented";
     if (type === "follow") return "Circle";
-    if (type === "reply") return "Reply";
+    if (type === "reply") return "Replied";
     return "Signal";
   };
 
@@ -213,14 +221,15 @@ function Notifications() {
 
   const getMessage = (notification) => {
     const senderName = notification.sender?.name || notification.sender?.username || "Someone";
+    const postKind = getPostKind(notification.post);
+    const storedMessage = notification.message || "";
 
-    if (notification.message) return notification.message;
-    if (notification.type === "like") return `${senderName} felt your vybe`;
-    if (notification.type === "comment") return `${senderName} replied to your vybe`;
+    if (notification.type === "like") return `${senderName} felt your ${postKind}`;
+    if (notification.type === "comment") return `${senderName} commented on your ${postKind}`;
     if (notification.type === "follow") return `${senderName} tuned into your Vybe Space`;
-    if (notification.type === "reply") return `${senderName} replied in your thread`;
+    if (notification.type === "reply") return `${senderName} replied to your comment`;
 
-    return "A new signal just came in";
+    return storedMessage || "A new signal just came in";
   };
 
   const formatSignalTime = (date) => {
@@ -298,7 +307,7 @@ function Notifications() {
                 </h1>
 
                 <p className="text-gray-400 mt-2 text-sm sm:text-base max-w-xl">
-                  Likes, replies, follows aur Vybe Space activity yahin milegi.
+                  Felt, comments, replies, follows aur Vybe Space activity yahin milegi.
                 </p>
               </div>
 
@@ -401,7 +410,7 @@ function Notifications() {
               </h2>
 
               <p className="text-gray-400 max-w-md mx-auto">
-                Jab koi feel, reply, follow ya interact karega to yahan clean signal card aayega.
+                Jab koi felt, comment, reply, follow ya interact karega to yahan clean signal card aayega.
               </p>
             </div>
           </div>
