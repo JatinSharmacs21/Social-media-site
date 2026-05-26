@@ -758,7 +758,7 @@ function Reels() {
                   onMouseLeave={handleHoldEnd}
                   onTouchStart={() => handleHoldStart(reel)}
                   onTouchEnd={handleHoldEnd}
-                  className="absolute inset-0 z-10 cursor-pointer text-left"
+                  className="absolute inset-0 z-[5] cursor-pointer text-left"
                   aria-label="Tap to mute or unmute. Double tap to feel. Long press to pause or play."
                 />
 
@@ -803,7 +803,7 @@ function Reels() {
                   </div>
                 )}
 
-                <div className="absolute top-0 left-0 right-0 z-20 px-3 sm:px-4 pt-3 sm:pt-5 pb-3 flex items-center justify-between pointer-events-none">
+                <div className="absolute top-0 left-0 right-0 z-40 px-3 sm:px-4 pt-3 sm:pt-5 pb-3 flex items-center justify-between pointer-events-none">
                   <button
                     onClick={() => navigate(-1)}
                     className="pointer-events-auto w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-black/45 border border-white/15 backdrop-blur-md flex items-center justify-center hover:bg-white/10 active:scale-95 transition-all text-lg"
@@ -862,7 +862,7 @@ function Reels() {
                   </div>
                 </div>
 
-                <div className="absolute right-3 sm:right-4 bottom-28 sm:bottom-32 z-20 flex flex-col items-center gap-3">
+                <div className="absolute right-3 sm:right-4 bottom-28 sm:bottom-32 z-40 flex flex-col items-center gap-3">
                   <div className="rounded-[1.6rem] border border-white/10 bg-black/[0.32] p-2 shadow-2xl backdrop-blur-xl">
                     <button
                       onClick={(event) => { event.stopPropagation(); likeReel(reel._id, reel.reelId); }}
@@ -908,7 +908,7 @@ function Reels() {
                   </button>
                 </div>
 
-                <div className="absolute left-0 right-16 sm:right-20 bottom-0 z-20 p-4 pb-6 pointer-events-none">
+                <div className="absolute left-0 right-16 sm:right-20 bottom-0 z-40 p-4 pb-6 pointer-events-none">
                   <div className="pointer-events-auto flex items-center gap-3">
                     <div
                       onClick={() => openUserProfile(reel.user?._id)}
@@ -961,7 +961,7 @@ function Reels() {
                 </div>
 
                 {commentsOpen && (
-                <div className="fixed left-2 right-2 bottom-[76px] z-[90] mx-auto max-w-[430px] overflow-hidden rounded-[1.65rem] border border-pink-300/20 bg-[#080812]/95 shadow-[0_-24px_80px_rgba(0,0,0,0.78)] backdrop-blur-2xl">
+                <div onClick={(event) => event.stopPropagation()} className="absolute left-2 right-2 bottom-2 z-[90] overflow-hidden rounded-[1.65rem] border border-pink-300/20 bg-[#080812]/95 shadow-[0_-24px_80px_rgba(0,0,0,0.78)] backdrop-blur-2xl">
                   <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-pink-400/70 to-transparent" />
                   <div className="max-h-[58svh] overflow-y-auto p-3.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20" />
