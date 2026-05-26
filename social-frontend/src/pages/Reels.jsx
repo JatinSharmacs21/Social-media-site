@@ -71,6 +71,42 @@ function Reels() {
     profilePic: currentUser.profilePic || "",
   };
 
+  const buildFollowingMap = (following = []) =>
+    (Array.isArray(following) ? following : []).reduce((map, follow) => {
+      const id = typeof follow === "string" ? follow : follow?._id;
+      if (id) map[id] = true;
+      return map;
+    }, {});
+
+  useEffect(() => {
+    if (!token) return;
+
+    const syncMyFollowing = async () => {
+      try {
+        const res = await API.get("/api/users/me", authConfig);
+        const freshUser = res.data || {};
+        const freshFollowing = buildFollowingMap(freshUser.following || []);
+
+        setFollowingUsers(freshFollowing);
+
+        try {
+          const cachedUser = JSON.parse(localStorage.getItem("user") || "null") || {};
+          localStorage.setItem(
+            "user",
+            JSON.stringify({ ...cachedUser, ...freshUser })
+          );
+        } catch {
+          // Local cache sync is best-effort only.
+        }
+      } catch (error) {
+        logger.error(error.response?.data || error);
+      }
+    };
+
+    syncMyFollowing();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
   const getMediaUrl = (item) => {
     let rawUrl = "";
 
@@ -335,7 +371,16 @@ function Reels() {
 
   const isClipOwner = (clip) => clip?.user?._id === currentUserId;
 
-  const isTunedIntoUser = (userId) => Boolean(userId && followingUsers[userId]);
+  const isTunedIntoUser = (userId, user = null) => {
+    if (!userId) return false;
+    if (followingUsers[userId]) return true;
+
+    const followers = Array.isArray(user?.followers) ? user.followers : [];
+    return followers.some((follower) => {
+      const id = typeof follower === "string" ? follower : follower?._id;
+      return id === currentUserId;
+    });
+  };
 
   const toggleTuneIn = async (userId) => {
     if (!userId || userId === currentUserId || tuningUsers[userId]) return;
@@ -350,6 +395,37 @@ function Reels() {
       const nextFollowing = res.data?.following ?? !wasFollowing;
 
       setFollowingUsers((prev) => ({ ...prev, [userId]: nextFollowing }));
+      setClips((prev) =>
+        prev.map((clip) => {
+          if (clip.user?._id !== userId) return clip;
+
+          const followers = Array.isArray(clip.user.followers)
+            ? clip.user.followers
+            : [];
+          const alreadyInFollowers = followers.some((follower) => {
+            const id = typeof follower === "string" ? follower : follower?._id;
+            return id === currentUserId;
+          });
+
+          let nextFollowers = followers;
+          if (nextFollowing && !alreadyInFollowers) {
+            nextFollowers = [...followers, currentUserLite];
+          } else if (!nextFollowing) {
+            nextFollowers = followers.filter((follower) => {
+              const id = typeof follower === "string" ? follower : follower?._id;
+              return id !== currentUserId;
+            });
+          }
+
+          return {
+            ...clip,
+            user: {
+              ...clip.user,
+              followers: nextFollowers,
+            },
+          };
+        })
+      );
 
       try {
         const storedUser = JSON.parse(localStorage.getItem("user") || "null");
@@ -750,15 +826,22 @@ function Reels() {
               className="reel-snap-card relative h-full w-full max-w-full snap-start flex items-center justify-center bg-black overflow-hidden"
             >
               <div className="relative h-full w-full max-w-full sm:h-[94svh] sm:max-w-[430px] md:max-w-[460px] sm:rounded-[2rem] overflow-hidden bg-zinc-950 shadow-2xl shadow-black/60 border-x border-white/10">
-                <button
-                  type="button"
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleVideoTap(reel)}
                   onMouseDown={() => handleHoldStart(reel)}
                   onMouseUp={handleHoldEnd}
                   onMouseLeave={handleHoldEnd}
                   onTouchStart={() => handleHoldStart(reel)}
                   onTouchEnd={handleHoldEnd}
-                  className="absolute inset-0 z-[5] cursor-pointer text-left"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleVideoTap(reel);
+                    }
+                  }}
+                  className="absolute inset-0 z-[5] cursor-pointer"
                   aria-label="Tap to mute or unmute. Double tap to feel. Long press to pause or play."
                 />
 
@@ -803,7 +886,7 @@ function Reels() {
                   </div>
                 )}
 
-                <div className="absolute top-0 left-0 right-0 z-40 px-3 sm:px-4 pt-3 sm:pt-5 pb-3 flex items-center justify-between pointer-events-none">
+                <div className="absolute top-0 left-0 right-0 z-20 px-3 sm:px-4 pt-3 sm:pt-5 pb-3 flex items-center justify-between pointer-events-none">
                   <button
                     onClick={() => navigate(-1)}
                     className="pointer-events-auto w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-black/45 border border-white/15 backdrop-blur-md flex items-center justify-center hover:bg-white/10 active:scale-95 transition-all text-lg"
@@ -862,7 +945,7 @@ function Reels() {
                   </div>
                 </div>
 
-                <div className="absolute right-3 sm:right-4 bottom-28 sm:bottom-32 z-40 flex flex-col items-center gap-3">
+                <div className={`absolute right-3 sm:right-4 bottom-28 sm:bottom-32 z-[65] flex flex-col items-center gap-2.5 pointer-events-auto transition-all duration-200 ${commentsOpen ? "translate-x-8 opacity-0 pointer-events-none" : "translate-x-0 opacity-100"}`}>
                   <div className="rounded-[1.6rem] border border-white/10 bg-black/[0.32] p-2 shadow-2xl backdrop-blur-xl">
                     <button
                       onClick={(event) => { event.stopPropagation(); likeReel(reel._id, reel.reelId); }}
@@ -908,7 +991,7 @@ function Reels() {
                   </button>
                 </div>
 
-                <div className="absolute left-0 right-16 sm:right-20 bottom-0 z-40 p-4 pb-6 pointer-events-none">
+                <div className="absolute left-0 right-16 sm:right-20 bottom-0 z-[60] p-4 pb-6 pointer-events-none">
                   <div className="pointer-events-auto flex items-center gap-3">
                     <div
                       onClick={() => openUserProfile(reel.user?._id)}
@@ -939,14 +1022,14 @@ function Reels() {
                         }}
                         disabled={tuningUsers[reel.user?._id]}
                         className={`shrink-0 rounded-full border px-3.5 py-2 text-xs font-black shadow-xl backdrop-blur-md transition-all active:scale-95 disabled:opacity-70 ${
-                          isTunedIntoUser(reel.user?._id)
+                          isTunedIntoUser(reel.user?._id, reel.user)
                             ? "border-cyan-300/30 bg-cyan-400/18 text-cyan-50"
                             : "border-pink-300/30 bg-pink-500/20 text-pink-50 hover:bg-pink-500/30"
                         }`}
                       >
                         {tuningUsers[reel.user?._id]
                           ? "..."
-                          : isTunedIntoUser(reel.user?._id)
+                          : isTunedIntoUser(reel.user?._id, reel.user)
                           ? "Tuned"
                           : "Tune In"}
                       </button>
@@ -961,17 +1044,14 @@ function Reels() {
                 </div>
 
                 {commentsOpen && (
-                <div onClick={(event) => event.stopPropagation()} className="absolute left-2 right-2 bottom-2 z-[90] overflow-hidden rounded-[1.65rem] border border-pink-300/20 bg-[#080812]/95 shadow-[0_-24px_80px_rgba(0,0,0,0.78)] backdrop-blur-2xl">
+                <div className="absolute left-3 right-3 bottom-4 z-[100] overflow-hidden rounded-[1.45rem] border border-white/12 bg-[#090913]/96 shadow-[0_-18px_60px_rgba(0,0,0,0.72)] backdrop-blur-2xl pointer-events-auto">
                   <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-pink-400/70 to-transparent" />
-                  <div className="max-h-[58svh] overflow-y-auto p-3.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20" />
+                  <div className="max-h-[50svh] overflow-y-auto p-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <div className="mx-auto mb-2.5 h-1 w-9 rounded-full bg-white/18" />
 
-                    <div className="mb-3 flex items-center justify-between">
+                    <div className="mb-2.5 flex items-center justify-between">
                       <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-pink-200/80">
-                          Clip discussion
-                        </p>
-                        <h3 className="mt-0.5 text-lg font-black text-white">
+                        <h3 className="text-lg font-black text-white">
                           Replies
                           <span className="ml-2 rounded-full border border-white/10 bg-white/[0.08] px-2 py-0.5 text-xs text-white/75">
                             {formatCount(getCommentCount(reel))}
@@ -980,20 +1060,21 @@ function Reels() {
                       </div>
 
                       <button
-                        onClick={() =>
+                        onClick={(event) => {
+                          event.stopPropagation();
                           setOpenComments((prev) => ({
                             ...prev,
                             [reel._id]: false,
-                          }))
-                        }
-                        className="w-9 h-9 rounded-full border border-white/10 bg-white/[0.08] text-white/70 hover:bg-white/12 hover:text-white active:scale-95 text-lg"
+                          }));
+                        }}
+                        className="w-8 h-8 rounded-full border border-white/10 bg-white/[0.07] text-white/65 hover:bg-white/12 hover:text-white active:scale-95 text-lg"
                         title="Close replies"
                       >
                         ×
                       </button>
                     </div>
 
-                    <div className="sticky top-0 z-10 mb-3 rounded-2xl border border-white/10 bg-black/35 p-2 shadow-xl backdrop-blur-xl">
+                    <div className="sticky top-0 z-10 mb-3 rounded-2xl border border-white/10 bg-black/30 p-1.5 shadow-xl backdrop-blur-xl">
                       <div className="flex gap-2">
                       <input
                         type="text"
@@ -1008,13 +1089,13 @@ function Reels() {
                           if (e.key === "Enter") addComment(reel._id);
                         }}
                         placeholder="Add a reply"
-                        className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.07] px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/35 focus:border-pink-400/50 focus:bg-white/[0.09]"
+                        className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.07] px-3 py-2 text-sm text-white outline-none placeholder:text-white/35 focus:border-pink-400/50 focus:bg-white/[0.09]"
                       />
 
                       <button
-                        onClick={() => addComment(reel._id)}
+                        onClick={(event) => { event.stopPropagation(); addComment(reel._id); }}
                         disabled={savingComment[reel._id]}
-                        className="rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-pink-500/15 transition-all hover:scale-[1.02] disabled:opacity-50"
+                        className="rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 px-3.5 py-2 text-sm font-black text-white shadow-lg shadow-pink-500/15 transition-all hover:scale-[1.02] disabled:opacity-50"
                       >
                         {savingComment[reel._id] ? "..." : "Reply"}
                       </button>
@@ -1186,9 +1267,9 @@ function Reels() {
                         })}
                       </div>
                     ) : (
-                      <div className="rounded-2xl border border-white/[0.08] bg-white/[0.045] px-4 py-7 text-center">
+                      <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-5 text-center">
                         <p className="text-sm font-bold text-white/80">No replies yet</p>
-                        <p className="mt-1 text-xs text-white/40">Be the first to respond to this clip.</p>
+                        <p className="mt-1 text-xs text-white/40">Start the conversation.</p>
                       </div>
                     )}
                   </div>
