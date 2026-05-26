@@ -31,19 +31,6 @@ function Reels() {
   const [progressByReel, setProgressByReel] = useState({});
   const [pausedReels, setPausedReels] = useState({});
   const [expandedReplies, setExpandedReplies] = useState({});
-  const [followingUsers, setFollowingUsers] = useState(() => {
-    try {
-      const user = JSON.parse(localStorage.getItem("user") || "null") || {};
-      return (user.following || []).reduce((map, follow) => {
-        const id = typeof follow === "string" ? follow : follow?._id;
-        if (id) map[id] = true;
-        return map;
-      }, {});
-    } catch {
-      return {};
-    }
-  });
-  const [tuningUsers, setTuningUsers] = useState({});
 
   const videoRefs = useRef({});
   const tapTimerRef = useRef(null);
@@ -335,55 +322,6 @@ function Reels() {
 
   const isClipOwner = (clip) => clip?.user?._id === currentUserId;
 
-  const isTunedIntoUser = (userId) => Boolean(userId && followingUsers[userId]);
-
-  const toggleTuneIn = async (userId) => {
-    if (!userId || userId === currentUserId || tuningUsers[userId]) return;
-
-    const wasFollowing = isTunedIntoUser(userId);
-
-    setTuningUsers((prev) => ({ ...prev, [userId]: true }));
-    setFollowingUsers((prev) => ({ ...prev, [userId]: !wasFollowing }));
-
-    try {
-      const res = await API.put(`/api/users/follow/${userId}`, {}, authConfig);
-      const nextFollowing = res.data?.following ?? !wasFollowing;
-
-      setFollowingUsers((prev) => ({ ...prev, [userId]: nextFollowing }));
-
-      try {
-        const storedUser = JSON.parse(localStorage.getItem("user") || "null");
-        if (storedUser) {
-          const currentFollowing = Array.isArray(storedUser.following)
-            ? storedUser.following
-            : [];
-          const exists = currentFollowing.some((follow) => {
-            const id = typeof follow === "string" ? follow : follow?._id;
-            return id === userId;
-          });
-
-          if (nextFollowing && !exists) {
-            storedUser.following = [...currentFollowing, userId];
-          } else if (!nextFollowing) {
-            storedUser.following = currentFollowing.filter((follow) => {
-              const id = typeof follow === "string" ? follow : follow?._id;
-              return id !== userId;
-            });
-          }
-
-          localStorage.setItem("user", JSON.stringify(storedUser));
-        }
-      } catch {
-        // Local user cache update is best-effort only.
-      }
-    } catch (error) {
-      setFollowingUsers((prev) => ({ ...prev, [userId]: wasFollowing }));
-      logger.error(error.response?.data || error);
-    } finally {
-      setTuningUsers((prev) => ({ ...prev, [userId]: false }));
-    }
-  };
-
   const startEditClip = (clip) => {
     setEditingClip(clip);
     setEditCaption(clip.caption || clip.content || "");
@@ -599,6 +537,11 @@ function Reels() {
     navigate(userId === currentUserId ? "/profile" : `/profile/${userId}`);
   };
 
+  const openTunedIn = (postId) => {
+    if (!postId) return;
+    navigate(`/feed?post=${postId}&openComments=1`);
+  };
+
   const getShareUrl = (postId) => `${window.location.origin}/post/${postId}`;
 
   const copyShareLink = async () => {
@@ -707,6 +650,22 @@ function Reels() {
           <path d="M18.5 5.5a9 9 0 0 1 0 13" />
         </>
       )}
+    </svg>
+  );
+
+  const TunedIcon = () => (
+    <svg
+      viewBox="0 0 24 24"
+      className="w-5 h-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 13.5 9.5 19 20 6" />
+      <path d="M4 6h7" />
+      <path d="M4 10h4" />
     </svg>
   );
 
@@ -865,7 +824,7 @@ function Reels() {
                 <div className="absolute right-3 sm:right-4 bottom-28 sm:bottom-32 z-20 flex flex-col items-center gap-3">
                   <div className="rounded-[1.6rem] border border-white/10 bg-black/[0.32] p-2 shadow-2xl backdrop-blur-xl">
                     <button
-                      onClick={(event) => { event.stopPropagation(); likeReel(reel._id, reel.reelId); }}
+                      onClick={() => likeReel(reel._id, reel.reelId)}
                       className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center active:scale-90 transition-all ${
                         isLiked
                           ? "bg-pink-500/20 text-pink-300 shadow-[0_0_22px_rgba(236,72,153,0.28)]"
@@ -882,13 +841,12 @@ function Reels() {
 
                   <div className="rounded-[1.6rem] border border-white/10 bg-black/[0.32] p-2 shadow-2xl backdrop-blur-xl">
                     <button
-                      onClick={(event) => {
-                        event.stopPropagation();
+                      onClick={() =>
                         setOpenComments((prev) => ({
                           ...prev,
                           [reel._id]: !prev[reel._id],
-                        }));
-                      }}
+                        }))
+                      }
                       className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/[0.08] text-white flex items-center justify-center hover:bg-indigo-500/18 hover:text-indigo-100 active:scale-90 transition-all"
                       title="Replies"
                     >
@@ -900,7 +858,7 @@ function Reels() {
                   </div>
 
                   <button
-                    onClick={(event) => { event.stopPropagation(); setShareReel(reel); }}
+                    onClick={() => setShareReel(reel)}
                     className="w-12 h-12 rounded-2xl border border-white/10 bg-black/[0.32] text-white shadow-2xl backdrop-blur-xl flex items-center justify-center hover:bg-white/12 hover:text-cyan-200 active:scale-90 transition-all"
                     title="Share"
                   >
@@ -908,70 +866,65 @@ function Reels() {
                   </button>
                 </div>
 
-                <div className="absolute left-0 right-16 sm:right-20 bottom-0 z-20 p-4 pb-6 pointer-events-none">
-                  <div className="pointer-events-auto flex items-center gap-3">
-                    <div
-                      onClick={() => openUserProfile(reel.user?._id)}
-                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-3"
-                    >
-                      <img
-                        src={avatarFor(reel.user)}
-                        alt=""
-                        className="h-11 w-11 rounded-full object-cover border border-white/25 shadow-lg"
-                      />
+                <div className="absolute left-0 right-16 sm:right-20 bottom-0 z-20 p-3 sm:p-4 pb-6 pointer-events-none">
+                  <div className="pointer-events-auto rounded-[1.7rem] border border-white/10 bg-black/30 p-3 shadow-2xl backdrop-blur-xl">
+                    <div className="flex items-center gap-3">
+                      <div
+                        onClick={() => openUserProfile(reel.user?._id)}
+                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3"
+                      >
+                        <img
+                          src={avatarFor(reel.user)}
+                          alt=""
+                          className="h-10 w-10 rounded-2xl object-cover border border-white/20"
+                        />
 
-                      <div className="min-w-0">
-                        <p className="truncate text-lg font-black leading-tight text-white drop-shadow">
-                          {reel.user?.name || "Unknown User"}
-                        </p>
-                        <p className="truncate text-sm font-semibold text-white/70 drop-shadow">
-                          {reel.user?.username ? `@${reel.user.username}` : "Creator"}
-                        </p>
+                        <div className="min-w-0">
+                          <p className="truncate font-black leading-tight text-white">
+                            {reel.user?.name || "Unknown User"}
+                          </p>
+                          <p className="truncate text-xs text-white/60">
+                            {reel.user?.username ? `@${reel.user.username}` : "Creator"}
+                          </p>
+                        </div>
                       </div>
+
+                      {!isClipOwner(reel) && reel.user?._id && (
+                        <button
+                          type="button"
+                          onClick={() => openUserProfile(reel.user?._id)}
+                          className="shrink-0 rounded-full border border-pink-300/25 bg-gradient-to-r from-pink-500/25 to-purple-500/25 px-3 py-2 text-xs font-black text-pink-50 shadow-[0_0_22px_rgba(236,72,153,0.18)] hover:from-pink-500/35 hover:to-purple-500/35 active:scale-95"
+                        >
+                          Tune In
+                        </button>
+                      )}
                     </div>
 
-                    {!isClipOwner(reel) && reel.user?._id && (
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          toggleTuneIn(reel.user?._id);
-                        }}
-                        disabled={tuningUsers[reel.user?._id]}
-                        className={`shrink-0 rounded-full border px-3.5 py-2 text-xs font-black shadow-xl backdrop-blur-md transition-all active:scale-95 disabled:opacity-70 ${
-                          isTunedIntoUser(reel.user?._id)
-                            ? "border-cyan-300/30 bg-cyan-400/18 text-cyan-50"
-                            : "border-pink-300/30 bg-pink-500/20 text-pink-50 hover:bg-pink-500/30"
-                        }`}
-                      >
-                        {tuningUsers[reel.user?._id]
-                          ? "..."
-                          : isTunedIntoUser(reel.user?._id)
-                          ? "Tuned"
-                          : "Tune In"}
-                      </button>
+                    {(reel.caption || reel.content) && (
+                      <p className="mt-3 text-sm sm:text-[15px] text-white/90 leading-5 sm:leading-6 line-clamp-3">
+                        {reel.caption || reel.content}
+                      </p>
                     )}
                   </div>
-
-                  {(reel.caption || reel.content) && (
-                    <p className="mt-3 max-w-[92%] text-base text-white leading-6 drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)] line-clamp-3">
-                      {reel.caption || reel.content}
-                    </p>
-                  )}
                 </div>
 
-                {commentsOpen && (
-                <div className="fixed left-2 right-2 bottom-[76px] z-[90] mx-auto max-w-[430px] overflow-hidden rounded-[1.65rem] border border-pink-300/20 bg-[#080812]/95 shadow-[0_-24px_80px_rgba(0,0,0,0.78)] backdrop-blur-2xl">
+                <div
+                  className={`absolute left-2 right-2 bottom-2 z-40 overflow-hidden rounded-[2rem] border border-pink-300/12 bg-[#080812]/92 shadow-[0_-24px_80px_rgba(0,0,0,0.72)] backdrop-blur-2xl transition-all duration-300 ${
+                    commentsOpen
+                      ? "translate-y-0 opacity-100"
+                      : "translate-y-[110%] opacity-0 pointer-events-none"
+                  }`}
+                >
                   <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-pink-400/70 to-transparent" />
-                  <div className="max-h-[58svh] overflow-y-auto p-3.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <div className="max-h-[76svh] overflow-y-auto p-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20" />
 
-                    <div className="mb-3 flex items-center justify-between">
+                    <div className="mb-4 flex items-center justify-between">
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.22em] text-pink-200/80">
                           Clip discussion
                         </p>
-                        <h3 className="mt-0.5 text-lg font-black text-white">
+                        <h3 className="mt-1 text-xl font-black text-white">
                           Replies
                           <span className="ml-2 rounded-full border border-white/10 bg-white/[0.08] px-2 py-0.5 text-xs text-white/75">
                             {formatCount(getCommentCount(reel))}
@@ -986,14 +939,14 @@ function Reels() {
                             [reel._id]: false,
                           }))
                         }
-                        className="w-9 h-9 rounded-full border border-white/10 bg-white/[0.08] text-white/70 hover:bg-white/12 hover:text-white active:scale-95 text-lg"
+                        className="w-10 h-10 rounded-full border border-white/10 bg-white/[0.08] text-white/70 hover:bg-white/12 hover:text-white active:scale-95 text-xl"
                         title="Close replies"
                       >
                         ×
                       </button>
                     </div>
 
-                    <div className="sticky top-0 z-10 mb-3 rounded-2xl border border-white/10 bg-black/35 p-2 shadow-xl backdrop-blur-xl">
+                    <div className="sticky top-0 z-10 mb-4 rounded-3xl border border-white/10 bg-black/30 p-2 shadow-xl backdrop-blur-xl">
                       <div className="flex gap-2">
                       <input
                         type="text"
@@ -1008,13 +961,13 @@ function Reels() {
                           if (e.key === "Enter") addComment(reel._id);
                         }}
                         placeholder="Add a reply"
-                        className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.07] px-3.5 py-2.5 text-sm text-white outline-none placeholder:text-white/35 focus:border-pink-400/50 focus:bg-white/[0.09]"
+                        className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.07] px-4 py-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-pink-400/50 focus:bg-white/[0.09]"
                       />
 
                       <button
                         onClick={() => addComment(reel._id)}
                         disabled={savingComment[reel._id]}
-                        className="rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-pink-500/15 transition-all hover:scale-[1.02] disabled:opacity-50"
+                        className="rounded-2xl bg-gradient-to-r from-pink-500 to-purple-500 px-4 py-3 text-sm font-black text-white shadow-lg shadow-pink-500/15 transition-all hover:scale-[1.02] disabled:opacity-50"
                       >
                         {savingComment[reel._id] ? "..." : "Reply"}
                       </button>
@@ -1031,7 +984,7 @@ function Reels() {
                           return (
                             <div
                               key={comment._id}
-                              className="rounded-2xl border border-white/[0.08] bg-white/[0.055] p-3 shadow-[0_14px_40px_rgba(0,0,0,0.22)]"
+                              className="rounded-3xl border border-white/[0.08] bg-white/[0.055] p-3.5 shadow-[0_14px_40px_rgba(0,0,0,0.22)]"
                             >
                               <div className="flex items-start gap-3">
                                 <img
@@ -1186,14 +1139,13 @@ function Reels() {
                         })}
                       </div>
                     ) : (
-                      <div className="rounded-2xl border border-white/[0.08] bg-white/[0.045] px-4 py-7 text-center">
+                      <div className="rounded-3xl border border-white/[0.08] bg-white/[0.045] px-4 py-10 text-center">
                         <p className="text-sm font-bold text-white/80">No replies yet</p>
                         <p className="mt-1 text-xs text-white/40">Be the first to respond to this clip.</p>
                       </div>
                     )}
                   </div>
                 </div>
-                )}
               </div>
             </section>
           );
