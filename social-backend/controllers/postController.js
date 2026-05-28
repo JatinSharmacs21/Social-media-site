@@ -147,6 +147,50 @@ const getPosts = async (req, res) => {
   }
 };
 
+
+const searchPosts = async (req, res) => {
+  try {
+    const q = String(req.query.q || "").trim().slice(0, 80);
+    const type = String(req.query.type || "all").trim().toLowerCase();
+    const mood = String(req.query.mood || "All").trim();
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 12, 1), 24);
+
+    const allowedMoods = ["All", "Deep", "Funny", "Chaos", "Late Night", "Creative", "College"];
+
+    const filter = {
+      postType: { $in: ["normal", null] },
+    };
+
+    if (q) {
+      const safeQuery = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      filter.caption = { $regex: safeQuery, $options: "i" };
+    }
+
+    if (mood && mood !== "All" && allowedMoods.includes(mood)) {
+      filter.mood = mood;
+    }
+
+    if (type === "clips") {
+      filter.media = { $elemMatch: { type: "video" } };
+    } else if (type === "moments") {
+      filter.media = { $elemMatch: { type: "image" } };
+    } else if (type === "thoughts") {
+      filter.$or = [{ media: { $exists: false } }, { media: { $size: 0 } }];
+    }
+
+    const posts = await Post.find(filter)
+      .populate("user", "name username profilePic")
+      .populate("likes", "name username profilePic")
+      .populate("comments.user", "name username profilePic")
+      .sort({ createdAt: -1 })
+      .limit(limit);
+
+    res.json({ posts });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 const getPostById = async (req, res) => {
   try {
     const post = await getPopulatedPost(req.params.postId);
@@ -965,6 +1009,7 @@ const getUserPosts = async (req, res) => {
 module.exports = {
   createPost,
   getPosts,
+  searchPosts,
   getPostById,
   toggleLikePost,
   updatePost,

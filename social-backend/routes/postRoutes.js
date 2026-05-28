@@ -6,6 +6,7 @@ const { protect } = require("../middleware/authMiddleware");
 const {
   createPost,
   getPosts,
+  searchPosts,
   getPostById,
   toggleLikePost,
   updatePost,
@@ -61,6 +62,9 @@ router.get("/my-posts", protect, getMyPosts);
 
 // USER POSTS
 router.get("/user/:userId", getUserPosts);
+
+// SEARCH POSTS
+router.get("/search", searchPosts);
 
 // SINGLE POST
 router.get("/:postId", getPostById);
