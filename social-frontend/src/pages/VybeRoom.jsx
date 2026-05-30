@@ -456,10 +456,65 @@ function VybeRoom() {
 
   if (loading && messages.length === 0) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-11 h-11 rounded-full border-4 border-white/20 border-t-pink-500 animate-spin mx-auto mb-4" />
-          <p className="text-sm text-gray-400">Opening room</p>
+      <div className="h-[calc(100svh-148px)] md:h-screen bg-black text-white overflow-hidden">
+        <div className="relative h-full max-w-[940px] mx-auto flex flex-col px-3 sm:px-5 pt-2 md:pt-6 pb-2 md:pb-6">
+          <div className="pointer-events-none absolute -top-20 right-0 h-44 w-44 rounded-full bg-pink-500/10 blur-3xl" />
+          <div className="pointer-events-none absolute bottom-20 left-0 h-44 w-44 rounded-full bg-cyan-400/10 blur-3xl" />
+
+          <div className="shrink-0 mb-2 overflow-hidden rounded-[1.15rem] border border-white/10 bg-zinc-950/75 p-2.5 shadow-xl backdrop-blur-xl">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="h-7 w-40 rounded-xl bg-gradient-to-r from-pink-500/45 via-purple-400/35 to-cyan-400/35 animate-pulse" />
+                <div className="mt-2 h-3 w-56 max-w-[70vw] rounded-full bg-white/10 animate-pulse" />
+              </div>
+              <div className="h-10 w-24 rounded-2xl border border-white/10 bg-white/[0.055] animate-pulse" />
+            </div>
+
+            <div className="mt-3 flex gap-2 overflow-hidden">
+              {[0, 1, 2, 3].map((item) => (
+                <div
+                  key={item}
+                  className={`h-9 shrink-0 rounded-full border border-white/10 animate-pulse ${
+                    item === 0
+                      ? "w-24 bg-gradient-to-r from-pink-500/45 to-cyan-400/35"
+                      : "w-20 bg-white/[0.055]"
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-hidden rounded-[1.4rem] border border-white/10 bg-zinc-950/35 p-3">
+            <div className="space-y-3">
+              {[0, 1, 2].map((item) => (
+                <div
+                  key={item}
+                  className="rounded-[1.25rem] border border-white/10 bg-white/[0.035] p-3 animate-pulse"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-purple-500/25" />
+                    <div className="min-w-0 flex-1">
+                      <div className="h-4 w-36 rounded-full bg-white/15" />
+                      <div className="mt-2 h-3 w-16 rounded-full bg-white/[0.08]" />
+                    </div>
+                  </div>
+                  <div className="mt-4 h-4 w-2/3 rounded-full bg-white/12" />
+                  <div className="mt-4 flex gap-2">
+                    {[0, 1, 2, 3].map((chip) => (
+                      <div key={chip} className="h-8 w-12 rounded-full bg-white/[0.07]" />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-2 shrink-0 rounded-[1.35rem] border border-white/10 bg-zinc-950/80 p-2 shadow-2xl backdrop-blur-xl">
+            <div className="flex items-center gap-2">
+              <div className="h-12 flex-1 rounded-2xl bg-white/[0.07] animate-pulse" />
+              <div className="h-12 w-16 rounded-2xl bg-gradient-to-r from-pink-500/35 to-cyan-400/30 animate-pulse" />
+            </div>
+          </div>
         </div>
       </div>
     );
