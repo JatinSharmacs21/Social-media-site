@@ -4,8 +4,8 @@ import { getOtherParticipant, getUserId, sortConversations } from "../utils/whis
 import logger from "../utils/logger";
 import useWhisperSocket from "./useWhisperSocket";
 
-function notifyWhisperCountChange() {
-  window.dispatchEvent(new CustomEvent("vybeo:whispers-count"));
+function notifyWhisperCountChange(count) {
+  window.dispatchEvent(new CustomEvent("vybeo:whispers-count", { detail: { count } }));
 }
 
 function useWhispers() {
@@ -80,7 +80,7 @@ function useWhispers() {
       setActiveConversation((current) => current || res.data?.[0] || null);
     } catch (err) {
       logger.error(err.response?.data || err);
-      setError("Whispers load nahi ho paaye. Thoda refresh karke try kar.");
+      setError("Whispers could not be loaded. Please refresh and try again.");
     } finally {
       setLoading(false);
     }
@@ -101,7 +101,7 @@ function useWhispers() {
         scrollToBottom();
       } catch (err) {
         logger.error(err.response?.data || err);
-        setError("Messages load nahi ho paaye.");
+        setError("Messages could not be loaded.");
       } finally {
         setMessagesLoading(false);
       }
@@ -172,7 +172,7 @@ function useWhispers() {
         setUsers([]);
       } catch (err) {
         logger.error(err.response?.data || err);
-        setError("Conversation start nahi ho paayi.");
+        setError("Conversation could not be started.");
       }
     },
     [updateConversation]
@@ -207,7 +207,7 @@ function useWhispers() {
       } catch (err) {
         logger.error(err.response?.data || err);
         setText(cleanText);
-        setError("Message send nahi hua. Dobara try kar.");
+        setError("Message could not be sent. Please try again.");
       } finally {
         setSending(false);
       }

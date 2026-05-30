@@ -4,8 +4,8 @@ function WhisperComposer({ text, sending, onChangeText, onSendMessage }) {
   const showCounter = text.length > 900;
 
   return (
-    <form onSubmit={onSendMessage} className="shrink-0 border-t border-white/10 bg-[#050508]/90 p-3 shadow-2xl shadow-black/50 backdrop-blur-2xl md:p-4">
-      <div className="flex items-end gap-2 rounded-[26px] border border-white/10 bg-white/[0.055] p-2 shadow-xl shadow-black/30 transition focus-within:border-pink-400/45 focus-within:bg-white/[0.075]">
+    <form onSubmit={onSendMessage} className="shrink-0 border-t border-white/10 bg-[#030306]/90 p-3 shadow-2xl shadow-black/50 backdrop-blur-2xl md:p-4">
+      <div className="flex items-end gap-2 rounded-[28px] border border-white/10 bg-white/[0.055] p-2 shadow-xl shadow-black/30 transition focus-within:border-pink-400/45 focus-within:bg-white/[0.08]">
         <textarea
           value={text}
           onChange={(e) => onChangeText(e.target.value)}
@@ -26,11 +26,11 @@ function WhisperComposer({ text, sending, onChangeText, onSendMessage }) {
           {sending ? "…" : "➤"}
         </button>
       </div>
-      <div className={`mt-2 flex items-center justify-between px-2 text-[11px] font-medium text-zinc-600 ${showCounter ? "opacity-100" : "opacity-0 sm:opacity-100"}`}>
-        <span className="hidden sm:inline">Enter to send • Shift + Enter for new line</span>
-        <span className="sm:hidden">Shift + Enter for line</span>
-        <span>{text.length}/1200</span>
-      </div>
+      {showCounter && (
+        <div className="mt-2 flex justify-end px-2 text-[11px] font-medium text-zinc-600">
+          <span>{text.length}/1200</span>
+        </div>
+      )}
     </form>
   );
 }

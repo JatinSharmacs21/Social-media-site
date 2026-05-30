@@ -28,16 +28,6 @@ function Navbar() {
       }
     };
 
-    const fetchWhisperUnreadCount = async () => {
-      try {
-        if (!token) return;
-        const res = await API.get("/api/whispers/unread-count");
-        setWhisperUnreadCount(res.data.count || 0);
-      } catch (error) {
-        logger.error(error.response?.data || error);
-      }
-    };
-
     const syncNotificationCount = (event) => {
       if (typeof event.detail?.count === "number") {
         setUnreadCount(Math.max(event.detail.count, 0));
@@ -48,16 +38,42 @@ function Navbar() {
     };
 
     fetchUnreadCount();
-    fetchWhisperUnreadCount();
     window.addEventListener("vybeo:notifications-count", syncNotificationCount);
 
-    const interval = setInterval(() => {
-      fetchUnreadCount();
-      fetchWhisperUnreadCount();
-    }, 30000);
+    const interval = setInterval(fetchUnreadCount, 30000);
     return () => {
       clearInterval(interval);
       window.removeEventListener("vybeo:notifications-count", syncNotificationCount);
+    };
+  }, [token, location.pathname]);
+
+  useEffect(() => {
+    const fetchWhisperUnreadCount = async () => {
+      try {
+        if (!token) return;
+        const res = await API.get("/api/whispers/unread-count");
+        setWhisperUnreadCount(res.data.count || 0);
+      } catch (error) {
+        logger.error(error.response?.data || error);
+      }
+    };
+
+    const syncWhisperUnreadCount = (event) => {
+      if (typeof event.detail?.count === "number") {
+        setWhisperUnreadCount(Math.max(event.detail.count, 0));
+        return;
+      }
+
+      fetchWhisperUnreadCount();
+    };
+
+    fetchWhisperUnreadCount();
+    window.addEventListener("vybeo:whispers-count", syncWhisperUnreadCount);
+
+    const interval = setInterval(fetchWhisperUnreadCount, 30000);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("vybeo:whispers-count", syncWhisperUnreadCount);
     };
   }, [token, location.pathname]);
 
@@ -75,16 +91,6 @@ function Navbar() {
       socket.emit("register-user");
     });
 
-    socket.on("new-whisper", () => {
-      if (location.pathname.startsWith("/whispers")) return;
-      setWhisperUnreadCount((prev) => Number(prev || 0) + 1);
-      setToast({
-        message: "New Whisper received",
-        type: "whisper",
-      });
-      setTimeout(() => setToast(null), 3500);
-    });
-
     socket.on("new-notification", (data) => {
       if (location.pathname === "/notifications") return;
 
@@ -97,9 +103,27 @@ function Navbar() {
       setTimeout(() => setToast(null), 4000);
     });
 
+    socket.on("whisper-inbox-updated", ({ message }) => {
+      const senderId = message?.sender?._id || message?.sender;
+      if (senderId === localStorage.getItem("userId")) return;
+
+      if (location.pathname !== "/whispers") {
+        setWhisperUnreadCount((prev) => Number(prev || 0) + 1);
+        setToast({
+          message: "New private whisper received",
+          type: "whisper",
+        });
+
+        setTimeout(() => setToast(null), 4000);
+        return;
+      }
+
+      window.dispatchEvent(new CustomEvent("vybeo:whispers-count"));
+    });
+
     return () => {
-      socket.off("new-whisper");
       socket.off("new-notification");
+      socket.off("whisper-inbox-updated");
       socket.disconnect();
     };
   }, [token, location.pathname]);
@@ -113,7 +137,7 @@ function Navbar() {
     navigate("/");
   };
 
-  const isActive = (path) => location.pathname === path || (path === "/whispers" && location.pathname.startsWith("/whispers"));
+  const isActive = (path) => location.pathname === path;
 
   const isVybeActive =
     location.pathname === "/vybe-drops" || location.pathname === "/vybe-room";
@@ -190,17 +214,16 @@ function Navbar() {
         </svg>
       ),
     },
-
     {
       label: "Whispers",
-      shortLabel: "Whispers",
+      shortLabel: "Chat",
       path: "/whispers",
       badge: whisperUnreadCount,
       icon: (
         <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4 5.5h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 3v-14a2 2 0 0 1 2-2z" />
-          <path d="M8 10h8" />
-          <path d="M8 14h5" />
+          <path d="M4 6.5A3.5 3.5 0 0 1 7.5 3h9A3.5 3.5 0 0 1 20 6.5v6A3.5 3.5 0 0 1 16.5 16H11l-5 4v-4.2A3.5 3.5 0 0 1 4 12.5v-6z" />
+          <path d="M8 8.5h8" />
+          <path d="M8 12h5" />
         </svg>
       ),
     },
@@ -232,7 +255,7 @@ function Navbar() {
   const mobileNavItems = [
     navItems.find((item) => item.path === "/feed"),
     navItems.find((item) => item.path === "/search"),
-    navItems.find((item) => item.path === "/reels"),
+    navItems.find((item) => item.path === "/whispers"),
     navItems.find((item) => item.path === "/profile"),
   ].filter(Boolean);
 
@@ -268,7 +291,7 @@ function Navbar() {
     if (!item) return null;
 
     const active = isActive(item.path);
-    const showBadge = (item.label === "Signals" || item.label === "Whispers") && Number(item.badge) > 0;
+    const showBadge = Number(item.badge) > 0;
 
     if (mobile) {
       return (
@@ -707,7 +730,8 @@ function Navbar() {
             <Logo />
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-3">
+
             <button
               onClick={() => go("/notifications")}
               className="relative w-11 h-11 rounded-2xl border border-white/10 bg-white/[0.04] flex items-center justify-center hover:bg-white/[0.08] transition-all"
@@ -725,37 +749,19 @@ function Navbar() {
 
             <button
               onClick={() => go("/whispers")}
-              className={`relative w-11 h-11 rounded-2xl border flex items-center justify-center transition-all active:scale-95 ${
-                location.pathname.startsWith("/whispers")
-                  ? "border-pink-300/30 bg-gradient-to-br from-pink-500/25 via-purple-500/20 to-cyan-500/20 text-white shadow-lg shadow-pink-500/15"
-                  : "border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]"
-              }`}
+              className="relative w-11 h-11 rounded-2xl border border-white/10 bg-white/[0.04] flex items-center justify-center hover:bg-white/[0.08] transition-all"
               aria-label="Open Whispers"
-              title="Whispers"
             >
-              <span className="absolute inset-0 rounded-2xl bg-gradient-to-br from-pink-500/10 via-purple-500/5 to-cyan-500/10" />
-              <svg
-                viewBox="0 0 24 24"
-                className="relative w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.25"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M5 6.5h14a2.5 2.5 0 0 1 2.5 2.5v6.5A2.5 2.5 0 0 1 19 18H11l-5.5 3.2V18H5A2.5 2.5 0 0 1 2.5 15.5V9A2.5 2.5 0 0 1 5 6.5z" />
-                <path d="M8 11h8" />
-                <path d="M8 14h5.5" />
-                <path d="M17.5 3.8l.6 1.2 1.2.6-1.2.6-.6 1.2-.6-1.2-1.2-.6 1.2-.6.6-1.2z" />
+              <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 6.5A3.5 3.5 0 0 1 7.5 3h9A3.5 3.5 0 0 1 20 6.5v6A3.5 3.5 0 0 1 16.5 16H11l-5 4v-4.2A3.5 3.5 0 0 1 4 12.5v-6z" />
+                <path d="M8 8.5h8" />
+                <path d="M8 12h5" />
               </svg>
 
               {whisperUnreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-cyan-400 text-black text-[10px] flex items-center justify-center font-black shadow-[0_0_12px_rgba(34,211,238,0.85)]">
-                  {whisperUnreadCount > 9 ? "9+" : whisperUnreadCount}
-                </span>
+                <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.9)]" />
               )}
             </button>
-
 
             <SpaceControlButton compact />
           </div>
