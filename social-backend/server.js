@@ -105,8 +105,49 @@ const removeOnlineSocket = (userId, socketId) => {
   }
 };
 
-// Vybe room users count
-const vybeOnlineUsers = new Set();
+// Vybe room users count: roomId -> Set(userId)
+const vybeRoomUsers = new Map();
+
+const normalizeVybeRoom = (room = "general") =>
+  String(room || "general").trim().toLowerCase().slice(0, 50) || "general";
+
+const addVybeRoomUser = (room, userId) => {
+  const roomId = normalizeVybeRoom(room);
+  const id = userId?.toString();
+  if (!id) return 0;
+
+  if (!vybeRoomUsers.has(roomId)) {
+    vybeRoomUsers.set(roomId, new Set());
+  }
+
+  vybeRoomUsers.get(roomId).add(id);
+  return vybeRoomUsers.get(roomId).size;
+};
+
+const removeVybeRoomUser = (room, userId) => {
+  const roomId = normalizeVybeRoom(room);
+  const id = userId?.toString();
+  if (!id || !vybeRoomUsers.has(roomId)) return 0;
+
+  const users = vybeRoomUsers.get(roomId);
+  users.delete(id);
+
+  if (users.size === 0) {
+    vybeRoomUsers.delete(roomId);
+    return 0;
+  }
+
+  return users.size;
+};
+
+const emitVybeRoomCount = (room) => {
+  const roomId = normalizeVybeRoom(room);
+  const count = vybeRoomUsers.get(roomId)?.size || 0;
+  io.to(`vybe-room-${roomId}`).emit("vybe-online-users", {
+    room: roomId,
+    count,
+  });
+};
 
 app.set("onlineUsers", onlineUsers);
 
@@ -165,42 +206,48 @@ socket.on("drop-pulse", ({ dropId }) => {
 });
 
 socket.on("join-vybe-room", ({ room = "general" }) => {
-  socket.join(`vybe-room-${room}`);
+  const roomId = normalizeVybeRoom(room);
+  socket.join(`vybe-room-${roomId}`);
+  socket.currentVybeRoom = roomId;
 
   if (socket.user?.id) {
-    vybeOnlineUsers.add(socket.user.id.toString());
+    addVybeRoomUser(roomId, socket.user.id);
   }
 
-  io.to(`vybe-room-${room}`).emit(
-    "vybe-online-users",
-    vybeOnlineUsers.size
-  );
+  emitVybeRoomCount(roomId);
 });
 
   socket.on("vybe-typing", ({ room, typing }) => {
-    socket.to(`vybe-room-${room}`).emit(
-      "vybe-user-typing",
-      typing
-    );
+    const roomId = normalizeVybeRoom(room);
+    socket.to(`vybe-room-${roomId}`).emit("vybe-user-typing", {
+      room: roomId,
+      typing: Boolean(typing),
+    });
   });
 
 socket.on("leave-vybe-room", ({ room = "general" }) => {
-  socket.leave(`vybe-room-${room}`);
+  const roomId = normalizeVybeRoom(room);
+  socket.leave(`vybe-room-${roomId}`);
 
   if (socket.user?.id) {
-    vybeOnlineUsers.delete(socket.user.id.toString());
+    removeVybeRoomUser(roomId, socket.user.id);
   }
 
-  io.to(`vybe-room-${room}`).emit(
-    "vybe-online-users",
-    vybeOnlineUsers.size
-  );
+  if (socket.currentVybeRoom === roomId) {
+    socket.currentVybeRoom = null;
+  }
+
+  emitVybeRoomCount(roomId);
 });
 
 socket.on("disconnect", () => {
   if (socket.userId) {
     removeOnlineSocket(socket.userId, socket.id);
-    vybeOnlineUsers.delete(socket.userId);
+  }
+
+  if (socket.user?.id && socket.currentVybeRoom) {
+    removeVybeRoomUser(socket.currentVybeRoom, socket.user.id);
+    emitVybeRoomCount(socket.currentVybeRoom);
   }
 
   logger.info("Socket disconnected:", socket.id);

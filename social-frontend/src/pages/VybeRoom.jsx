@@ -1,31 +1,100 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import API from "../services/api";
 import logger from "../utils/logger";
 import { SOCKET_URL } from "../config/env";
 
+const fallbackRooms = [
+  {
+    id: "general",
+    label: "General",
+    accent: "from-pink-500 to-cyan-400",
+    prompt: "Share a thought, question, or moment with the room.",
+  },
+  {
+    id: "deep",
+    label: "Deep",
+    accent: "from-indigo-500 to-cyan-400",
+    prompt: "What is something you have been thinking about lately?",
+  },
+  {
+    id: "funny",
+    label: "Funny",
+    accent: "from-amber-400 to-pink-500",
+    prompt: "Drop something that made you laugh today.",
+  },
+  {
+    id: "chaos",
+    label: "Chaos",
+    accent: "from-fuchsia-500 to-orange-400",
+    prompt: "What is the most random thing happening right now?",
+  },
+  {
+    id: "late-night",
+    label: "Late Night",
+    accent: "from-violet-500 to-blue-400",
+    prompt: "What is on your mind tonight?",
+  },
+  {
+    id: "college",
+    label: "College",
+    accent: "from-emerald-400 to-cyan-400",
+    prompt: "Share a campus, class, exam, or friend-circle moment.",
+  },
+];
+
+const reactionItems = [
+  { key: "felt", label: "Felt", emoji: "♡" },
+  { key: "real", label: "Real", emoji: "✦" },
+  { key: "same", label: "Same", emoji: "↺" },
+  { key: "chaos", label: "Chaos", emoji: "⚡" },
+  { key: "needed", label: "Needed", emoji: "✓" },
+];
+
 function VybeRoom() {
   const token = localStorage.getItem("token");
-  const room = "general";
+  const currentUserId = localStorage.getItem("userId");
 
+  const [rooms, setRooms] = useState(fallbackRooms);
+  const [activeRoom, setActiveRoom] = useState("general");
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [replyText, setReplyText] = useState({});
   const [replyingTo, setReplyingTo] = useState(null);
+  const [expandedReplies, setExpandedReplies] = useState({});
   const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [savingReply, setSavingReply] = useState({});
   const [connected, setConnected] = useState(false);
-  const [onlineCount, setOnlineCount] = useState(0);
-  const [someoneTyping, setSomeoneTyping] = useState(false);
+  const [onlineByRoom, setOnlineByRoom] = useState({});
+  const [typingByRoom, setTypingByRoom] = useState({});
+  const [openMessageMenu, setOpenMessageMenu] = useState(null);
+  const [copiedMessageId, setCopiedMessageId] = useState(null);
+  const [reportingMessage, setReportingMessage] = useState({});
+  const [deletingMessage, setDeletingMessage] = useState({});
+  const [deletingReply, setDeletingReply] = useState({});
 
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const joinedRoomRef = useRef(activeRoom);
 
-  const authConfig = {
-    headers: {
-      Authorization: "Bearer " + token,
-    },
-  };
+  const authConfig = useMemo(
+    () => ({
+      headers: {
+        Authorization: "Bearer " + token,
+      },
+    }),
+    [token]
+  );
+
+  const roomMeta = useMemo(
+    () => rooms.find((room) => room.id === activeRoom) || fallbackRooms[0],
+    [rooms, activeRoom]
+  );
+
+  const onlineCount = onlineByRoom[activeRoom] || 0;
+  const someoneTyping = Boolean(typingByRoom[activeRoom]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -33,10 +102,12 @@ function VybeRoom() {
         behavior: "smooth",
         block: "end",
       });
-    }, 100);
+    }, 80);
   };
 
   const addMessageIfMissing = (newMessage) => {
+    if (!newMessage?._id || newMessage.room !== activeRoom) return;
+
     setMessages((prev) => {
       const exists = prev.some((msg) => msg._id === newMessage._id);
       if (exists) return prev;
@@ -45,15 +116,34 @@ function VybeRoom() {
   };
 
   const updateMessageInState = (updatedMessage) => {
+    if (!updatedMessage?._id || updatedMessage.room !== activeRoom) return;
+
     setMessages((prev) =>
       prev.map((msg) => (msg._id === updatedMessage._id ? updatedMessage : msg))
     );
   };
 
-  const fetchMessages = async () => {
+  const fetchRooms = async () => {
     try {
-      const res = await API.get("/api/vybe-room", authConfig);
-      setMessages(res.data);
+      const res = await API.get("/api/vybe-room/rooms", authConfig);
+      if (Array.isArray(res.data) && res.data.length) {
+        const withAccent = res.data.map((room, index) => ({
+          ...room,
+          accent: fallbackRooms[index]?.accent || fallbackRooms[0].accent,
+        }));
+        setRooms(withAccent);
+      }
+    } catch (error) {
+      logger.error(error.response?.data || error);
+    }
+  };
+
+  const fetchMessages = async (roomId = activeRoom) => {
+    try {
+      setLoading(true);
+      const res = await API.get(`/api/vybe-room?room=${roomId}`, authConfig);
+      setMessages(Array.isArray(res.data) ? res.data : []);
+      scrollToBottom();
     } catch (error) {
       logger.error(error.response?.data || error);
     } finally {
@@ -61,16 +151,38 @@ function VybeRoom() {
     }
   };
 
+  const joinRoom = (roomId) => {
+    const socket = socketRef.current;
+    if (!socket) return;
+
+    if (joinedRoomRef.current) {
+      socket.emit("leave-vybe-room", { room: joinedRoomRef.current });
+    }
+
+    joinedRoomRef.current = roomId;
+    socket.emit("join-vybe-room", { room: roomId });
+  };
+
+  const changeRoom = (roomId) => {
+    if (roomId === activeRoom) return;
+    setActiveRoom(roomId);
+    setReplyingTo(null);
+    setText("");
+    setMessages([]);
+    setOpenMessageMenu(null);
+    joinRoom(roomId);
+    fetchMessages(roomId);
+  };
+
   const emitTyping = (typing) => {
     socketRef.current?.emit("vybe-typing", {
-      room,
+      room: activeRoom,
       typing,
     });
   };
 
   const handleMainTextChange = (value) => {
     setText(value);
-
     emitTyping(true);
 
     if (typingTimeoutRef.current) {
@@ -83,22 +195,19 @@ function VybeRoom() {
   };
 
   useEffect(() => {
-    fetchMessages();
+    fetchRooms();
+    fetchMessages("general");
 
     const socket = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
-      auth: {
-      token,
-    },
-});
+      auth: { token },
+    });
 
     socketRef.current = socket;
 
     socket.on("connect", () => {
       setConnected(true);
-      socket.emit("join-vybe-room", {
-      room,
-});
+      socket.emit("join-vybe-room", { room: joinedRoomRef.current || "general" });
     });
 
     socket.on("disconnect", () => {
@@ -107,30 +216,37 @@ function VybeRoom() {
 
     socket.on("vybe-message-created", (newMessage) => {
       addMessageIfMissing(newMessage);
+      scrollToBottom();
     });
 
     socket.on("vybe-message-updated", (updatedMessage) => {
       updateMessageInState(updatedMessage);
     });
 
-    socket.on("vybe-online-users", (count) => {
-      setOnlineCount(count || 0);
+    socket.on("vybe-online-users", (payload) => {
+      if (typeof payload === "number") {
+        setOnlineByRoom((prev) => ({ ...prev, [joinedRoomRef.current]: payload }));
+        return;
+      }
+
+      if (payload?.room) {
+        setOnlineByRoom((prev) => ({ ...prev, [payload.room]: payload.count || 0 }));
+      }
     });
 
-    socket.on("vybe-user-typing", (typing) => {
-      setSomeoneTyping(Boolean(typing));
+    socket.on("vybe-user-typing", (payload) => {
+      const roomId = payload?.room || joinedRoomRef.current || "general";
+      setTypingByRoom((prev) => ({ ...prev, [roomId]: Boolean(payload?.typing ?? payload) }));
 
-      if (typing) {
+      if (payload?.typing ?? payload) {
         setTimeout(() => {
-          setSomeoneTyping(false);
-        }, 1200);
+          setTypingByRoom((prev) => ({ ...prev, [roomId]: false }));
+        }, 1300);
       }
     });
 
     return () => {
-      socket.emit("leave-vybe-room", {
-      room,
-  });
+      socket.emit("leave-vybe-room", { room: joinedRoomRef.current || "general" });
       socket.disconnect();
 
       if (typingTimeoutRef.current) {
@@ -147,17 +263,18 @@ function VybeRoom() {
 
   const sendMessage = async () => {
     try {
-      if (!text.trim()) return;
+      if (!text.trim() || sending) return;
 
       const messageText = text.trim();
       setText("");
+      setSending(true);
       emitTyping(false);
 
       const res = await API.post(
         "/api/vybe-room",
         {
           text: messageText,
-          room,
+          room: activeRoom,
         },
         authConfig
       );
@@ -166,15 +283,17 @@ function VybeRoom() {
       scrollToBottom();
     } catch (error) {
       logger.error(error.response?.data || error);
+    } finally {
+      setSending(false);
     }
   };
 
   const sendReply = async (messageId) => {
+    const value = replyText[messageId];
+    if (!value || !value.trim() || savingReply[messageId]) return;
+
     try {
-      const value = replyText[messageId];
-
-      if (!value || !value.trim()) return;
-
+      setSavingReply((prev) => ({ ...prev, [messageId]: true }));
       const res = await API.post(
         `/api/vybe-room/${messageId}/reply`,
         {
@@ -194,175 +313,330 @@ function VybeRoom() {
       scrollToBottom();
     } catch (error) {
       logger.error(error.response?.data || error);
+    } finally {
+      setSavingReply((prev) => ({ ...prev, [messageId]: false }));
     }
   };
 
   const reactMessage = async (messageId, reaction) => {
     try {
+      const currentMessage = messages.find((msg) => msg._id === messageId);
+      if (!currentMessage) return;
+
+      const optimistic = { ...currentMessage, reactions: { ...(currentMessage.reactions || {}) } };
+
+      reactionItems.forEach((item) => {
+        optimistic.reactions[item.key] = (optimistic.reactions[item.key] || []).filter(
+          (id) => (typeof id === "string" ? id : id?._id) !== currentUserId
+        );
+      });
+      optimistic.reactions[reaction] = [...(optimistic.reactions[reaction] || []), currentUserId];
+      updateMessageInState(optimistic);
+
       const res = await API.put(
         `/api/vybe-room/${messageId}/react`,
-        {
-          reaction,
-        },
+        { reaction },
         authConfig
       );
 
       updateMessageInState(res.data);
     } catch (error) {
       logger.error(error.response?.data || error);
+      fetchMessages(activeRoom);
     }
   };
 
-  const ReactionButton = ({ emoji, count, onClick }) => (
-    <button
-      onClick={onClick}
-      className="px-3 py-1.5 rounded-full bg-white/[0.05] border border-white/10 hover:bg-white/[0.09] hover:border-white/20 active:scale-95 transition-all text-sm"
-    >
-      <span>{emoji}</span>
-      <span className="ml-1 text-gray-300">{count || 0}</span>
-    </button>
-  );
 
-  if (loading) {
+  const getItemUserId = (item) => {
+    if (!item?.user) return "";
+    return typeof item.user === "string" ? item.user : item.user?._id || item.user?.id || "";
+  };
+
+  const isOwnItem = (item) => getItemUserId(item)?.toString() === currentUserId?.toString();
+
+  const copyMessage = async (msg) => {
+    try {
+      if (!msg?.text || msg.isDeleted) return;
+      await navigator.clipboard.writeText(msg.text);
+      setCopiedMessageId(msg._id);
+      setOpenMessageMenu(null);
+      setTimeout(() => setCopiedMessageId(null), 1300);
+    } catch (error) {
+      logger.error("Copy message failed:", error);
+    }
+  };
+
+  const copyReply = async (reply) => {
+    try {
+      if (!reply?.text || reply.isDeleted) return;
+      await navigator.clipboard.writeText(reply.text);
+    } catch (error) {
+      logger.error("Copy reply failed:", error);
+    }
+  };
+
+  const reportMessage = async (messageId) => {
+    try {
+      if (!messageId || reportingMessage[messageId]) return;
+      setReportingMessage((prev) => ({ ...prev, [messageId]: true }));
+      await API.post(
+        `/api/vybe-room/${messageId}/report`,
+        { reason: "Reported from Vybe Room" },
+        authConfig
+      );
+      setOpenMessageMenu(null);
+    } catch (error) {
+      logger.error(error.response?.data || error);
+    } finally {
+      setReportingMessage((prev) => ({ ...prev, [messageId]: false }));
+    }
+  };
+
+  const removeMessage = async (messageId) => {
+    try {
+      if (!messageId || deletingMessage[messageId]) return;
+      setDeletingMessage((prev) => ({ ...prev, [messageId]: true }));
+      const res = await API.delete(`/api/vybe-room/${messageId}`, authConfig);
+      updateMessageInState(res.data);
+      setOpenMessageMenu(null);
+    } catch (error) {
+      logger.error(error.response?.data || error);
+    } finally {
+      setDeletingMessage((prev) => ({ ...prev, [messageId]: false }));
+    }
+  };
+
+  const removeReply = async (messageId, replyId) => {
+    const key = `${messageId}-${replyId}`;
+
+    try {
+      if (!messageId || !replyId || deletingReply[key]) return;
+      setDeletingReply((prev) => ({ ...prev, [key]: true }));
+      const res = await API.delete(
+        `/api/vybe-room/${messageId}/reply/${replyId}`,
+        authConfig
+      );
+      updateMessageInState(res.data);
+    } catch (error) {
+      logger.error(error.response?.data || error);
+    } finally {
+      setDeletingReply((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const userReacted = (msg, reaction) =>
+    msg.reactions?.[reaction]?.some((id) =>
+      (typeof id === "string" ? id : id?._id) === currentUserId
+    );
+
+  const ReactionButton = ({ msg, item }) => {
+    const count = msg.reactions?.[item.key]?.length || 0;
+    const active = userReacted(msg, item.key);
+
+    return (
+      <button
+        onClick={() => reactMessage(msg._id, item.key)}
+        title={item.label}
+        className={`shrink-0 rounded-full border px-2.5 py-1.5 text-[11px] font-black transition-all active:scale-95 ${
+          active
+            ? "border-pink-300/40 bg-pink-500/15 text-pink-100 shadow-[0_0_16px_rgba(236,72,153,0.16)]"
+            : "border-white/10 bg-white/[0.045] text-white/65 hover:border-white/20 hover:bg-white/[0.08]"
+        }`}
+      >
+        <span>{item.emoji}</span>
+        {count > 0 && <span className="ml-1 text-white/70">{count}</span>}
+      </button>
+    );
+  };
+
+  const visibleReplies = (msg) => {
+    const replies = msg.replies || [];
+    return expandedReplies[msg._id] ? replies : replies.slice(0, 2);
+  };
+
+  if (loading && messages.length === 0) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 rounded-full border-4 border-white/20 border-t-pink-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-400">Loading Vybe Room...</p>
+          <div className="w-11 h-11 rounded-full border-4 border-white/20 border-t-pink-500 animate-spin mx-auto mb-4" />
+          <p className="text-sm text-gray-400">Opening room</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen bg-black text-white overflow-hidden">
-      <div className="h-full max-w-[920px] mx-auto flex flex-col px-3 sm:px-5 pt-20 md:pt-8 pb-24 md:pb-8">
-        <div className="shrink-0 mb-4">
-          <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-zinc-950/80 p-5 shadow-2xl">
-            <div className="absolute -top-20 -right-20 w-44 h-44 bg-pink-500/20 rounded-full blur-3xl" />
-            <div className="absolute -bottom-20 -left-20 w-44 h-44 bg-cyan-500/20 rounded-full blur-3xl" />
+    <div className="h-[calc(100svh-148px)] md:h-screen bg-black text-white overflow-hidden">
+      <div className="h-full max-w-[940px] mx-auto flex flex-col px-3 sm:px-5 pt-2 md:pt-6 pb-2 md:pb-6">
+        <div className="shrink-0 mb-2">
+          <div className="relative overflow-hidden rounded-[1.15rem] border border-white/10 bg-zinc-950/75 p-2.5 shadow-xl backdrop-blur-xl">
+            <div className="absolute -top-24 -right-16 h-36 w-36 rounded-full bg-pink-500/20 blur-3xl" />
+            <div className="absolute -bottom-24 -left-16 h-36 w-36 rounded-full bg-cyan-500/20 blur-3xl" />
 
-            <div className="relative z-10 flex items-center justify-between gap-4">
-              <div>
-                <h1 className="text-3xl sm:text-4xl font-black bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
-                  Vybe Room
-                </h1>
-                <p className="text-sm sm:text-base text-gray-400 mt-1">
-                  Anonymous public discussions · General room
+            <div className="relative z-10 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl sm:text-2xl font-black bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                    Vybe Room
+                  </h1>
+                  <span className="rounded-full border border-white/10 bg-white/[0.055] px-2 py-0.5 text-[10px] font-bold text-white/55">
+                    {roomMeta.label}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[11px] sm:text-xs text-gray-400 line-clamp-1">
+                  {roomMeta.prompt}
                 </p>
               </div>
 
-              <div className="hidden sm:flex flex-col items-end gap-2">
-                <div className="flex items-center gap-2 rounded-full bg-white/[0.06] border border-white/10 px-4 py-2 text-sm text-gray-300">
+              <div className="shrink-0 rounded-full border border-white/10 bg-white/[0.055] px-2.5 py-1.5 text-right">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-white/75">
                   <span
-                    className={`w-2 h-2 rounded-full ${
+                    className={`h-2 w-2 rounded-full ${
                       connected ? "bg-green-400 animate-pulse" : "bg-yellow-400"
                     }`}
                   />
-                  {connected ? "Live" : "Connecting"}
-                </div>
-
-                <div className="text-xs text-gray-500">
-                  {onlineCount} online
+                  {onlineCount} tuned in
                 </div>
               </div>
             </div>
 
-            <div className="relative z-10 sm:hidden mt-4 flex items-center gap-3 text-xs text-gray-400">
-              <span className={connected ? "text-green-400" : "text-yellow-400"}>
-                ● {connected ? "Live" : "Connecting"}
-              </span>
-              <span>•</span>
-              <span>{onlineCount} online</span>
+            <div className="relative z-10 mt-2 flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {rooms.map((room) => {
+                const active = room.id === activeRoom;
+                return (
+                  <button
+                    key={room.id}
+                    type="button"
+                    onClick={() => changeRoom(room.id)}
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-black transition-all active:scale-95 ${
+                      active
+                        ? `border-white/20 bg-gradient-to-r ${room.accent} text-white shadow-lg shadow-pink-500/15`
+                        : "border-white/10 bg-white/[0.04] text-white/60 hover:bg-white/[0.08]"
+                    }`}
+                  >
+                    {room.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 rounded-3xl border border-white/10 bg-zinc-950/55 overflow-hidden shadow-2xl">
-          <div className="h-full overflow-y-auto px-3 sm:px-5 py-5 space-y-5 scroll-smooth">
+        <div className="flex-1 min-h-0 overflow-hidden rounded-[1.2rem] border border-white/10 bg-zinc-950/25 shadow-xl">
+          <div className="h-full overflow-y-auto px-1.5 sm:px-4 py-2 space-y-2 scroll-smooth overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {messages.length === 0 ? (
               <div className="h-full flex items-center justify-center text-center px-6">
-                <div>
-                  <div className="text-5xl mb-4">💬</div>
-                  <h2 className="text-2xl font-bold mb-2">Start the first Vybe</h2>
-                  <p className="text-gray-400">
-                    Share something anonymously and let the room react.
-                  </p>
+                <div className="max-w-sm rounded-[1.25rem] border border-white/10 bg-white/[0.035] p-4">
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500/20 to-cyan-500/20 text-3xl">
+                    ✦
+                  </div>
+                  <h2 className="text-base font-black mb-1.5">Start the conversation</h2>
+                  <p className="text-sm text-gray-400">{roomMeta.prompt}</p>
                 </div>
               </div>
             ) : (
               messages.map((msg) => (
                 <div
                   key={msg._id}
-                  className="group rounded-3xl border border-white/10 bg-black/35 hover:bg-white/[0.035] transition-all p-4 sm:p-5"
+                  className="group rounded-[1.15rem] border border-white/[0.08] bg-white/[0.035] px-2.5 py-2.5 sm:p-3 shadow-[0_10px_28px_rgba(0,0,0,0.18)] transition-all hover:bg-white/[0.05]"
                 >
-                  <div className="flex items-start justify-between gap-4 mb-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-pink-500/30 via-purple-500/30 to-cyan-500/30 border border-white/10 flex items-center justify-center shrink-0">
-                        🎭
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-gradient-to-br from-pink-500/25 via-purple-500/25 to-cyan-500/25 text-sm font-black">
+                        {msg.anonymousName?.slice(0, 1) || "V"}
                       </div>
 
                       <div className="min-w-0">
-                        <h3 className="font-bold text-pink-300 truncate">
+                        <h3 className="truncate text-[13px] font-black text-white/90">
                           {msg.anonymousName}
                         </h3>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-[10px] text-white/38">
                           {msg.createdAt
-                            ? new Date(msg.createdAt).toLocaleString()
+                            ? new Date(msg.createdAt).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
                             : ""}
                         </p>
                       </div>
                     </div>
 
-                    <span className="text-xs text-gray-600 shrink-0">
-                      #{String(msg._id).slice(-4)}
-                    </span>
+                    {!msg.isDeleted && (
+                      <div className="relative shrink-0">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setOpenMessageMenu(openMessageMenu === msg._id ? null : msg._id)
+                          }
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.045] text-white/55 transition-all hover:bg-white/[0.08] hover:text-white active:scale-95"
+                          title="Message options"
+                        >
+                          ⋯
+                        </button>
+
+                        {openMessageMenu === msg._id && (
+                          <div className="absolute right-0 top-9 z-30 w-40 overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/95 shadow-2xl backdrop-blur-xl">
+                            <button
+                              type="button"
+                              onClick={() => copyMessage(msg)}
+                              className="block w-full px-4 py-3 text-left text-xs font-bold text-white/80 hover:bg-white/[0.07]"
+                            >
+                              {copiedMessageId === msg._id ? "Copied" : "Copy"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => reportMessage(msg._id)}
+                              disabled={reportingMessage[msg._id]}
+                              className="block w-full px-4 py-3 text-left text-xs font-bold text-amber-100/85 hover:bg-amber-500/10 disabled:opacity-50"
+                            >
+                              {reportingMessage[msg._id] ? "Reporting..." : "Report"}
+                            </button>
+                            {isOwnItem(msg) && (
+                              <button
+                                type="button"
+                                onClick={() => removeMessage(msg._id)}
+                                disabled={deletingMessage[msg._id]}
+                                className="block w-full px-4 py-3 text-left text-xs font-bold text-red-300 hover:bg-red-500/10 disabled:opacity-50"
+                              >
+                                {deletingMessage[msg._id] ? "Removing..." : "Delete"}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  <p className="text-gray-100 whitespace-pre-wrap leading-7 break-words">
-                    {msg.text}
+                  <p
+                    className={`break-words whitespace-pre-wrap text-[15px] leading-5 ${
+                      msg.isDeleted ? "italic text-gray-500" : "text-gray-100"
+                    }`}
+                  >
+                    {msg.isDeleted ? "This message was removed" : msg.text}
                   </p>
 
-                  <div className="flex flex-wrap items-center gap-2 mt-4">
-                    <ReactionButton
-                      emoji="❤️"
-                      count={msg.reactions?.like?.length}
-                      onClick={() => reactMessage(msg._id, "like")}
-                    />
-                    <ReactionButton
-                      emoji="🔥"
-                      count={msg.reactions?.fire?.length}
-                      onClick={() => reactMessage(msg._id, "fire")}
-                    />
-                    <ReactionButton
-                      emoji="😂"
-                      count={msg.reactions?.laugh?.length}
-                      onClick={() => reactMessage(msg._id, "laugh")}
-                    />
-                    <ReactionButton
-                      emoji="👎"
-                      count={msg.reactions?.dislike?.length}
-                      onClick={() => reactMessage(msg._id, "dislike")}
-                    />
+                  {!msg.isDeleted && (
+                    <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {reactionItems.map((item) => (
+                      <ReactionButton key={item.key} msg={msg} item={item} />
+                    ))}
 
                     <button
                       onClick={() =>
                         setReplyingTo(replyingTo === msg._id ? null : msg._id)
                       }
-                      className="ml-auto px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 hover:bg-cyan-500/20 active:scale-95 transition-all text-sm font-semibold"
+                      className="ml-auto shrink-0 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2.5 py-1.5 text-[11px] font-black text-cyan-200 transition-all hover:bg-cyan-400/16 active:scale-95"
                     >
-                      {replyingTo === msg._id ? "Cancel" : "Reply"}
+                      {replyingTo === msg._id ? "Cancel" : `Reply${msg.replies?.length ? ` · ${msg.replies.length}` : ""}`}
                     </button>
-                  </div>
+                    </div>
+                  )}
 
-                  {replyingTo === msg._id && (
-                    <div className="mt-4 rounded-2xl border border-white/10 bg-black/50 p-3 animate-[fadeIn_0.2s_ease-out]">
-                      <div className="mb-2 text-xs text-gray-500 flex items-center justify-between">
+                  {!msg.isDeleted && replyingTo === msg._id && (
+                    <div className="mt-2.5 rounded-2xl border border-white/10 bg-black/35 p-2">
+                      <div className="mb-2 flex items-center justify-between text-[11px] text-gray-500">
                         <span>
-                          Replying to{" "}
-                          <span className="text-cyan-300 font-semibold">
-                            {msg.anonymousName}
-                          </span>
+                          Replying to <span className="font-bold text-cyan-200">{msg.anonymousName}</span>
                         </span>
 
                         <button
@@ -373,7 +647,7 @@ function VybeRoom() {
                         </button>
                       </div>
 
-                      <div className="flex flex-col sm:flex-row gap-2">
+                      <div className="flex gap-2">
                         <input
                           type="text"
                           value={replyText[msg._id] || ""}
@@ -388,45 +662,90 @@ function VybeRoom() {
                               sendReply(msg._id);
                             }
                           }}
-                          placeholder="Write a reply..."
-                          className="flex-1 bg-white/[0.04] border border-white/10 rounded-2xl px-4 py-3 outline-none focus:border-cyan-400 text-sm"
+                          placeholder="Write a reply"
+                          className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2 text-sm outline-none placeholder:text-gray-500 focus:border-cyan-300/50"
                         />
 
                         <button
                           onClick={() => sendReply(msg._id)}
-                          disabled={!replyText[msg._id]?.trim()}
-                          className="px-5 py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-cyan-500 font-semibold hover:scale-[1.02] active:scale-95 disabled:opacity-40 disabled:hover:scale-100 transition-all"
+                          disabled={!replyText[msg._id]?.trim() || savingReply[msg._id]}
+                          className="rounded-xl bg-gradient-to-r from-pink-500 to-cyan-500 px-3.5 py-2 text-sm font-black transition-all active:scale-95 disabled:opacity-40"
                         >
-                          Send
+                          {savingReply[msg._id] ? "..." : "Send"}
                         </button>
                       </div>
                     </div>
                   )}
 
-                  {msg.replies && msg.replies.length > 0 && (
-                    <div className="mt-5 space-y-3 border-t border-white/10 pt-4">
-                      {msg.replies.map((reply) => (
+                  {!msg.isDeleted && msg.replies && msg.replies.length > 0 && (
+                    <div className="mt-2 space-y-1.5 border-t border-white/10 pt-2">
+                      {visibleReplies(msg).map((reply) => (
                         <div
                           key={reply._id}
-                          className="rounded-2xl bg-white/[0.04] border border-white/5 p-3"
+                          className="rounded-xl border border-white/[0.055] bg-black/25 p-2.5"
                         >
-                          <div className="flex items-center justify-between gap-3 mb-1">
-                            <p className="text-sm font-semibold text-cyan-300">
+                          <div className="mb-1 flex items-center justify-between gap-3">
+                            <p className="truncate text-xs font-black text-cyan-200">
                               {reply.anonymousName}
                             </p>
 
-                            <span className="text-[11px] text-gray-600">
-                              {reply.createdAt
-                                ? new Date(reply.createdAt).toLocaleTimeString()
-                                : ""}
-                            </span>
+                            <div className="flex shrink-0 items-center gap-2 text-[10px] text-gray-600">
+                              <span>
+                                {reply.createdAt
+                                  ? new Date(reply.createdAt).toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })
+                                  : ""}
+                              </span>
+                              {!reply.isDeleted && (
+                                <button
+                                  type="button"
+                                  onClick={() => copyReply(reply)}
+                                  className="rounded-full border border-white/10 px-2 py-1 text-white/45 hover:text-white"
+                                >
+                                  Copy
+                                </button>
+                              )}
+                              {!reply.isDeleted && (isOwnItem(reply) || isOwnItem(msg)) && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeReply(msg._id, reply._id)}
+                                  disabled={deletingReply[`${msg._id}-${reply._id}`]}
+                                  className="rounded-full border border-red-300/15 px-2 py-1 text-red-300/80 hover:bg-red-500/10 disabled:opacity-50"
+                                >
+                                  {deletingReply[`${msg._id}-${reply._id}`] ? "..." : "Delete"}
+                                </button>
+                              )}
+                            </div>
                           </div>
 
-                          <p className="text-sm text-gray-300 break-words">
-                            {reply.text}
+                          <p
+                            className={`break-words text-[13px] leading-5 ${
+                              reply.isDeleted ? "italic text-gray-500" : "text-gray-300"
+                            }`}
+                          >
+                            {reply.isDeleted ? "This reply was removed" : reply.text}
                           </p>
                         </div>
                       ))}
+
+                      {msg.replies.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedReplies((prev) => ({
+                              ...prev,
+                              [msg._id]: !prev[msg._id],
+                            }))
+                          }
+                          className="text-xs font-black text-indigo-200 hover:text-white"
+                        >
+                          {expandedReplies[msg._id]
+                            ? "Show fewer replies"
+                            : `View ${msg.replies.length - 2} more replies`}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -434,13 +753,13 @@ function VybeRoom() {
             )}
 
             {someoneTyping && (
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/[0.06] border border-white/10 px-4 py-2 text-xs text-gray-400">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[11px] text-gray-400">
                 <span className="flex gap-1">
-                  <span className="w-1.5 h-1.5 bg-cyan-300 rounded-full animate-bounce" />
-                  <span className="w-1.5 h-1.5 bg-cyan-300 rounded-full animate-bounce [animation-delay:0.15s]" />
-                  <span className="w-1.5 h-1.5 bg-cyan-300 rounded-full animate-bounce [animation-delay:0.3s]" />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-300" />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-300 [animation-delay:0.15s]" />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-300 [animation-delay:0.3s]" />
                 </span>
-                Someone is typing...
+                Someone is typing
               </div>
             )}
 
@@ -448,9 +767,9 @@ function VybeRoom() {
           </div>
         </div>
 
-        <div className="shrink-0 mt-4">
-          <div className="rounded-3xl border border-white/10 bg-zinc-950/90 backdrop-blur-2xl p-3 sm:p-4 shadow-2xl">
-            <div className="flex items-end gap-3">
+        <div className="shrink-0 mt-2">
+          <div className="rounded-[1.15rem] border border-white/10 bg-zinc-950/95 p-2 shadow-xl backdrop-blur-2xl">
+            <div className="flex items-end gap-2">
               <textarea
                 value={text}
                 onChange={(e) => handleMainTextChange(e.target.value)}
@@ -460,21 +779,21 @@ function VybeRoom() {
                     sendMessage();
                   }
                 }}
-                placeholder="Drop an anonymous vybe..."
-                className="flex-1 max-h-36 min-h-[52px] bg-white/[0.04] border border-white/10 rounded-2xl px-4 py-3 outline-none resize-none focus:border-pink-400 text-white placeholder:text-gray-500"
+                placeholder={`Message ${roomMeta.label}`}
+                className="max-h-20 min-h-[42px] flex-1 resize-none rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2.5 text-sm text-white outline-none placeholder:text-gray-500 focus:border-pink-300/50"
               />
 
               <button
                 onClick={sendMessage}
-                disabled={!text.trim()}
-                className="h-[52px] px-5 sm:px-7 rounded-2xl bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 font-bold hover:scale-[1.03] active:scale-95 disabled:opacity-40 disabled:hover:scale-100 transition-all shadow-lg shadow-pink-500/15"
+                disabled={!text.trim() || sending}
+                className="h-[42px] rounded-xl bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 px-4 text-sm font-black shadow-lg shadow-pink-500/15 transition-all active:scale-95 disabled:opacity-40"
               >
-                Send
+                {sending ? "..." : "Send"}
               </button>
             </div>
 
-            <p className="text-[11px] text-gray-600 mt-2 px-1">
-              Press Enter to send · Shift + Enter for new line
+            <p className="hidden mt-1 px-1 text-[10px] text-gray-600">
+              Anonymous room · Enter sends
             </p>
           </div>
         </div>

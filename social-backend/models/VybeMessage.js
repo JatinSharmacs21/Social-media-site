@@ -1,5 +1,25 @@
 const mongoose = require("mongoose");
 
+const reactionUserSchema = [
+  {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+];
+
+const reactionsSchema = {
+  felt: reactionUserSchema,
+  real: reactionUserSchema,
+  same: reactionUserSchema,
+  chaos: reactionUserSchema,
+  needed: reactionUserSchema,
+  // Backward compatibility with older messages/reactions.
+  like: reactionUserSchema,
+  dislike: reactionUserSchema,
+  fire: reactionUserSchema,
+  laugh: reactionUserSchema,
+};
+
 const replySchema = new mongoose.Schema(
   {
     user: {
@@ -16,36 +36,21 @@ const replySchema = new mongoose.Schema(
     text: {
       type: String,
       required: true,
+      trim: true,
+      maxlength: 300,
     },
 
-    reactions: {
-      like: [
-        {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-        },
-      ],
+    reactions: reactionsSchema,
 
-      dislike: [
-        {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-        },
-      ],
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
 
-      fire: [
-        {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-        },
-      ],
-
-      laugh: [
-        {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-        },
-      ],
+    deletedAt: {
+      type: Date,
+      default: null,
     },
   },
   {
@@ -58,12 +63,15 @@ const vybeMessageSchema = new mongoose.Schema(
     room: {
       type: String,
       default: "general",
+      trim: true,
+      index: true,
     },
 
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true,
     },
 
     anonymousName: {
@@ -74,37 +82,30 @@ const vybeMessageSchema = new mongoose.Schema(
     text: {
       type: String,
       required: true,
+      trim: true,
+      maxlength: 500,
     },
 
-    reactions: {
-      like: [
-        {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-        },
-      ],
+    reactions: reactionsSchema,
 
-      dislike: [
-        {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-        },
-      ],
-
-      fire: [
-        {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-        },
-      ],
-
-      laugh: [
-        {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-        },
-      ],
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
     },
+
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+
+    reports: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        reason: { type: String, trim: true, maxlength: 160, default: "reported" },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
 
     replies: [replySchema],
   },
@@ -113,7 +114,6 @@ const vybeMessageSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model(
-  "VybeMessage",
-  vybeMessageSchema
-);
+vybeMessageSchema.index({ room: 1, createdAt: -1 });
+
+module.exports = mongoose.model("VybeMessage", vybeMessageSchema);
