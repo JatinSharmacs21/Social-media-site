@@ -10,6 +10,7 @@ import Profile from "./pages/Profile";
 import Search from "./pages/Search";
 import Reels from "./pages/Reels";
 import Notifications from "./pages/Notifications";
+import Whispers from "./pages/Whispers";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import MainLayout from "./components/MainLayout";
@@ -41,6 +42,17 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <Notifications />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/whispers"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Whispers />
               </MainLayout>
             </ProtectedRoute>
           }

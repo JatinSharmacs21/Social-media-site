@@ -7,6 +7,7 @@ const mongoSanitize = require("express-mongo-sanitize");
 const rateLimit = require("express-rate-limit");
 const notificationRoutes = require("./routes/notificationRoutes");
 const vybeRoomRoutes = require("./routes/vybeRoomRoutes");
+const whisperRoutes = require("./routes/whisperRoutes");
 
 const http = require("http");
 const { Server } = require("socket.io");
@@ -225,6 +226,26 @@ socket.on("join-vybe-room", ({ room = "general" }) => {
     });
   });
 
+
+  socket.on("join-whisper", ({ conversationId }) => {
+    if (!socket.user?.id || !conversationId) return;
+    socket.join(`whisper-${conversationId}`);
+  });
+
+  socket.on("leave-whisper", ({ conversationId }) => {
+    if (!conversationId) return;
+    socket.leave(`whisper-${conversationId}`);
+  });
+
+  socket.on("whisper-typing", ({ conversationId, typing }) => {
+    if (!socket.user?.id || !conversationId) return;
+    socket.to(`whisper-${conversationId}`).emit("whisper-user-typing", {
+      conversationId,
+      userId: socket.user.id.toString(),
+      typing: Boolean(typing),
+    });
+  });
+
 socket.on("leave-vybe-room", ({ room = "general" }) => {
   const roomId = normalizeVybeRoom(room);
   socket.leave(`vybe-room-${roomId}`);
@@ -326,6 +347,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/upload", uploadLimiter, uploadRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/vybe-room", vybeRoomRoutes);
+app.use("/api/whispers", whisperRoutes);
 
 // ERROR MIDDLEWARE
 app.use(notFound);
