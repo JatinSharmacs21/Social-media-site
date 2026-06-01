@@ -12,6 +12,7 @@ const whisperRoutes = require("./routes/whisperRoutes");
 const http = require("http");
 const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
+const User = require("./models/User");
 
 const logger = require("./utils/logger");
 const connectDB = require("./config/db");
@@ -96,13 +97,35 @@ const addOnlineSocket = (userId, socketId) => {
 
 const removeOnlineSocket = (userId, socketId) => {
   const id = userId?.toString();
-  if (!id || !onlineUsers.has(id)) return;
+  if (!id || !onlineUsers.has(id)) return false;
 
   const sockets = onlineUsers.get(id);
   sockets.delete(socketId);
 
   if (sockets.size === 0) {
     onlineUsers.delete(id);
+    return true;
+  }
+
+  return false;
+};
+
+const getOnlineUserIds = () => Array.from(onlineUsers.keys());
+
+const emitPresenceUpdate = () => {
+  io.emit("whisper-online-users", { userIds: getOnlineUserIds() });
+};
+
+const markUserLastSeen = async (userId) => {
+  if (!userId) return null;
+
+  const lastSeen = new Date();
+  try {
+    await User.findByIdAndUpdate(userId, { lastSeen });
+    return lastSeen;
+  } catch (error) {
+    logger.error("Failed to update last seen:", error);
+    return lastSeen;
   }
 };
 
@@ -163,6 +186,9 @@ io.on("connection", (socket) => {
   const id = socket.user.id.toString();
   socket.userId = id;
   addOnlineSocket(id, socket.id);
+
+  socket.emit("whisper-online-users", { userIds: getOnlineUserIds() });
+  emitPresenceUpdate();
 
   logger.info("Realtime user registered:", id);
 });
@@ -261,9 +287,17 @@ socket.on("leave-vybe-room", ({ room = "general" }) => {
   emitVybeRoomCount(roomId);
 });
 
-socket.on("disconnect", () => {
+socket.on("disconnect", async () => {
   if (socket.userId) {
-    removeOnlineSocket(socket.userId, socket.id);
+    const wentOffline = removeOnlineSocket(socket.userId, socket.id);
+    if (wentOffline) {
+      const lastSeen = await markUserLastSeen(socket.userId);
+      emitPresenceUpdate();
+      io.emit("whisper-user-presence", {
+        userId: socket.userId,
+        lastSeen: lastSeen?.toISOString?.() || new Date().toISOString(),
+      });
+    }
   }
 
   if (socket.user?.id && socket.currentVybeRoom) {

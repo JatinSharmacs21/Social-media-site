@@ -3,7 +3,7 @@ const Conversation = require("../models/Conversation");
 const WhisperMessage = require("../models/WhisperMessage");
 const User = require("../models/User");
 
-const userFields = "name username profilePic bio";
+const userFields = "name username profilePic bio lastSeen";
 
 const getCurrentUserId = (req) => req.user?._id || req.user?.id;
 const isObjectId = (value) => mongoose.Types.ObjectId.isValid(value);

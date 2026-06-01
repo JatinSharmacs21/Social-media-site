@@ -8,6 +8,19 @@ function notifyWhisperCountChange(count) {
   window.dispatchEvent(new CustomEvent("vybeo:whispers-count", { detail: { count } }));
 }
 
+const updateParticipantPresence = (conversation, userId, lastSeen) => {
+  if (!conversation?.participants?.length || !userId) return conversation;
+
+  return {
+    ...conversation,
+    participants: conversation.participants.map((participant) => {
+      const participantId = participant?._id || participant;
+      if (String(participantId) !== String(userId) || !participant?._id) return participant;
+      return { ...participant, lastSeen };
+    }),
+  };
+};
+
 function useWhisperSocket({
   token,
   activeId,
@@ -16,6 +29,7 @@ function useWhisperSocket({
   setMessages,
   setConversations,
   setTypingUser,
+  setOnlineUserIds,
   updateConversation,
   scrollToBottom,
 }) {
@@ -111,6 +125,24 @@ function useWhisperSocket({
       notifyWhisperCountChange();
     });
 
+    socket.on("whisper-online-users", ({ userIds = [] } = {}) => {
+      setOnlineUserIds(Array.isArray(userIds) ? userIds.map(String) : []);
+    });
+
+    socket.on("whisper-user-presence", ({ userId, lastSeen }) => {
+      if (!userId || !lastSeen) return;
+
+      setConversations((prev) => prev.map((conversation) => updateParticipantPresence(conversation, userId, lastSeen)));
+      setActiveConversation((current) => updateParticipantPresence(current, userId, lastSeen));
+      setMessages((prev) =>
+        prev.map((message) => {
+          const senderId = message?.sender?._id || message?.sender;
+          if (String(senderId) !== String(userId) || !message?.sender?._id) return message;
+          return { ...message, sender: { ...message.sender, lastSeen } };
+        })
+      );
+    });
+
     socket.on("whisper-user-typing", ({ conversationId, userId, typing }) => {
       if (String(conversationId) === String(activeIdRef.current) && String(userId) !== String(currentUserIdRef.current)) {
         setTypingUser(Boolean(typing));
@@ -136,12 +168,14 @@ function useWhisperSocket({
       socket.off("whisper-inbox-updated");
       socket.off("whisper-message-deleted");
       socket.off("whisper-conversation-deleted");
+      socket.off("whisper-online-users");
+      socket.off("whisper-user-presence");
       socket.off("whisper-user-typing");
       socket.off("whisper-seen");
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [token, setActiveConversation, setMessages, setConversations, setTypingUser, updateConversation, scrollToBottom]);
+  }, [token, setActiveConversation, setMessages, setConversations, setTypingUser, setOnlineUserIds, updateConversation, scrollToBottom]);
 
   useEffect(() => {
     const socket = socketRef.current;

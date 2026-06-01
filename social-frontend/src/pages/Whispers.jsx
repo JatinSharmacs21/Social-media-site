@@ -20,6 +20,7 @@ function Whispers() {
     users,
     searching,
     typingUser,
+    onlineUserIds,
     error,
     mobileChatOpen,
     bottomRef,
@@ -58,6 +59,7 @@ function Whispers() {
           activeId={activeId}
           currentUserId={currentUserId}
           deletingConversation={deletingConversation}
+          onlineUserIds={onlineUserIds}
           onOpenConversation={openConversation}
           onStartConversation={startConversation}
           onDeleteConversation={deleteConversation}
@@ -70,6 +72,7 @@ function Whispers() {
           messagesLoading={messagesLoading}
           mobileChatOpen={mobileChatOpen}
           typingUser={typingUser}
+          onlineUserIds={onlineUserIds}
           currentUserId={currentUserId}
           bottomRef={bottomRef}
           text={text}

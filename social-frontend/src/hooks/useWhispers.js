@@ -25,6 +25,7 @@ function useWhispers() {
   const [users, setUsers] = useState([]);
   const [searching, setSearching] = useState(false);
   const [typingUser, setTypingUser] = useState(false);
+  const [onlineUserIds, setOnlineUserIds] = useState([]);
   const [error, setError] = useState("");
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const [replyTo, setReplyTo] = useState(null);
@@ -123,6 +124,7 @@ function useWhispers() {
     setMessages,
     setConversations,
     setTypingUser,
+    setOnlineUserIds,
     updateConversation,
     scrollToBottom,
   });
@@ -302,6 +304,7 @@ function useWhispers() {
     users,
     searching,
     typingUser,
+    onlineUserIds,
     error,
     mobileChatOpen,
     bottomRef,
