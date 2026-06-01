@@ -6,9 +6,7 @@ const User = require("../models/User");
 const userFields = "name username profilePic bio";
 
 const getCurrentUserId = (req) => req.user?._id || req.user?.id;
-
 const isObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
-
 const getConversationRoom = (conversationId) => `whisper-${conversationId}`;
 
 const getParticipantIds = (conversation) =>
@@ -19,18 +17,32 @@ const getParticipantIds = (conversation) =>
 const ensureParticipant = (conversation, userId) =>
   getParticipantIds(conversation).includes(userId.toString());
 
+const populateMessage = (query) =>
+  query.populate("sender", userFields).populate({
+    path: "replyTo",
+    select: "text sender createdAt",
+    populate: { path: "sender", select: userFields },
+  });
+
 const populateConversation = async (conversationId) =>
   Conversation.findById(conversationId)
     .populate("participants", userFields)
     .populate({
       path: "lastMessage",
-      populate: { path: "sender", select: userFields },
+      populate: [
+        { path: "sender", select: userFields },
+        {
+          path: "replyTo",
+          select: "text sender createdAt",
+          populate: { path: "sender", select: userFields },
+        },
+      ],
     });
 
 const emitToParticipants = (req, conversation, event, payload) => {
   const io = req.app.get("io");
   const onlineUsers = req.app.get("onlineUsers");
-  if (!io || !onlineUsers) return;
+  if (!io || !onlineUsers || !conversation) return;
 
   getParticipantIds(conversation).forEach((participantId) => {
     const sockets = onlineUsers.get(participantId);
@@ -40,6 +52,18 @@ const emitToParticipants = (req, conversation, event, payload) => {
       io.to(socketId).emit(event, payload);
     });
   });
+};
+
+const refreshConversationLastMessage = async (conversationId) => {
+  const latest = await WhisperMessage.findOne({ conversation: conversationId })
+    .sort({ createdAt: -1 })
+    .select("_id createdAt");
+
+  const update = latest
+    ? { lastMessage: latest._id, lastMessageAt: latest.createdAt }
+    : { lastMessage: null, lastMessageAt: new Date() };
+
+  await Conversation.findByIdAndUpdate(conversationId, update);
 };
 
 const getOrCreateConversation = async (req, res) => {
@@ -84,7 +108,14 @@ const getConversations = async (req, res) => {
       .populate("participants", userFields)
       .populate({
         path: "lastMessage",
-        populate: { path: "sender", select: userFields },
+        populate: [
+          { path: "sender", select: userFields },
+          {
+            path: "replyTo",
+            select: "text sender createdAt",
+            populate: { path: "sender", select: userFields },
+          },
+        ],
       })
       .sort({ lastMessageAt: -1 })
       .limit(50);
@@ -93,8 +124,8 @@ const getConversations = async (req, res) => {
       {
         $match: {
           conversation: { $in: conversations.map((item) => item._id) },
-          sender: { $ne: currentUserId },
-          readBy: { $ne: currentUserId },
+          sender: { $ne: new mongoose.Types.ObjectId(currentUserId) },
+          readBy: { $ne: new mongoose.Types.ObjectId(currentUserId) },
         },
       },
       { $group: { _id: "$conversation", count: { $sum: 1 } } },
@@ -132,10 +163,9 @@ const getMessages = async (req, res) => {
       return res.status(403).json({ message: "You are not part of this whisper" });
     }
 
-    const messages = await WhisperMessage.find({ conversation: conversationId })
-      .populate("sender", userFields)
-      .sort({ createdAt: 1 })
-      .limit(120);
+    const messages = await populateMessage(
+      WhisperMessage.find({ conversation: conversationId }).sort({ createdAt: 1 }).limit(120)
+    );
 
     await WhisperMessage.updateMany(
       {
@@ -162,6 +192,7 @@ const sendMessage = async (req, res) => {
     const currentUserId = getCurrentUserId(req);
     const { conversationId } = req.params;
     const text = String(req.body.text || "").trim();
+    const replyTo = req.body.replyTo || null;
 
     if (!text) return res.status(400).json({ message: "Message is required" });
     if (text.length > 1200) {
@@ -175,33 +206,114 @@ const sendMessage = async (req, res) => {
       return res.status(403).json({ message: "You are not part of this whisper" });
     }
 
+    let validReplyTo = null;
+    if (replyTo && isObjectId(replyTo)) {
+      const repliedMessage = await WhisperMessage.findOne({ _id: replyTo, conversation: conversationId }).select("_id");
+      if (repliedMessage) validReplyTo = repliedMessage._id;
+    }
+
     let message = await WhisperMessage.create({
       conversation: conversationId,
       sender: currentUserId,
       text,
+      replyTo: validReplyTo,
       readBy: [currentUserId],
     });
 
-    message = await WhisperMessage.findById(message._id).populate("sender", userFields);
+    message = await populateMessage(WhisperMessage.findById(message._id));
 
     conversation.lastMessage = message._id;
     conversation.lastMessageAt = message.createdAt;
     await conversation.save();
 
     const populatedConversation = await populateConversation(conversationId);
-
-    const payload = {
-      conversation: populatedConversation,
-      message,
-    };
+    const payload = { conversation: populatedConversation, message };
 
     const io = req.app.get("io");
-    if (io) {
-      io.to(getConversationRoom(conversationId)).emit("whisper-message-created", payload);
-    }
+    if (io) io.to(getConversationRoom(conversationId)).emit("whisper-message-created", payload);
     emitToParticipants(req, populatedConversation, "whisper-inbox-updated", payload);
 
     res.status(201).json(payload);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const deleteMessage = async (req, res) => {
+  try {
+    const currentUserId = getCurrentUserId(req);
+    const { messageId, conversationId } = req.params;
+
+    if (!isObjectId(messageId)) {
+      return res.status(400).json({ message: "Valid message is required" });
+    }
+
+    const message = await WhisperMessage.findById(messageId);
+    if (!message) return res.status(404).json({ message: "Message not found" });
+
+    if (conversationId && String(message.conversation) !== String(conversationId)) {
+      return res.status(400).json({ message: "Message does not belong to this conversation" });
+    }
+
+    const conversation = await Conversation.findById(message.conversation);
+    if (!conversation) return res.status(404).json({ message: "Conversation not found" });
+
+    if (!ensureParticipant(conversation, currentUserId)) {
+      return res.status(403).json({ message: "You are not part of this whisper" });
+    }
+
+    const senderId = message.sender?._id || message.sender;
+    if (String(senderId) !== String(currentUserId)) {
+      return res.status(403).json({ message: "You can delete only your own messages" });
+    }
+
+    await WhisperMessage.updateMany({ replyTo: message._id }, { $set: { replyTo: null } });
+    await WhisperMessage.deleteOne({ _id: message._id });
+    await refreshConversationLastMessage(conversation._id);
+
+    const populatedConversation = await populateConversation(conversation._id);
+    const payload = {
+      deleted: true,
+      conversationId: conversation._id.toString(),
+      messageId: message._id.toString(),
+      conversation: populatedConversation,
+    };
+
+    const io = req.app.get("io");
+    if (io) io.to(getConversationRoom(conversation._id)).emit("whisper-message-deleted", payload);
+    emitToParticipants(req, populatedConversation || conversation, "whisper-message-deleted", payload);
+
+    return res.json(payload);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+const deleteConversation = async (req, res) => {
+  try {
+    const currentUserId = getCurrentUserId(req);
+    const { conversationId } = req.params;
+
+    if (!isObjectId(conversationId)) {
+      return res.status(400).json({ message: "Valid conversation is required" });
+    }
+
+    const conversation = await Conversation.findById(conversationId).populate("participants", userFields);
+    if (!conversation) return res.status(404).json({ message: "Conversation not found" });
+
+    if (!ensureParticipant(conversation, currentUserId)) {
+      return res.status(403).json({ message: "You are not part of this whisper" });
+    }
+
+    await WhisperMessage.deleteMany({ conversation: conversationId });
+    await Conversation.deleteOne({ _id: conversationId });
+
+    const payload = { conversationId: conversationId.toString() };
+    const io = req.app.get("io");
+    if (io) io.to(getConversationRoom(conversationId)).emit("whisper-conversation-deleted", payload);
+    emitToParticipants(req, conversation, "whisper-conversation-deleted", payload);
+
+    res.json(payload);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -263,6 +375,8 @@ module.exports = {
   getConversations,
   getMessages,
   sendMessage,
+  deleteMessage,
+  deleteConversation,
   markConversationRead,
   getUnreadCount,
 };

@@ -13,6 +13,8 @@ function Whispers() {
     loading,
     messagesLoading,
     sending,
+    deletingConversation,
+    deletingMessageId,
     text,
     query,
     users,
@@ -25,13 +27,20 @@ function Whispers() {
     currentUserId,
     totalUnread,
     emptyState,
+    replyTo,
+    lastMineMessage,
     setQuery,
     clearError,
     closeMobileChat,
     openConversation,
     startConversation,
     handleTyping,
+    setReplyTo,
+    cancelReply,
     sendMessage,
+    deleteMessage,
+    deleteConversation,
+    jumpToMessage,
   } = useWhispers();
 
   return (
@@ -48,8 +57,10 @@ function Whispers() {
           searching={searching}
           activeId={activeId}
           currentUserId={currentUserId}
+          deletingConversation={deletingConversation}
           onOpenConversation={openConversation}
           onStartConversation={startConversation}
+          onDeleteConversation={deleteConversation}
         />
 
         <WhisperChatWindow
@@ -63,9 +74,18 @@ function Whispers() {
           bottomRef={bottomRef}
           text={text}
           sending={sending}
+          deletingConversation={deletingConversation}
+          deletingMessageId={deletingMessageId}
+          replyTo={replyTo}
+          lastMineMessage={lastMineMessage}
           onBack={closeMobileChat}
           onChangeText={handleTyping}
           onSendMessage={sendMessage}
+          onReplyToMessage={setReplyTo}
+          onCancelReply={cancelReply}
+          onDeleteMessage={deleteMessage}
+          onDeleteConversation={deleteConversation}
+          onJumpToMessage={jumpToMessage}
         />
       </div>
     </WhispersShell>

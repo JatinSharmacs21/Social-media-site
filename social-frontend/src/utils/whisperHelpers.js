@@ -38,12 +38,22 @@ export const getInitials = (name = "") =>
     .map((part) => part[0]?.toUpperCase())
     .join("") || "V";
 
+export const getMessageSenderId = (message) => message?.sender?._id || message?.sender || "";
+
+export const getDisplayMessageText = (message, currentUserId) => {
+  if (!message?.text) return "";
+  const mine = String(getMessageSenderId(message)) === String(currentUserId);
+  return `${mine ? "You: " : ""}${message.text}`;
+};
+
 const whisperHelpers = {
   getUserId,
   formatWhisperTime,
   getOtherParticipant,
   sortConversations,
   getInitials,
+  getMessageSenderId,
+  getDisplayMessageText,
 };
 
 export default whisperHelpers;

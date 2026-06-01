@@ -19,6 +19,11 @@ const whisperMessageSchema = new mongoose.Schema(
       trim: true,
       maxlength: 1200,
     },
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "WhisperMessage",
+      default: null,
+    },
     readBy: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -31,5 +36,6 @@ const whisperMessageSchema = new mongoose.Schema(
 
 whisperMessageSchema.index({ conversation: 1, createdAt: -1 });
 whisperMessageSchema.index({ sender: 1, createdAt: -1 });
+whisperMessageSchema.index({ replyTo: 1 });
 
 module.exports = mongoose.model("WhisperMessage", whisperMessageSchema);

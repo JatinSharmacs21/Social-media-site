@@ -4,6 +4,43 @@ import WhisperComposer from "./WhisperComposer";
 import WhisperMessageBubble from "./WhisperMessageBubble";
 import WhisperTypingBubble from "./WhisperTypingBubble";
 
+function MessageSkeleton() {
+  return (
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 px-3 pt-2">
+      {Array.from({ length: 7 }).map((_, index) => {
+        const mine = index % 2;
+        return (
+          <div key={index} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+            <div
+              className={`animate-pulse rounded-[24px] border border-white/[0.05] bg-white/[0.06] shadow-lg shadow-black/10 ${
+                mine ? "h-11 w-[48%] max-w-[280px]" : "h-12 w-[62%] max-w-[360px]"
+              }`}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function EmptyChatCard({ title, subtitle, compact = false }) {
+  return (
+    <div
+      className={`mx-auto w-full max-w-sm rounded-[30px] border border-white/[0.08] bg-white/[0.055] text-center shadow-2xl shadow-cyan-950/20 backdrop-blur-2xl ${
+        compact ? "p-5" : "p-7 sm:p-8"
+      }`}
+    >
+      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/[0.08] bg-gradient-to-br from-cyan-400/15 via-fuchsia-400/15 to-purple-500/15 text-2xl text-white shadow-lg shadow-purple-950/20">
+        ✦
+      </div>
+      <h3 className={`${compact ? "text-lg" : "text-xl sm:text-2xl"} font-extrabold tracking-tight text-white`}>
+        {title}
+      </h3>
+      <p className="mt-2 text-sm leading-relaxed text-zinc-400">{subtitle}</p>
+    </div>
+  );
+}
+
 function WhisperChatWindow({
   activeConversation,
   activePerson,
@@ -15,67 +52,98 @@ function WhisperChatWindow({
   bottomRef,
   text,
   sending,
+  deletingConversation,
+  deletingMessageId,
+  replyTo,
+  lastMineMessage,
   onBack,
   onChangeText,
   onSendMessage,
+  onReplyToMessage,
+  onCancelReply,
+  onDeleteMessage,
+  onDeleteConversation,
+  onJumpToMessage,
 }) {
   const baseClass =
-    "min-h-0 flex-col overflow-hidden bg-[#030306] bg-[radial-gradient(circle_at_84%_4%,rgba(236,72,153,0.22),transparent_34%),radial-gradient(circle_at_3%_86%,rgba(34,211,238,0.18),transparent_36%),radial-gradient(circle_at_50%_52%,rgba(168,85,247,0.10),transparent_44%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent_30%)] md:relative md:flex md:border-l md:border-white/10";
+    "min-h-0 h-full flex-col overflow-hidden bg-[#050711] md:relative md:flex md:border-l md:border-white/[0.07]";
 
-  const mobileClass = mobileChatOpen
-    ? "fixed inset-x-0 bottom-0 top-[76px] z-[80] flex bg-[#030306] md:static md:z-auto"
-    : "hidden md:flex";
+  const mobileClass = mobileChatOpen ? "flex" : "hidden md:flex";
 
   return (
     <section className={`${baseClass} ${mobileClass}`}>
       {activeConversation ? (
         <>
-          <WhisperChatHeader activePerson={activePerson} typingUser={typingUser} onBack={onBack} />
+          <WhisperChatHeader
+            activePerson={activePerson}
+            typingUser={typingUser}
+            deletingConversation={deletingConversation}
+            onBack={onBack}
+            onDeleteConversation={() => onDeleteConversation?.(activeConversation._id)}
+          />
 
-          <div
-            className="min-h-0 flex-1 overflow-y-auto px-3 py-4 [scrollbar-color:transparent_transparent] [scrollbar-width:none] md:px-6 md:py-5 [&::-webkit-scrollbar]:hidden"
-            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-          >
-            {messagesLoading ? (
-              <div className="space-y-4">
-                <div className="h-14 w-2/3 animate-pulse rounded-[28px] bg-white/[0.05]" />
-                <div className="ml-auto h-14 w-1/2 animate-pulse rounded-[28px] bg-white/[0.08]" />
-                <div className="h-14 w-3/5 animate-pulse rounded-[28px] bg-white/[0.05]" />
-                <div className="ml-auto h-14 w-2/5 animate-pulse rounded-[28px] bg-white/[0.08]" />
-              </div>
-            ) : messages.length ? (
-              <div className="space-y-4 pb-1 pt-1">
-                <div className="mx-auto mb-2 w-fit rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500 backdrop-blur-xl">
-                  Private chat
+          <div className="relative min-h-0 flex-1 overflow-hidden">
+            <div className="pointer-events-none absolute inset-0 bg-[#050711]" />
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(34,211,238,0.18),transparent_34%),radial-gradient(circle_at_88%_18%,rgba(168,85,247,0.18),transparent_34%),radial-gradient(circle_at_50%_100%,rgba(236,72,153,0.11),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.035),transparent_30%)]" />
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.018)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.014)_1px,transparent_1px)] bg-[size:34px_34px] opacity-35" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-[#050711] via-[#050711]/75 to-transparent" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#050711] via-[#050711]/70 to-transparent" />
+
+            <div
+              className="relative h-full overflow-y-auto overscroll-contain px-3 py-3 [scrollbar-color:transparent_transparent] [scrollbar-width:none] sm:px-4 md:px-7 md:py-5 [&::-webkit-scrollbar]:hidden"
+              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+            >
+              {messagesLoading ? (
+                <MessageSkeleton />
+              ) : messages.length ? (
+                <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col justify-start gap-2.5 pb-4 pt-1 sm:gap-3 md:pb-5">
+                  {messages.map((message) => {
+                    const mine = message.sender?._id === currentUserId || message.sender === currentUserId;
+                    return (
+                      <WhisperMessageBubble
+                        key={message._id}
+                        message={message}
+                        mine={mine}
+                        activePerson={activePerson}
+                        currentUserId={currentUserId}
+                        isLastMine={lastMineMessage?._id === message._id}
+                        deleting={deletingMessageId === message._id}
+                        onReplyToMessage={onReplyToMessage}
+                        onDeleteMessage={onDeleteMessage}
+                        onJumpToMessage={onJumpToMessage}
+                      />
+                    );
+                  })}
+                  {typingUser && <WhisperTypingBubble />}
+                  <div ref={bottomRef} />
                 </div>
-                {messages.map((message) => {
-                  const mine = message.sender?._id === currentUserId || message.sender === currentUserId;
-                  return <WhisperMessageBubble key={message._id} message={message} mine={mine} activePerson={activePerson} />;
-                })}
-                {typingUser && <WhisperTypingBubble />}
-                <div ref={bottomRef} />
-              </div>
-            ) : (
-              <div className="flex h-full min-h-[320px] items-center justify-center text-center">
-                <div className="mx-auto max-w-sm rounded-[34px] border border-white/10 bg-black/24 p-7 shadow-2xl shadow-black/40 backdrop-blur-xl md:p-8">
-                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[26px] bg-gradient-to-br from-pink-500/22 via-purple-500/20 to-cyan-500/18 text-3xl shadow-lg shadow-purple-500/10">
-                    ✨
-                  </div>
-                  <h3 className="text-xl font-black text-white">Start a whisper</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-zinc-500">Send a private message to begin the conversation.</p>
+              ) : (
+                <div className="flex h-full min-h-[240px] items-start justify-center px-2 pt-8 text-center sm:items-center sm:pt-0">
+                  <EmptyChatCard
+                    title="Start a private chat"
+                    subtitle="Send your first message and keep the conversation clean, private, and focused."
+                    compact
+                  />
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
-          <WhisperComposer text={text} sending={sending} onChangeText={onChangeText} onSendMessage={onSendMessage} />
+          <WhisperComposer
+            text={text}
+            sending={sending}
+            replyTo={replyTo}
+            onChangeText={onChangeText}
+            onSendMessage={onSendMessage}
+            onCancelReply={onCancelReply}
+          />
         </>
       ) : (
-        <div className="hidden flex-1 items-center justify-center p-8 text-center md:flex">
-          <div className="max-w-sm rounded-[34px] border border-white/10 bg-black/25 p-8 shadow-2xl shadow-black/40 backdrop-blur-xl">
-            <div className="mx-auto mb-4 flex h-18 w-18 items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.045] text-4xl">🌙</div>
-            <h2 className="text-2xl font-black text-white">Select a conversation</h2>
-            <p className="mt-2 text-sm leading-relaxed text-zinc-500">Open a chat or search for someone to start privately.</p>
+        <div className="relative hidden flex-1 items-center justify-center overflow-hidden p-8 text-center md:flex">
+          <div className="pointer-events-none absolute inset-0 bg-[#050711]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_24%_20%,rgba(34,211,238,0.16),transparent_32%),radial-gradient(circle_at_82%_18%,rgba(168,85,247,0.16),transparent_34%),radial-gradient(circle_at_50%_86%,rgba(236,72,153,0.10),transparent_40%)]" />
+          <div className="relative">
+            <EmptyChatCard title="Select a conversation" subtitle="Open a chat or search for someone to start a new private whisper." />
           </div>
         </div>
       )}

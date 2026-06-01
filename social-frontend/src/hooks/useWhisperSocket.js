@@ -2,20 +2,17 @@ import { useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 import API from "../services/api";
 import { SOCKET_URL } from "../config/env";
-import { sortConversations } from "../utils/whisperHelpers";
+import { getMessageSenderId, sortConversations } from "../utils/whisperHelpers";
 
 function notifyWhisperCountChange(count) {
   window.dispatchEvent(new CustomEvent("vybeo:whispers-count", { detail: { count } }));
-}
-
-function getMessageSenderId(message) {
-  return message?.sender?._id || message?.sender || "";
 }
 
 function useWhisperSocket({
   token,
   activeId,
   currentUserId,
+  setActiveConversation,
   setMessages,
   setConversations,
   setTypingUser,
@@ -49,9 +46,7 @@ function useWhisperSocket({
 
     socket.on("connect", () => {
       socket.emit("register-user");
-      if (activeIdRef.current) {
-        socket.emit("join-whisper", { conversationId: activeIdRef.current });
-      }
+      if (activeIdRef.current) socket.emit("join-whisper", { conversationId: activeIdRef.current });
     });
 
     socket.on("whisper-message-created", ({ conversation, message }) => {
@@ -63,9 +58,7 @@ function useWhisperSocket({
       updateConversation(conversation, { keepUnread: isActive || isMine });
 
       if (isActive && message?._id) {
-        setMessages((prev) =>
-          prev.some((item) => item._id === message._id) ? prev : [...prev, message]
-        );
+        setMessages((prev) => (prev.some((item) => item._id === message._id) ? prev : [...prev, message]));
         setTypingUser(false);
         API.put(`/api/whispers/conversations/${conversation._id}/read`).catch(() => {});
         scrollToBottom();
@@ -87,11 +80,7 @@ function useWhisperSocket({
         const next = exists
           ? prev.map((item) =>
               item._id === conversation._id
-                ? {
-                    ...item,
-                    ...conversation,
-                    unreadCount: isActive || isMine ? 0 : Number(item.unreadCount || 0) + 1,
-                  }
+                ? { ...item, ...conversation, unreadCount: isActive || isMine ? 0 : Number(item.unreadCount || 0) + 1 }
                 : item
             )
           : [{ ...conversation, unreadCount: isActive || isMine ? 0 : 1 }, ...prev];
@@ -102,18 +91,42 @@ function useWhisperSocket({
       });
     });
 
+    socket.on("whisper-message-deleted", ({ conversationId, messageId, conversation }) => {
+      if (String(conversationId) === String(activeIdRef.current)) {
+        setMessages((prev) => prev.filter((message) => String(message._id) !== String(messageId)));
+      }
+
+      setConversations((prev) => {
+        const next = prev.map((item) => (String(item._id) === String(conversationId) && conversation ? { ...item, ...conversation } : item));
+        return sortConversations(next);
+      });
+
+      notifyWhisperCountChange();
+    });
+
+    socket.on("whisper-conversation-deleted", ({ conversationId }) => {
+      setConversations((prev) => prev.filter((item) => String(item._id) !== String(conversationId)));
+      setMessages((prev) => (String(conversationId) === String(activeIdRef.current) ? [] : prev));
+      if (String(conversationId) === String(activeIdRef.current)) setActiveConversation(null);
+      notifyWhisperCountChange();
+    });
+
     socket.on("whisper-user-typing", ({ conversationId, userId, typing }) => {
-      if (
-        String(conversationId) === String(activeIdRef.current) &&
-        String(userId) !== String(currentUserIdRef.current)
-      ) {
+      if (String(conversationId) === String(activeIdRef.current) && String(userId) !== String(currentUserIdRef.current)) {
         setTypingUser(Boolean(typing));
       }
     });
 
-    socket.on("whisper-seen", ({ conversationId }) => {
+    socket.on("whisper-seen", ({ conversationId, seenBy }) => {
       if (String(conversationId) === String(activeIdRef.current)) {
-        setMessages((prev) => [...prev]);
+        setMessages((prev) =>
+          prev.map((message) => {
+            const isMine = String(getMessageSenderId(message)) === String(currentUserIdRef.current);
+            if (!isMine || !seenBy) return message;
+            const readBy = Array.isArray(message.readBy) ? message.readBy.map(String) : [];
+            return readBy.includes(String(seenBy)) ? message : { ...message, readBy: [...readBy, seenBy] };
+          })
+        );
       }
     });
 
@@ -121,12 +134,14 @@ function useWhisperSocket({
       socket.off("connect");
       socket.off("whisper-message-created");
       socket.off("whisper-inbox-updated");
+      socket.off("whisper-message-deleted");
+      socket.off("whisper-conversation-deleted");
       socket.off("whisper-user-typing");
       socket.off("whisper-seen");
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [token, setMessages, setConversations, setTypingUser, updateConversation, scrollToBottom]);
+  }, [token, setActiveConversation, setMessages, setConversations, setTypingUser, updateConversation, scrollToBottom]);
 
   useEffect(() => {
     const socket = socketRef.current;

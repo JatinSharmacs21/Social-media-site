@@ -6,6 +6,8 @@ const {
   getConversations,
   getMessages,
   sendMessage,
+  deleteMessage,
+  deleteConversation,
   markConversationRead,
   getUnreadCount,
 } = require("../controllers/whisperController");
@@ -19,5 +21,8 @@ router.post("/start/:participantId", getOrCreateConversation);
 router.get("/conversations/:conversationId/messages", getMessages);
 router.post("/conversations/:conversationId/messages", sendMessage);
 router.put("/conversations/:conversationId/read", markConversationRead);
+router.delete("/conversations/:conversationId/messages/:messageId", deleteMessage);
+router.delete("/messages/:messageId", deleteMessage);
+router.delete("/conversations/:conversationId", deleteConversation);
 
 module.exports = router;
