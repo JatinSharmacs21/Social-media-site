@@ -1,8 +1,8 @@
 export function formatWhisperLastSeen(value) {
-  if (!value) return "Offline";
+  if (!value) return "Last seen unavailable";
 
   const seenAt = new Date(value).getTime();
-  if (Number.isNaN(seenAt)) return "Offline";
+  if (Number.isNaN(seenAt)) return "Last seen unavailable";
 
   const diffMs = Date.now() - seenAt;
   if (diffMs < 0) return "Last seen just now";

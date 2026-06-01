@@ -49,9 +49,18 @@ const userSchema = new mongoose.Schema(
       default: false,
     },
 
+    // Updated only when the user's last active socket disconnects.
+    // Keep null for old/new users until they actually go online/offline once.
     lastSeen: {
       type: Date,
-      default: Date.now,
+      default: null,
+    },
+
+    // Optional audit field: updated when the user registers a realtime session.
+    // Do not use this for the public "Last seen" label.
+    lastLoginAt: {
+      type: Date,
+      default: null,
     },
 
     followers: [

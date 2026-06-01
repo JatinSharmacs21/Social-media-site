@@ -85,8 +85,22 @@ io.use((socket, next) => {
 // Realtime notification users: userId -> Set(socket.id)
 const onlineUsers = new Map();
 
+// Prevent false "Last seen just now" updates caused by quick reconnects,
+// React StrictMode dev remounts, route changes, or temporary websocket reconnects.
+// A user is marked offline only if they still have no active sockets after this delay.
+const lastSeenTimers = new Map();
+const LAST_SEEN_GRACE_MS = 30000;
+
+const cancelLastSeenTimer = (userId) => {
+  const id = userId?.toString();
+  if (!id || !lastSeenTimers.has(id)) return;
+  clearTimeout(lastSeenTimers.get(id));
+  lastSeenTimers.delete(id);
+};
+
 const addOnlineSocket = (userId, socketId) => {
   const id = userId.toString();
+  cancelLastSeenTimer(id);
 
   if (!onlineUsers.has(id)) {
     onlineUsers.set(id, new Set());
@@ -116,13 +130,27 @@ const emitPresenceUpdate = () => {
   io.emit("whisper-online-users", { userIds: getOnlineUserIds() });
 };
 
+const touchUserLoginSession = async (userId) => {
+  if (!userId) return;
+
+  try {
+    await User.findByIdAndUpdate(userId, { lastLoginAt: new Date() });
+  } catch (error) {
+    logger.error("Failed to update realtime login session:", error);
+  }
+};
+
 const markUserLastSeen = async (userId) => {
   if (!userId) return null;
 
   const lastSeen = new Date();
   try {
-    await User.findByIdAndUpdate(userId, { lastSeen });
-    return lastSeen;
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { lastSeen },
+      { new: true, select: "lastSeen" }
+    );
+    return user?.lastSeen || lastSeen;
   } catch (error) {
     logger.error("Failed to update last seen:", error);
     return lastSeen;
@@ -186,6 +214,7 @@ io.on("connection", (socket) => {
   const id = socket.user.id.toString();
   socket.userId = id;
   addOnlineSocket(id, socket.id);
+  touchUserLoginSession(id);
 
   socket.emit("whisper-online-users", { userIds: getOnlineUserIds() });
   emitPresenceUpdate();
@@ -287,16 +316,32 @@ socket.on("leave-vybe-room", ({ room = "general" }) => {
   emitVybeRoomCount(roomId);
 });
 
-socket.on("disconnect", async () => {
-  if (socket.userId) {
-    const wentOffline = removeOnlineSocket(socket.userId, socket.id);
+socket.on("disconnect", () => {
+  const disconnectedUserId = socket.userId;
+
+  if (disconnectedUserId) {
+    const wentOffline = removeOnlineSocket(disconnectedUserId, socket.id);
+
     if (wentOffline) {
-      const lastSeen = await markUserLastSeen(socket.userId);
+      // Show the user as offline immediately, but delay writing lastSeen.
+      // If the same user reconnects quickly, this timer is cancelled in addOnlineSocket().
       emitPresenceUpdate();
-      io.emit("whisper-user-presence", {
-        userId: socket.userId,
-        lastSeen: lastSeen?.toISOString?.() || new Date().toISOString(),
-      });
+
+      cancelLastSeenTimer(disconnectedUserId);
+      const timer = setTimeout(async () => {
+        lastSeenTimers.delete(disconnectedUserId);
+
+        // Safety check: never update lastSeen if the user came back online.
+        if (onlineUsers.has(disconnectedUserId)) return;
+
+        const lastSeen = await markUserLastSeen(disconnectedUserId);
+        io.emit("whisper-user-presence", {
+          userId: disconnectedUserId,
+          lastSeen: lastSeen?.toISOString?.() || null,
+        });
+      }, LAST_SEEN_GRACE_MS);
+
+      lastSeenTimers.set(disconnectedUserId, timer);
     }
   }
 
