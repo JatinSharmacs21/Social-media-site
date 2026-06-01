@@ -40,6 +40,7 @@ function Whispers() {
     cancelReply,
     sendMessage,
     deleteMessage,
+    reactToMessage,
     deleteConversation,
     jumpToMessage,
   } = useWhispers();
@@ -87,6 +88,7 @@ function Whispers() {
           onReplyToMessage={setReplyTo}
           onCancelReply={cancelReply}
           onDeleteMessage={deleteMessage}
+          onReactToMessage={reactToMessage}
           onDeleteConversation={deleteConversation}
           onJumpToMessage={jumpToMessage}
         />

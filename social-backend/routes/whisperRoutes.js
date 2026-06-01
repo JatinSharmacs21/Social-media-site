@@ -6,6 +6,7 @@ const {
   getConversations,
   getMessages,
   sendMessage,
+  reactToMessage,
   deleteMessage,
   deleteConversation,
   markConversationRead,
@@ -20,6 +21,7 @@ router.post("/conversations", getOrCreateConversation);
 router.post("/start/:participantId", getOrCreateConversation);
 router.get("/conversations/:conversationId/messages", getMessages);
 router.post("/conversations/:conversationId/messages", sendMessage);
+router.put("/conversations/:conversationId/messages/:messageId/react", reactToMessage);
 router.put("/conversations/:conversationId/read", markConversationRead);
 router.delete("/conversations/:conversationId/messages/:messageId", deleteMessage);
 router.delete("/messages/:messageId", deleteMessage);

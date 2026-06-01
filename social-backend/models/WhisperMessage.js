@@ -30,6 +30,24 @@ const whisperMessageSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    reactions: [
+      {
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        emoji: {
+          type: String,
+          enum: ["❤️", "😂", "🔥", "👀", "😮"],
+          required: true,
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
   { timestamps: true }
 );
@@ -37,5 +55,6 @@ const whisperMessageSchema = new mongoose.Schema(
 whisperMessageSchema.index({ conversation: 1, createdAt: -1 });
 whisperMessageSchema.index({ sender: 1, createdAt: -1 });
 whisperMessageSchema.index({ replyTo: 1 });
+whisperMessageSchema.index({ "reactions.user": 1 });
 
 module.exports = mongoose.model("WhisperMessage", whisperMessageSchema);

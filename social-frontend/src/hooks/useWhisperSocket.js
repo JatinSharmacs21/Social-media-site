@@ -143,6 +143,24 @@ function useWhisperSocket({
       );
     });
 
+
+    socket.on("whisper-message-reacted", ({ conversationId, message }) => {
+      if (!message?._id) return;
+
+      if (String(conversationId) === String(activeIdRef.current)) {
+        setMessages((prev) => prev.map((item) => (String(item._id) === String(message._id) ? { ...item, ...message } : item)));
+      }
+
+      setConversations((prev) =>
+        prev.map((conversation) => {
+          if (String(conversation._id) !== String(conversationId)) return conversation;
+          const lastMessageId = conversation.lastMessage?._id || conversation.lastMessage;
+          if (String(lastMessageId) !== String(message._id)) return conversation;
+          return { ...conversation, lastMessage: { ...conversation.lastMessage, ...message } };
+        })
+      );
+    });
+
     socket.on("whisper-user-typing", ({ conversationId, userId, typing }) => {
       if (String(conversationId) === String(activeIdRef.current) && String(userId) !== String(currentUserIdRef.current)) {
         setTypingUser(Boolean(typing));
@@ -170,6 +188,7 @@ function useWhisperSocket({
       socket.off("whisper-conversation-deleted");
       socket.off("whisper-online-users");
       socket.off("whisper-user-presence");
+      socket.off("whisper-message-reacted");
       socket.off("whisper-user-typing");
       socket.off("whisper-seen");
       socket.disconnect();

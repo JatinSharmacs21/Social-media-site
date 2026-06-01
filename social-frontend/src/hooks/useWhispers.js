@@ -235,6 +235,26 @@ function useWhispers() {
     [activeId, replyTo, sending, socketRef, text, updateConversation]
   );
 
+  const reactToMessage = useCallback(
+    async (messageId, emoji) => {
+      if (!activeId || !messageId || !emoji) return;
+
+      try {
+        const res = await API.put(`/api/whispers/conversations/${activeId}/messages/${messageId}/react`, { emoji });
+        const updatedMessage = res.data?.message;
+        if (updatedMessage?._id) {
+          setMessages((prev) =>
+            prev.map((message) => (String(message._id) === String(updatedMessage._id) ? { ...message, ...updatedMessage } : message))
+          );
+        }
+      } catch (err) {
+        logger.error(err.response?.data || err);
+        setError("Reaction could not be updated.");
+      }
+    },
+    [activeId]
+  );
+
   const deleteMessage = useCallback(
     async (messageId) => {
       if (!messageId || deletingMessageId) return;
@@ -324,6 +344,7 @@ function useWhispers() {
     cancelReply,
     sendMessage,
     deleteMessage,
+    reactToMessage,
     deleteConversation,
     jumpToMessage,
   };

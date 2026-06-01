@@ -3,8 +3,48 @@ import Avatar from "../ui/Avatar";
 import { formatWhisperTime, getDisplayMessageText, getOtherParticipant } from "../../utils/whisperHelpers";
 import { formatWhisperLastSeen } from "../../utils/whisperPresence";
 
+function DeleteChatDialog({ deleting, onCancel, onConfirm }) {
+  return (
+    <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/72 px-4 backdrop-blur-xl">
+      <div className="w-full max-w-sm overflow-hidden rounded-[28px] border border-white/[0.1] bg-[#0b0c12]/88 p-2 shadow-2xl shadow-black/90 backdrop-blur-3xl">
+        <div className="rounded-[22px] border border-red-300/15 bg-gradient-to-br from-red-500/18 via-white/[0.055] to-white/[0.025] px-4 py-4">
+          <div className="mb-3 flex items-center gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-red-300/15 bg-red-500/12 text-lg text-red-100 shadow-lg shadow-red-950/25">
+              ✕
+            </span>
+            <div className="min-w-0">
+              <p className="text-[15px] font-semibold text-white">Delete this chat?</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-zinc-400">This conversation will be removed from your whispers list.</p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={deleting}
+              className="rounded-2xl border border-white/[0.08] bg-white/[0.055] px-4 py-3 text-sm font-semibold text-zinc-200 transition hover:bg-white/[0.09] active:scale-[0.98] disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={deleting}
+              className="rounded-2xl border border-red-300/20 bg-red-500/18 px-4 py-3 text-sm font-semibold text-red-100 shadow-lg shadow-red-950/20 transition hover:bg-red-500/25 active:scale-[0.98] disabled:opacity-50"
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function WhisperConversationItem({ conversation, activeId, currentUserId, deletingConversation, onlineUserIds = [], onOpenConversation, onDeleteConversation }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const person = getOtherParticipant(conversation, currentUserId);
   const active = conversation._id === activeId;
   const unread = Number(conversation.unreadCount || 0);
@@ -15,14 +55,27 @@ function WhisperConversationItem({ conversation, activeId, currentUserId, deleti
     ? "Online now"
     : formatWhisperLastSeen(person?.lastSeen);
 
-  const handleDelete = (event) => {
+  const openDeleteConfirm = (event) => {
     event.stopPropagation();
     setMenuOpen(false);
-    if (window.confirm("Delete this chat?")) onDeleteConversation?.(conversation._id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
+    onDeleteConversation?.(conversation._id);
+    setDeleteConfirmOpen(false);
   };
 
   return (
     <div className="relative">
+      {deleteConfirmOpen && (
+        <DeleteChatDialog
+          deleting={deletingConversation}
+          onCancel={() => setDeleteConfirmOpen(false)}
+          onConfirm={confirmDelete}
+        />
+      )}
+
       <button
         onClick={() => onOpenConversation(conversation)}
         className={`group relative flex w-full items-center gap-3 overflow-hidden rounded-[22px] border px-3 py-2.5 pr-10 text-left transition duration-200 active:scale-[0.99] ${
@@ -77,13 +130,13 @@ function WhisperConversationItem({ conversation, activeId, currentUserId, deleti
 
       {menuOpen && (
         <>
-          <button type="button" aria-label="Close menu" className="fixed inset-0 z-20 cursor-default bg-transparent" onClick={() => setMenuOpen(false)} />
-          <div className="absolute right-2 top-12 z-30 w-44 overflow-hidden rounded-2xl border border-white/[0.09] bg-[#0a0b10]/98 p-1.5 shadow-2xl shadow-black/60 backdrop-blur-2xl">
+          <button type="button" aria-label="Close menu" className="fixed inset-0 z-20 cursor-default bg-black/35 backdrop-blur-[2px]" onClick={() => setMenuOpen(false)} />
+          <div className="absolute right-2 top-12 z-30 w-44 overflow-hidden rounded-2xl border border-white/[0.16] bg-[#11121a]/82 p-1.5 shadow-2xl shadow-black/80 backdrop-blur-3xl">
             <button
               type="button"
               disabled={deletingConversation}
-              onClick={handleDelete}
-              className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-red-200 transition hover:bg-red-500/12 disabled:opacity-50"
+              onClick={openDeleteConfirm}
+              className="flex w-full items-center justify-between rounded-xl border border-red-300/10 bg-red-500/[0.08] px-3 py-2.5 text-left text-sm font-semibold text-red-100 transition hover:bg-red-500/16 disabled:opacity-50"
             >
               <span>{deletingConversation ? "Deleting..." : "Delete chat"}</span>
               <span className="text-red-300/50">✕</span>

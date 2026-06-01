@@ -18,11 +18,14 @@ const ensureParticipant = (conversation, userId) =>
   getParticipantIds(conversation).includes(userId.toString());
 
 const populateMessage = (query) =>
-  query.populate("sender", userFields).populate({
-    path: "replyTo",
-    select: "text sender createdAt",
-    populate: { path: "sender", select: userFields },
-  });
+  query
+    .populate("sender", userFields)
+    .populate("reactions.user", userFields)
+    .populate({
+      path: "replyTo",
+      select: "text sender createdAt",
+      populate: { path: "sender", select: userFields },
+    });
 
 const populateConversation = async (conversationId) =>
   Conversation.findById(conversationId)
@@ -110,6 +113,7 @@ const getConversations = async (req, res) => {
         path: "lastMessage",
         populate: [
           { path: "sender", select: userFields },
+          { path: "reactions.user", select: userFields },
           {
             path: "replyTo",
             select: "text sender createdAt",
@@ -236,6 +240,60 @@ const sendMessage = async (req, res) => {
     res.status(201).json(payload);
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+const reactToMessage = async (req, res) => {
+  try {
+    const currentUserId = getCurrentUserId(req);
+    const { conversationId, messageId } = req.params;
+    const emoji = String(req.body.emoji || "").trim();
+    const allowedEmojis = ["❤️", "😂", "🔥", "👀", "😮"];
+
+    if (!isObjectId(conversationId) || !isObjectId(messageId)) {
+      return res.status(400).json({ message: "Valid conversation and message are required" });
+    }
+
+    if (!allowedEmojis.includes(emoji)) {
+      return res.status(400).json({ message: "Valid reaction is required" });
+    }
+
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) return res.status(404).json({ message: "Conversation not found" });
+
+    if (!ensureParticipant(conversation, currentUserId)) {
+      return res.status(403).json({ message: "You are not part of this whisper" });
+    }
+
+    const message = await WhisperMessage.findOne({ _id: messageId, conversation: conversationId });
+    if (!message) return res.status(404).json({ message: "Message not found" });
+
+    const currentUser = String(currentUserId);
+    const existingIndex = (message.reactions || []).findIndex((reaction) => String(reaction.user) === currentUser);
+
+    if (existingIndex >= 0) {
+      if (message.reactions[existingIndex].emoji === emoji) {
+        message.reactions.splice(existingIndex, 1);
+      } else {
+        message.reactions[existingIndex].emoji = emoji;
+        message.reactions[existingIndex].createdAt = new Date();
+      }
+    } else {
+      message.reactions.push({ user: currentUserId, emoji, createdAt: new Date() });
+    }
+
+    await message.save();
+
+    const populatedMessage = await populateMessage(WhisperMessage.findById(message._id));
+    const payload = { conversationId: conversationId.toString(), message: populatedMessage };
+
+    const io = req.app.get("io");
+    if (io) io.to(getConversationRoom(conversationId)).emit("whisper-message-reacted", payload);
+    emitToParticipants(req, conversation, "whisper-message-reacted", payload);
+
+    return res.json(payload);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
   }
 };
 
@@ -375,6 +433,7 @@ module.exports = {
   getConversations,
   getMessages,
   sendMessage,
+  reactToMessage,
   deleteMessage,
   deleteConversation,
   markConversationRead,
