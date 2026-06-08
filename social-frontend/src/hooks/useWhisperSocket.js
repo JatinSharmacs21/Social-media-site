@@ -72,7 +72,25 @@ function useWhisperSocket({
       updateConversation(conversation, { keepUnread: isActive || isMine });
 
       if (isActive && message?._id) {
-        setMessages((prev) => (prev.some((item) => item._id === message._id) ? prev : [...prev, message]));
+        setMessages((prev) => {
+          if (prev.some((item) => String(item._id) === String(message._id))) return prev;
+
+          if (isMine) {
+            const pendingIndex = prev.findIndex((item) => {
+              if (item.status !== "sending" && item.status !== "failed") return false;
+              if (String(getMessageSenderId(item)) !== String(currentUserIdRef.current)) return false;
+              const sameText = String(item.text || "") === String(message.text || "");
+              const sameMediaType = String(item.media?.type || "") === String(message.media?.type || "");
+              return sameText && sameMediaType;
+            });
+
+            if (pendingIndex !== -1) {
+              return prev.map((item, index) => (index === pendingIndex ? message : item));
+            }
+          }
+
+          return [...prev, message];
+        });
         setTypingUser(false);
         API.put(`/api/whispers/conversations/${conversation._id}/read`).catch(() => {});
         scrollToBottom();

@@ -69,6 +69,7 @@ function WhisperChatWindow({
   onSelectMedia,
   onClearMedia,
   onDeleteMessage,
+  onRetryMessage,
   onReactToMessage,
   onDeleteConversation,
   onJumpToMessage,
@@ -133,6 +134,7 @@ function WhisperChatWindow({
                         deleting={deletingMessageId === message._id}
                         onReplyToMessage={onReplyToMessage}
                         onDeleteMessage={onDeleteMessage}
+                        onRetryMessage={onRetryMessage}
                         onReactToMessage={onReactToMessage}
                         onJumpToMessage={onJumpToMessage}
                       />

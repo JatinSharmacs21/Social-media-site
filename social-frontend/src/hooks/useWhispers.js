@@ -8,6 +8,36 @@ function notifyWhisperCountChange(count) {
   window.dispatchEvent(new CustomEvent("vybeo:whispers-count", { detail: { count } }));
 }
 
+const createPendingId = () => `pending-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+const buildPendingMessage = ({ conversationId, currentUserId, text, replyTo, mediaPreview, mediaFile }) => ({
+  _id: createPendingId(),
+  conversation: conversationId,
+  sender: currentUserId,
+  text,
+  replyTo: replyTo || null,
+  media: mediaPreview
+    ? {
+        url: mediaPreview.previewUrl,
+        type: mediaPreview.type,
+        name: mediaPreview.name || mediaFile?.name || "Media",
+        size: mediaPreview.size || mediaFile?.size || 0,
+        local: true,
+      }
+    : undefined,
+  readBy: [currentUserId],
+  createdAt: new Date().toISOString(),
+  status: "sending",
+  isPending: true,
+  _retryPayload: {
+    text,
+    replyToId: replyTo?._id || null,
+    replyTo: replyTo || null,
+    mediaFile: mediaFile || null,
+    mediaPreview: mediaPreview || null,
+  },
+});
+
 function useWhispers() {
   const token = localStorage.getItem("token");
   const currentUserId = getUserId();
@@ -250,52 +280,115 @@ function useWhispers() {
 
   useEffect(() => () => clearMedia(), [clearMedia]);
 
-  const sendMessage = useCallback(
-    async (event) => {
-      event.preventDefault();
-      const cleanText = text.trim();
-      if ((!cleanText && !mediaFile) || !activeId || sending) return;
+  const finalizePendingMessage = useCallback((pendingId, realMessage) => {
+    if (!pendingId || !realMessage?._id) return;
+
+    setMessages((prev) => {
+      const withoutDuplicate = prev.filter((message) => String(message._id) !== String(realMessage._id));
+      const hasPending = withoutDuplicate.some((message) => String(message._id) === String(pendingId));
+      if (!hasPending) return withoutDuplicate;
+      return withoutDuplicate.map((message) => (String(message._id) === String(pendingId) ? realMessage : message));
+    });
+  }, []);
+
+  const markPendingFailed = useCallback((pendingId, fallbackText = "Message failed. Tap retry.") => {
+    if (!pendingId) return;
+    setMessages((prev) =>
+      prev.map((message) =>
+        String(message._id) === String(pendingId)
+          ? { ...message, status: "failed", isPending: true, errorMessage: fallbackText }
+          : message
+      )
+    );
+  }, []);
+
+  const deliverPendingMessage = useCallback(
+    async (pendingMessage, retryPayload) => {
+      const conversationId = pendingMessage?.conversation || activeId;
+      if (!conversationId || !pendingMessage?._id) return;
 
       const payload = {
-        text: cleanText,
-        replyTo: replyTo?._id || null,
+        text: retryPayload?.text || "",
+        replyTo: retryPayload?.replyToId || null,
       };
 
       try {
         setSending(true);
-        setMediaUploading(Boolean(mediaFile));
-        setText("");
-        setReplyTo(null);
+        setMediaUploading(Boolean(retryPayload?.mediaFile));
 
-        if (mediaFile) {
+        if (retryPayload?.mediaFile) {
           const formData = new FormData();
-          formData.append("file", mediaFile);
+          formData.append("file", retryPayload.mediaFile);
           const uploadRes = await API.post("/api/upload", formData, {
             headers: { "Content-Type": "multipart/form-data" },
           });
           payload.media = {
             url: uploadRes.data?.url,
             type: uploadRes.data?.type,
-            name: mediaFile.name,
-            size: mediaFile.size,
+            name: retryPayload.mediaFile.name,
+            size: retryPayload.mediaFile.size,
           };
         }
 
-        socketRef.current?.emit("whisper-typing", { conversationId: activeId, typing: false });
-        const res = await API.post(`/api/whispers/conversations/${activeId}/messages`, payload);
-        clearMedia();
-        updateConversation(res.data.conversation);
+        socketRef.current?.emit("whisper-typing", { conversationId, typing: false });
+        const res = await API.post(`/api/whispers/conversations/${conversationId}/messages`, payload);
+        finalizePendingMessage(pendingMessage._id, res.data?.message);
+        updateConversation(res.data?.conversation);
       } catch (err) {
         logger.error(err.response?.data || err);
-        setText(cleanText);
-        setReplyTo(replyTo);
-        setError("Message could not be sent. Please try again.");
+        markPendingFailed(pendingMessage._id, "Message could not be sent. Tap retry.");
       } finally {
         setSending(false);
         setMediaUploading(false);
       }
     },
-    [activeId, clearMedia, mediaFile, replyTo, sending, socketRef, text, updateConversation]
+    [activeId, finalizePendingMessage, markPendingFailed, socketRef, updateConversation]
+  );
+
+  const sendMessage = useCallback(
+    async (event) => {
+      event.preventDefault();
+      const cleanText = text.trim();
+      if ((!cleanText && !mediaFile) || !activeId || sending) return;
+
+      const currentMediaFile = mediaFile;
+      const currentMediaPreview = mediaPreview;
+      const currentReplyTo = replyTo;
+      const pendingMessage = buildPendingMessage({
+        conversationId: activeId,
+        currentUserId,
+        text: cleanText,
+        replyTo: currentReplyTo,
+        mediaPreview: currentMediaPreview,
+        mediaFile: currentMediaFile,
+      });
+
+      setMessages((prev) => [...prev, pendingMessage]);
+      setText("");
+      setReplyTo(null);
+      setMediaFile(null);
+      setMediaPreview(null);
+      scrollToBottom();
+
+      deliverPendingMessage(pendingMessage, pendingMessage._retryPayload);
+    },
+    [activeId, currentUserId, deliverPendingMessage, mediaFile, mediaPreview, replyTo, scrollToBottom, sending, text]
+  );
+
+  const retryMessage = useCallback(
+    (message) => {
+      if (!message?._id || message.status !== "failed" || !message._retryPayload) return;
+      setMessages((prev) =>
+        prev.map((item) =>
+          String(item._id) === String(message._id)
+            ? { ...item, status: "sending", errorMessage: "" }
+            : item
+        )
+      );
+      scrollToBottom();
+      deliverPendingMessage({ ...message, status: "sending" }, message._retryPayload);
+    },
+    [deliverPendingMessage, scrollToBottom]
   );
 
   const reactToMessage = useCallback(
@@ -441,6 +534,7 @@ function useWhispers() {
     selectMedia,
     clearMedia,
     sendMessage,
+    retryMessage,
     deleteMessage,
     reactToMessage,
     deleteConversation,

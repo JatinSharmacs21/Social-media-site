@@ -332,6 +332,38 @@ function MobileSheet({ mine, message, deleting, selectedEmoji, onClose, onReplyT
   );
 }
 
+function DeliveryStatus({ message, mine, seen, isLastInGroup, onRetryMessage }) {
+  if (!mine || !isLastInGroup) return null;
+
+  if (message.status === "sending") {
+    return (
+      <span className="inline-flex items-center gap-1 text-white/60">
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white/70" />
+        Sending
+      </span>
+    );
+  }
+
+  if (message.status === "failed") {
+    return (
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onRetryMessage?.(message);
+        }}
+        className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-bold text-red-100 ring-1 ring-red-300/20 transition hover:bg-red-500/25 active:scale-95"
+        title={message.errorMessage || "Message failed"}
+      >
+        ⚠ Retry
+      </button>
+    );
+  }
+
+  if (seen) return <span className="text-cyan-100/75">Seen</span>;
+  return <span className="text-white/58">Sent</span>;
+}
+
 function WhisperMessageBubble({
   message,
   mine,
@@ -343,6 +375,7 @@ function WhisperMessageBubble({
   deleting,
   onReplyToMessage,
   onDeleteMessage,
+  onRetryMessage,
   onReactToMessage,
   onJumpToMessage,
 }) {
@@ -354,8 +387,13 @@ function WhisperMessageBubble({
   const reactions = Array.isArray(message.reactions) ? message.reactions : [];
   const seen = mine && isLastMine && readBy.some((id) => String(id) !== String(currentUserId));
   const myReaction = reactions.find((reaction) => String(reaction.user?._id || reaction.user) === String(currentUserId));
+  const pending = message.status === "sending";
+  const failed = message.status === "failed";
 
-  const openActions = () => setMenuOpen(true);
+  const openActions = () => {
+    if (pending || failed) return;
+    setMenuOpen(true);
+  };
   const closeActions = () => setMenuOpen(false);
 
   const requestDelete = () => {
@@ -416,7 +454,7 @@ function WhisperMessageBubble({
               mine
                 ? "bg-gradient-to-br from-[#c84ec0] via-[#7d5cf0] to-[#19a8c7] text-white shadow-violet-950/18"
                 : "border border-white/[0.07] bg-white/[0.055] text-zinc-100 shadow-black/20 backdrop-blur-xl"
-            }`}
+            } ${pending ? "opacity-70" : ""} ${failed ? "ring-1 ring-red-300/35" : ""}`}
           >
             <div className="max-w-full px-3.5 py-2.5 md:max-w-[620px] md:px-4 md:py-2.5">
               <ReplySnippet replyTo={message.replyTo} mine={mine} onJumpToMessage={onJumpToMessage} />
@@ -427,6 +465,7 @@ function WhisperMessageBubble({
               {isLastInGroup && (
                 <div className={`mt-1.5 flex items-center justify-end gap-2 text-[10px] font-medium ${mine ? "text-white/58" : "text-zinc-500"}`}>
                   <span>{formatWhisperTime(message.createdAt)}</span>
+                  <DeliveryStatus message={message} mine={mine} seen={seen} isLastInGroup={isLastInGroup} onRetryMessage={onRetryMessage} />
                 </div>
               )}
             </div>
@@ -472,7 +511,6 @@ function WhisperMessageBubble({
               </>
             )}
           </div>
-          {seen && <p className="mt-1 pr-1 text-right text-[10px] font-medium text-zinc-500">Seen</p>}
           <DeleteConfirmDialog
             open={deleteConfirmOpen}
             deleting={deleting}
