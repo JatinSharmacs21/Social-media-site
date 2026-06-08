@@ -23,7 +23,7 @@ const populateMessage = (query) =>
     .populate("reactions.user", userFields)
     .populate({
       path: "replyTo",
-      select: "text sender createdAt",
+      select: "text media sender createdAt",
       populate: { path: "sender", select: userFields },
     });
 
@@ -36,7 +36,7 @@ const populateConversation = async (conversationId) =>
         { path: "sender", select: userFields },
         {
           path: "replyTo",
-          select: "text sender createdAt",
+          select: "text media sender createdAt",
           populate: { path: "sender", select: userFields },
         },
       ],
@@ -116,7 +116,7 @@ const getConversations = async (req, res) => {
           { path: "reactions.user", select: userFields },
           {
             path: "replyTo",
-            select: "text sender createdAt",
+            select: "text media sender createdAt",
             populate: { path: "sender", select: userFields },
           },
         ],
@@ -197,8 +197,17 @@ const sendMessage = async (req, res) => {
     const { conversationId } = req.params;
     const text = String(req.body.text || "").trim();
     const replyTo = req.body.replyTo || null;
+    const mediaInput = req.body.media && typeof req.body.media === "object" ? req.body.media : null;
+    const media = mediaInput?.url
+      ? {
+          url: String(mediaInput.url || "").trim(),
+          type: mediaInput.type === "video" ? "video" : "image",
+          name: String(mediaInput.name || "").slice(0, 180),
+          size: Number(mediaInput.size || 0),
+        }
+      : null;
 
-    if (!text) return res.status(400).json({ message: "Message is required" });
+    if (!text && !media?.url) return res.status(400).json({ message: "Message or media is required" });
     if (text.length > 1200) {
       return res.status(400).json({ message: "Message is too long" });
     }
@@ -220,6 +229,7 @@ const sendMessage = async (req, res) => {
       conversation: conversationId,
       sender: currentUserId,
       text,
+      media: media || undefined,
       replyTo: validReplyTo,
       readBy: [currentUserId],
     });
@@ -240,6 +250,50 @@ const sendMessage = async (req, res) => {
     res.status(201).json(payload);
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+
+const togglePinConversation = async (req, res) => {
+  try {
+    const currentUserId = getCurrentUserId(req);
+    const { conversationId } = req.params;
+
+    if (!currentUserId) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    if (!isObjectId(conversationId)) {
+      return res.status(400).json({ message: "Valid conversation is required" });
+    }
+
+    const conversation = await Conversation.findOne({
+      _id: conversationId,
+      participants: currentUserId,
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    const currentUserKey = currentUserId.toString();
+    const pinnedBy = Array.isArray(conversation.pinnedBy) ? conversation.pinnedBy : [];
+    const alreadyPinned = pinnedBy.some((id) => id.toString() === currentUserKey);
+
+    conversation.pinnedBy = alreadyPinned
+      ? pinnedBy.filter((id) => id.toString() !== currentUserKey)
+      : [...pinnedBy, currentUserId];
+
+    await conversation.save();
+
+    const populatedConversation = await populateConversation(conversation._id);
+
+    res.json({
+      conversation: populatedConversation,
+      pinned: !alreadyPinned,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Chat pin could not be updated" });
   }
 };
 
@@ -438,4 +492,5 @@ module.exports = {
   deleteConversation,
   markConversationRead,
   getUnreadCount,
+  togglePinConversation,
 };

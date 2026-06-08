@@ -10,6 +10,12 @@ function Whispers() {
     activeConversation,
     activePerson,
     messages,
+    filteredMessages,
+    messageSearch,
+    messageSearchCount,
+    setMessageSearch,
+    mediaPreview,
+    mediaUploading,
     loading,
     messagesLoading,
     sending,
@@ -38,10 +44,13 @@ function Whispers() {
     handleTyping,
     setReplyTo,
     cancelReply,
+    selectMedia,
+    clearMedia,
     sendMessage,
     deleteMessage,
     reactToMessage,
     deleteConversation,
+    togglePinConversation,
     jumpToMessage,
   } = useWhispers();
 
@@ -64,12 +73,17 @@ function Whispers() {
           onOpenConversation={openConversation}
           onStartConversation={startConversation}
           onDeleteConversation={deleteConversation}
+          onTogglePinConversation={togglePinConversation}
         />
 
         <WhisperChatWindow
           activeConversation={activeConversation}
           activePerson={activePerson}
-          messages={messages}
+          messages={filteredMessages}
+          allMessages={messages}
+          messageSearch={messageSearch}
+          messageSearchCount={messageSearchCount}
+          setMessageSearch={setMessageSearch}
           messagesLoading={messagesLoading}
           mobileChatOpen={mobileChatOpen}
           typingUser={typingUser}
@@ -78,6 +92,8 @@ function Whispers() {
           bottomRef={bottomRef}
           text={text}
           sending={sending}
+          mediaPreview={mediaPreview}
+          mediaUploading={mediaUploading}
           deletingConversation={deletingConversation}
           deletingMessageId={deletingMessageId}
           replyTo={replyTo}
@@ -87,6 +103,8 @@ function Whispers() {
           onSendMessage={sendMessage}
           onReplyToMessage={setReplyTo}
           onCancelReply={cancelReply}
+          onSelectMedia={selectMedia}
+          onClearMedia={clearMedia}
           onDeleteMessage={deleteMessage}
           onReactToMessage={reactToMessage}
           onDeleteConversation={deleteConversation}

@@ -1,6 +1,7 @@
 import React from "react";
 import WhisperConversationItem from "./WhisperConversationItem";
 import WhisperSearchBox from "./WhisperSearchBox";
+import { isConversationPinned } from "../../utils/whisperHelpers";
 
 function InboxSkeleton() {
   return (
@@ -34,9 +35,12 @@ function WhisperInbox({
   onOpenConversation,
   onStartConversation,
   onDeleteConversation,
+  onTogglePinConversation,
 }) {
   const unreadTotal = conversations.reduce((sum, conversation) => sum + Number(conversation.unreadCount || 0), 0);
   const onlineSet = new Set((onlineUserIds || []).map(String));
+  const pinnedConversations = conversations.filter((conversation) => isConversationPinned(conversation, currentUserId));
+  const normalConversations = conversations.filter((conversation) => !isConversationPinned(conversation, currentUserId));
   const onlineConversations = conversations.filter((conversation) => {
     const person = conversation.participants?.find((participant) => String(participant?._id) !== String(currentUserId)) || conversation.participants?.[0];
     return person?._id && onlineSet.has(String(person._id));
@@ -98,19 +102,44 @@ function WhisperInbox({
             <p className="mt-1 text-sm leading-relaxed text-zinc-500">Search someone and send a private Whisper.</p>
           </div>
         ) : (
-          <div className="space-y-2 pb-2">
-            {conversations.map((conversation) => (
-              <WhisperConversationItem
-                key={conversation._id}
-                conversation={conversation}
-                activeId={activeId}
-                currentUserId={currentUserId}
-                deletingConversation={deletingConversation}
-                onOpenConversation={onOpenConversation}
-                onlineUserIds={onlineUserIds}
-                onDeleteConversation={onDeleteConversation}
-              />
-            ))}
+          <div className="space-y-3 pb-2">
+            {pinnedConversations.length > 0 && (
+              <div className="space-y-2">
+                <p className="px-1 text-[10px] font-bold uppercase tracking-[0.16em] text-pink-200/70">Pinned</p>
+                {pinnedConversations.map((conversation) => (
+                  <WhisperConversationItem
+                    key={conversation._id}
+                    conversation={conversation}
+                    activeId={activeId}
+                    currentUserId={currentUserId}
+                    deletingConversation={deletingConversation}
+                    onOpenConversation={onOpenConversation}
+                    onlineUserIds={onlineUserIds}
+                    onDeleteConversation={onDeleteConversation}
+                    onTogglePinConversation={onTogglePinConversation}
+                  />
+                ))}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {pinnedConversations.length > 0 && normalConversations.length > 0 && (
+                <p className="px-1 pt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-600">Recent</p>
+              )}
+              {normalConversations.map((conversation) => (
+                <WhisperConversationItem
+                  key={conversation._id}
+                  conversation={conversation}
+                  activeId={activeId}
+                  currentUserId={currentUserId}
+                  deletingConversation={deletingConversation}
+                  onOpenConversation={onOpenConversation}
+                  onlineUserIds={onlineUserIds}
+                  onDeleteConversation={onDeleteConversation}
+                  onTogglePinConversation={onTogglePinConversation}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>

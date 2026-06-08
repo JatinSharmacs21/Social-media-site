@@ -11,6 +11,7 @@ const {
   deleteConversation,
   markConversationRead,
   getUnreadCount,
+  togglePinConversation,
 } = require("../controllers/whisperController");
 
 router.use(protect);
@@ -23,6 +24,9 @@ router.get("/conversations/:conversationId/messages", getMessages);
 router.post("/conversations/:conversationId/messages", sendMessage);
 router.put("/conversations/:conversationId/messages/:messageId/react", reactToMessage);
 router.put("/conversations/:conversationId/read", markConversationRead);
+router.put("/conversations/:conversationId/pin", togglePinConversation);
+router.patch("/conversations/:conversationId/pin", togglePinConversation);
+router.post("/conversations/:conversationId/pin", togglePinConversation);
 router.delete("/conversations/:conversationId/messages/:messageId", deleteMessage);
 router.delete("/messages/:messageId", deleteMessage);
 router.delete("/conversations/:conversationId", deleteConversation);

@@ -43,6 +43,10 @@ function WhisperChatWindow({
   activeConversation,
   activePerson,
   messages,
+  allMessages = [],
+  messageSearch = "",
+  messageSearchCount = 0,
+  setMessageSearch,
   messagesLoading,
   mobileChatOpen,
   typingUser,
@@ -51,6 +55,8 @@ function WhisperChatWindow({
   bottomRef,
   text,
   sending,
+  mediaPreview,
+  mediaUploading,
   deletingConversation,
   deletingMessageId,
   replyTo,
@@ -60,6 +66,8 @@ function WhisperChatWindow({
   onSendMessage,
   onReplyToMessage,
   onCancelReply,
+  onSelectMedia,
+  onClearMedia,
   onDeleteMessage,
   onReactToMessage,
   onDeleteConversation,
@@ -77,6 +85,9 @@ function WhisperChatWindow({
             typingUser={typingUser}
             onlineUserIds={onlineUserIds}
             deletingConversation={deletingConversation}
+            messageSearch={messageSearch}
+            messageSearchCount={messageSearchCount}
+            setMessageSearch={setMessageSearch}
             onBack={onBack}
             onDeleteConversation={() => onDeleteConversation?.(activeConversation._id)}
           />
@@ -133,8 +144,8 @@ function WhisperChatWindow({
               ) : (
                 <div className="flex h-full min-h-[240px] items-start justify-center px-2 pt-8 text-center sm:items-center sm:pt-0">
                   <EmptyChatCard
-                    title="Start a private chat"
-                    subtitle="Send your first message and keep the conversation clean, private, and focused."
+                    title={messageSearch && allMessages.length ? "No matching whispers" : "Start a private chat"}
+                    subtitle={messageSearch && allMessages.length ? "Try another word or clear search to see the full conversation." : "Send your first message and keep the conversation clean, private, and focused."}
                     compact
                   />
                 </div>
@@ -145,10 +156,14 @@ function WhisperChatWindow({
           <WhisperComposer
             text={text}
             sending={sending}
+            mediaPreview={mediaPreview}
+            mediaUploading={mediaUploading}
             replyTo={replyTo}
             onChangeText={onChangeText}
             onSendMessage={onSendMessage}
             onCancelReply={onCancelReply}
+            onSelectMedia={onSelectMedia}
+            onClearMedia={onClearMedia}
           />
         </>
       ) : (

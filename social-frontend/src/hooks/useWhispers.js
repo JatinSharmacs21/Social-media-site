@@ -29,6 +29,10 @@ function useWhispers() {
   const [error, setError] = useState("");
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const [replyTo, setReplyTo] = useState(null);
+  const [messageSearch, setMessageSearch] = useState("");
+  const [mediaFile, setMediaFile] = useState(null);
+  const [mediaPreview, setMediaPreview] = useState(null);
+  const [mediaUploading, setMediaUploading] = useState(false);
 
   const bottomRef = useRef(null);
   const typingTimerRef = useRef(null);
@@ -75,23 +79,24 @@ function useWhispers() {
           })
         : [conversation, ...prev];
 
-      return sortConversations(next);
+      return sortConversations(next, currentUserId);
     });
-  }, []);
+  }, [currentUserId]);
 
   const loadConversations = useCallback(async () => {
     try {
       setLoading(true);
       const res = await API.get("/api/whispers/conversations");
-      setConversations(res.data || []);
-      setActiveConversation((current) => current || res.data?.[0] || null);
+      const sortedConversations = sortConversations(res.data || [], currentUserId);
+      setConversations(sortedConversations);
+      setActiveConversation((current) => current || sortedConversations?.[0] || null);
     } catch (err) {
       logger.error(err.response?.data || err);
       setError("Whispers could not be loaded. Please refresh and try again.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentUserId]);
 
   const loadMessages = useCallback(
     async (conversation) => {
@@ -102,7 +107,7 @@ function useWhispers() {
         const res = await API.get(`/api/whispers/conversations/${conversation._id}/messages`);
         setMessages(res.data || []);
         setConversations((prev) =>
-          prev.map((item) => (item._id === conversation._id ? { ...item, unreadCount: 0 } : item))
+          sortConversations(prev.map((item) => (item._id === conversation._id ? { ...item, unreadCount: 0 } : item)), currentUserId)
         );
         notifyWhisperCountChange();
         scrollToBottom();
@@ -113,7 +118,7 @@ function useWhispers() {
         setMessagesLoading(false);
       }
     },
-    [scrollToBottom]
+    [scrollToBottom, currentUserId]
   );
 
   const socketRef = useWhisperSocket({
@@ -138,6 +143,10 @@ function useWhispers() {
     setReplyTo(null);
     setTypingUser(false);
   }, [activeConversation, loadMessages]);
+
+  useEffect(() => {
+    setMessageSearch("");
+  }, [activeId]);
 
   useEffect(() => {
     if (!query.trim()) {
@@ -205,11 +214,47 @@ function useWhispers() {
 
   const cancelReply = useCallback(() => setReplyTo(null), []);
 
+  const clearMedia = useCallback(() => {
+    setMediaFile(null);
+    setMediaPreview((current) => {
+      if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl);
+      return null;
+    });
+  }, []);
+
+  const selectMedia = useCallback((file) => {
+    if (!file) return;
+
+    const isImage = file.type?.startsWith("image/");
+    const isVideo = file.type?.startsWith("video/");
+    if (!isImage && !isVideo) {
+      setError("Only image and video files can be sent in Whispers.");
+      return;
+    }
+
+    const limit = isImage ? 10 * 1024 * 1024 : 60 * 1024 * 1024;
+    if (file.size > limit) {
+      setError(isImage ? "Image too large. Max size is 10MB." : "Video too large. Max size is 60MB.");
+      return;
+    }
+
+    clearMedia();
+    setMediaFile(file);
+    setMediaPreview({
+      previewUrl: URL.createObjectURL(file),
+      type: isVideo ? "video" : "image",
+      name: file.name,
+      size: file.size,
+    });
+  }, [clearMedia]);
+
+  useEffect(() => () => clearMedia(), [clearMedia]);
+
   const sendMessage = useCallback(
     async (event) => {
       event.preventDefault();
       const cleanText = text.trim();
-      if (!cleanText || !activeId || sending) return;
+      if ((!cleanText && !mediaFile) || !activeId || sending) return;
 
       const payload = {
         text: cleanText,
@@ -218,10 +263,27 @@ function useWhispers() {
 
       try {
         setSending(true);
+        setMediaUploading(Boolean(mediaFile));
         setText("");
         setReplyTo(null);
+
+        if (mediaFile) {
+          const formData = new FormData();
+          formData.append("file", mediaFile);
+          const uploadRes = await API.post("/api/upload", formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+          payload.media = {
+            url: uploadRes.data?.url,
+            type: uploadRes.data?.type,
+            name: mediaFile.name,
+            size: mediaFile.size,
+          };
+        }
+
         socketRef.current?.emit("whisper-typing", { conversationId: activeId, typing: false });
         const res = await API.post(`/api/whispers/conversations/${activeId}/messages`, payload);
+        clearMedia();
         updateConversation(res.data.conversation);
       } catch (err) {
         logger.error(err.response?.data || err);
@@ -230,9 +292,10 @@ function useWhispers() {
         setError("Message could not be sent. Please try again.");
       } finally {
         setSending(false);
+        setMediaUploading(false);
       }
     },
-    [activeId, replyTo, sending, socketRef, text, updateConversation]
+    [activeId, clearMedia, mediaFile, replyTo, sending, socketRef, text, updateConversation]
   );
 
   const reactToMessage = useCallback(
@@ -301,6 +364,33 @@ function useWhispers() {
     }
   }, [activeId, deletingConversation]);
 
+  const filteredMessages = useMemo(() => {
+    const term = messageSearch.trim().toLowerCase();
+    if (!term) return messages;
+    return messages.filter((message) => {
+      const textMatch = String(message.text || "").toLowerCase().includes(term);
+      const mediaMatch = String(message.media?.name || message.media?.type || "").toLowerCase().includes(term);
+      return textMatch || mediaMatch;
+    });
+  }, [messages, messageSearch]);
+
+  const messageSearchCount = messageSearch.trim() ? filteredMessages.length : 0;
+
+  const togglePinConversation = useCallback(
+    async (conversationId) => {
+      if (!conversationId) return;
+      try {
+        const res = await API.put(`/api/whispers/conversations/${conversationId}/pin`);
+        const updatedConversation = res.data?.conversation;
+        if (updatedConversation?._id) updateConversation(updatedConversation, { keepUnread: true });
+      } catch (err) {
+        logger.error(err.response?.data || err);
+        setError("Chat pin could not be updated.");
+      }
+    },
+    [updateConversation]
+  );
+
   const jumpToMessage = useCallback((messageId) => {
     const node = document.getElementById(`whisper-message-${messageId}`);
     if (!node) return;
@@ -314,6 +404,12 @@ function useWhispers() {
     activeConversation,
     activePerson,
     messages,
+    filteredMessages,
+    messageSearch,
+    messageSearchCount,
+    setMessageSearch,
+    mediaPreview,
+    mediaUploading,
     loading,
     messagesLoading,
     sending,
@@ -342,10 +438,13 @@ function useWhispers() {
     handleTyping,
     setReplyTo,
     cancelReply,
+    selectMedia,
+    clearMedia,
     sendMessage,
     deleteMessage,
     reactToMessage,
     deleteConversation,
+    togglePinConversation,
     jumpToMessage,
   };
 }

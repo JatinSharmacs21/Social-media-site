@@ -15,6 +15,8 @@ function ReplySnippet({ replyTo, mine, onJumpToMessage }) {
     }
   };
 
+  const previewText = replyTo.text || (replyTo.media?.type === "video" ? "Video" : replyTo.media?.type === "image" ? "Image" : "Message");
+
   return (
     <div
       role="button"
@@ -26,8 +28,41 @@ function ReplySnippet({ replyTo, mine, onJumpToMessage }) {
       }`}
     >
       <p className={`text-[10px] font-bold uppercase tracking-[0.14em] ${mine ? "text-white/62" : "text-zinc-500"}`}>Reply</p>
-      <p className={`mt-0.5 truncate text-xs font-medium ${mine ? "text-white/82" : "text-zinc-300"}`}>{replyTo.text}</p>
+      <p className={`mt-0.5 truncate text-xs font-medium ${mine ? "text-white/82" : "text-zinc-300"}`}>{previewText}</p>
     </div>
+  );
+}
+
+function MediaContent({ media, mine }) {
+  if (!media?.url) return null;
+
+  const wrapperClass = `mb-2 overflow-hidden rounded-[18px] border ${
+    mine ? "border-white/12 bg-black/10" : "border-white/[0.07] bg-black/20"
+  }`;
+
+  if (media.type === "video") {
+    return (
+      <div className={wrapperClass}>
+        <video
+          src={media.url}
+          controls
+          playsInline
+          preload="metadata"
+          className="max-h-[360px] w-full min-w-[220px] bg-black object-contain"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <a href={media.url} target="_blank" rel="noreferrer" className={`${wrapperClass} block`}>
+      <img
+        src={media.url}
+        alt={media.name || "Whisper media"}
+        loading="lazy"
+        className="max-h-[360px] w-full min-w-[220px] object-cover"
+      />
+    </a>
   );
 }
 
@@ -355,7 +390,7 @@ function WhisperMessageBubble({
       id={`whisper-message-${message._id}`}
       className={`group flex scroll-mt-24 transition ${mine ? "justify-end" : "justify-start"} ${isFirstInGroup ? "mt-2.5" : "mt-0.5"}`}
     >
-      <div className={`flex max-w-[82%] gap-2 sm:max-w-[76%] md:max-w-[66%] ${mine ? "flex-row-reverse" : "flex-row"}`}>
+      <div className={`flex min-w-0 max-w-[88%] gap-2 sm:max-w-[76%] md:max-w-[66%] ${mine ? "flex-row-reverse" : "flex-row"}`}>
         {!mine && (
           <div
             className={`mt-auto hidden h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/[0.07] bg-white/[0.04] text-[10px] font-semibold text-zinc-500 sm:flex ${
@@ -366,7 +401,7 @@ function WhisperMessageBubble({
           </div>
         )}
 
-        <div className={`relative flex flex-col ${mine ? "items-end" : "items-start"}`}>
+        <div className={`relative flex min-w-0 max-w-full flex-col ${mine ? "items-end" : "items-start"}`}>
           {reactionBarOpen && <ReactionBar mine={mine} selectedEmoji={myReaction?.emoji} onReactToMessage={handleReact} />}
 
           <button
@@ -377,15 +412,18 @@ function WhisperMessageBubble({
               event.preventDefault();
               openActions();
             }}
-            className={`relative ${bubbleRadius} text-left shadow-md transition active:scale-[0.995] ${
+            className={`relative max-w-full overflow-hidden ${bubbleRadius} text-left shadow-md transition active:scale-[0.995] ${
               mine
                 ? "bg-gradient-to-br from-[#c84ec0] via-[#7d5cf0] to-[#19a8c7] text-white shadow-violet-950/18"
                 : "border border-white/[0.07] bg-white/[0.055] text-zinc-100 shadow-black/20 backdrop-blur-xl"
             }`}
           >
-            <div className="px-3.5 py-2.5 md:max-w-[620px] md:px-4 md:py-2.5">
+            <div className="max-w-full px-3.5 py-2.5 md:max-w-[620px] md:px-4 md:py-2.5">
               <ReplySnippet replyTo={message.replyTo} mine={mine} onJumpToMessage={onJumpToMessage} />
-              <p className="whitespace-pre-wrap break-words text-[14.5px] font-normal leading-relaxed text-white/95 md:text-[15px]">{message.text}</p>
+              <MediaContent media={message.media} mine={mine} />
+              {message.text ? (
+                <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[14.5px] font-normal leading-relaxed text-white/95 md:text-[15px]">{message.text}</p>
+              ) : null}
               {isLastInGroup && (
                 <div className={`mt-1.5 flex items-center justify-end gap-2 text-[10px] font-medium ${mine ? "text-white/58" : "text-zinc-500"}`}>
                   <span>{formatWhisperTime(message.createdAt)}</span>

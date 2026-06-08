@@ -42,7 +42,7 @@ function DeleteChatDialog({ deleting, onCancel, onConfirm }) {
   );
 }
 
-function WhisperChatHeader({ activePerson, typingUser, onlineUserIds = [], deletingConversation, onBack, onDeleteConversation }) {
+function WhisperChatHeader({ activePerson, typingUser, onlineUserIds = [], deletingConversation, messageSearch, messageSearchCount, setMessageSearch, onBack, onDeleteConversation }) {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -149,6 +149,31 @@ function WhisperChatHeader({ activePerson, typingUser, onlineUserIds = [], delet
           )}
         </div>
       </div>
+
+      <div className="relative z-40 mt-2 flex items-center gap-2 rounded-2xl border border-white/[0.07] bg-white/[0.035] px-3 py-2 transition focus-within:border-cyan-200/20 focus-within:bg-white/[0.055]">
+        <span className="text-xs text-zinc-500">⌕</span>
+        <input
+          value={messageSearch}
+          onChange={(event) => setMessageSearch?.(event.target.value)}
+          placeholder="Search in this chat"
+          className="min-w-0 flex-1 bg-transparent text-[12px] font-medium text-white placeholder:text-zinc-600 outline-none"
+        />
+        {messageSearch && (
+          <>
+            <span className="rounded-full border border-white/[0.06] bg-white/[0.045] px-2 py-0.5 text-[10px] font-semibold text-zinc-400">
+              {messageSearchCount} found
+            </span>
+            <button
+              type="button"
+              onClick={() => setMessageSearch?.("")}
+              className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-zinc-500 transition hover:bg-white/10 hover:text-white"
+            >
+              Clear
+            </button>
+          </>
+        )}
+      </div>
+
     </div>
   );
 }

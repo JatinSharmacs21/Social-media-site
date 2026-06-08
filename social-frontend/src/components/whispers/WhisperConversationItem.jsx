@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import Avatar from "../ui/Avatar";
-import { formatWhisperTime, getDisplayMessageText, getOtherParticipant } from "../../utils/whisperHelpers";
+import { formatWhisperTime, getDisplayMessageText, getOtherParticipant, isConversationPinned } from "../../utils/whisperHelpers";
 import { formatWhisperLastSeen } from "../../utils/whisperPresence";
 
 function DeleteChatDialog({ deleting, onCancel, onConfirm }) {
@@ -42,12 +42,13 @@ function DeleteChatDialog({ deleting, onCancel, onConfirm }) {
   );
 }
 
-function WhisperConversationItem({ conversation, activeId, currentUserId, deletingConversation, onlineUserIds = [], onOpenConversation, onDeleteConversation }) {
+function WhisperConversationItem({ conversation, activeId, currentUserId, deletingConversation, onlineUserIds = [], onOpenConversation, onDeleteConversation, onTogglePinConversation }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const person = getOtherParticipant(conversation, currentUserId);
   const active = conversation._id === activeId;
   const unread = Number(conversation.unreadCount || 0);
+  const pinned = isConversationPinned(conversation, currentUserId);
   const isOnline = Boolean(person?._id && onlineUserIds.map(String).includes(String(person._id)));
   const lastText = conversation.lastMessage?.text
     ? getDisplayMessageText(conversation.lastMessage, currentUserId)
@@ -88,6 +89,7 @@ function WhisperConversationItem({ conversation, activeId, currentUserId, deleti
         type="button"
       >
         {active && <span className="absolute inset-y-3 left-0 w-0.5 rounded-r-full bg-gradient-to-b from-pink-300 via-violet-300 to-cyan-300" />}
+        {pinned && <span className="absolute right-9 top-2 text-[11px] text-pink-200/80">📌</span>}
 
         <div className={`relative shrink-0 rounded-full p-[2px] ${unread || active ? "bg-gradient-to-br from-pink-400/38 via-violet-400/30 to-cyan-300/30" : "bg-white/[0.075]"}`}>
           <Avatar src={person?.profilePic} name={person?.name || person?.username} size="lg" />
@@ -131,7 +133,19 @@ function WhisperConversationItem({ conversation, activeId, currentUserId, deleti
       {menuOpen && (
         <>
           <button type="button" aria-label="Close menu" className="fixed inset-0 z-20 cursor-default bg-black/35 backdrop-blur-[2px]" onClick={() => setMenuOpen(false)} />
-          <div className="absolute right-2 top-12 z-30 w-44 overflow-hidden rounded-2xl border border-white/[0.16] bg-[#11121a]/82 p-1.5 shadow-2xl shadow-black/80 backdrop-blur-3xl">
+          <div className="absolute right-2 top-12 z-30 w-48 overflow-hidden rounded-2xl border border-white/[0.16] bg-[#11121a]/82 p-1.5 shadow-2xl shadow-black/80 backdrop-blur-3xl">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setMenuOpen(false);
+                onTogglePinConversation?.(conversation._id);
+              }}
+              className="mb-1 flex w-full items-center justify-between rounded-xl border border-white/[0.07] bg-white/[0.045] px-3 py-2.5 text-left text-sm font-semibold text-zinc-100 transition hover:bg-white/[0.08]"
+            >
+              <span>{pinned ? "Unpin chat" : "Pin chat"}</span>
+              <span className="text-pink-200/70">📌</span>
+            </button>
             <button
               type="button"
               disabled={deletingConversation}

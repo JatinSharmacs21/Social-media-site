@@ -18,11 +18,17 @@ const conversationSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    pinnedBy: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: "User",
+      default: [],
+    },
   },
   { timestamps: true }
 );
 
 conversationSchema.index({ participants: 1 });
 conversationSchema.index({ lastMessageAt: -1 });
+conversationSchema.index({ pinnedBy: 1, lastMessageAt: -1 });
 
 module.exports = mongoose.model("Conversation", conversationSchema);
