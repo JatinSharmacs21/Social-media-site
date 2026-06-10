@@ -77,7 +77,7 @@ function useWhisperSocket({
 
           if (isMine) {
             const pendingIndex = prev.findIndex((item) => {
-              if (item.status !== "sending" && item.status !== "failed") return false;
+              if (item.status !== "sending") return false;
               if (String(getMessageSenderId(item)) !== String(currentUserIdRef.current)) return false;
               const sameText = String(item.text || "") === String(message.text || "");
               const sameMediaType = String(item.media?.type || "") === String(message.media?.type || "");

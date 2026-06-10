@@ -66,6 +66,7 @@ function useWhispers() {
 
   const bottomRef = useRef(null);
   const typingTimerRef = useRef(null);
+  const pendingRequestCountRef = useRef(0);
 
   const activeId = activeConversation?._id;
 
@@ -284,10 +285,21 @@ function useWhispers() {
     if (!pendingId || !realMessage?._id) return;
 
     setMessages((prev) => {
-      const withoutDuplicate = prev.filter((message) => String(message._id) !== String(realMessage._id));
-      const hasPending = withoutDuplicate.some((message) => String(message._id) === String(pendingId));
-      if (!hasPending) return withoutDuplicate;
-      return withoutDuplicate.map((message) => (String(message._id) === String(pendingId) ? realMessage : message));
+      const hasPending = prev.some((message) => String(message._id) === String(pendingId));
+      const hasRealMessage = prev.some((message) => String(message._id) === String(realMessage._id));
+
+      // If the socket already replaced the pending bubble with the real message,
+      // keep the current list as-is. The previous version removed that real message,
+      // which made quick messages appear and then disappear.
+      if (!hasPending && hasRealMessage) return prev;
+
+      if (hasPending) {
+        return prev
+          .filter((message) => String(message._id) !== String(realMessage._id))
+          .map((message) => (String(message._id) === String(pendingId) ? realMessage : message));
+      }
+
+      return [...prev, realMessage];
     });
   }, []);
 
@@ -313,6 +325,7 @@ function useWhispers() {
       };
 
       try {
+        pendingRequestCountRef.current += 1;
         setSending(true);
         setMediaUploading(Boolean(retryPayload?.mediaFile));
 
@@ -338,7 +351,8 @@ function useWhispers() {
         logger.error(err.response?.data || err);
         markPendingFailed(pendingMessage._id, "Message could not be sent. Tap retry.");
       } finally {
-        setSending(false);
+        pendingRequestCountRef.current = Math.max(0, pendingRequestCountRef.current - 1);
+        setSending(pendingRequestCountRef.current > 0);
         setMediaUploading(false);
       }
     },
@@ -349,7 +363,7 @@ function useWhispers() {
     async (event) => {
       event.preventDefault();
       const cleanText = text.trim();
-      if ((!cleanText && !mediaFile) || !activeId || sending) return;
+      if ((!cleanText && !mediaFile) || !activeId) return;
 
       const currentMediaFile = mediaFile;
       const currentMediaPreview = mediaPreview;
@@ -372,7 +386,7 @@ function useWhispers() {
 
       deliverPendingMessage(pendingMessage, pendingMessage._retryPayload);
     },
-    [activeId, currentUserId, deliverPendingMessage, mediaFile, mediaPreview, replyTo, scrollToBottom, sending, text]
+    [activeId, currentUserId, deliverPendingMessage, mediaFile, mediaPreview, replyTo, scrollToBottom, text]
   );
 
   const retryMessage = useCallback(
