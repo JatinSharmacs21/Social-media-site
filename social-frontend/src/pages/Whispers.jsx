@@ -49,6 +49,7 @@ function Whispers() {
     sendMessage,
     retryMessage,
     deleteMessage,
+    editMessage,
     reactToMessage,
     deleteConversation,
     togglePinConversation,
@@ -107,6 +108,7 @@ function Whispers() {
           onSelectMedia={selectMedia}
           onClearMedia={clearMedia}
           onDeleteMessage={deleteMessage}
+          onEditMessage={editMessage}
           onRetryMessage={retryMessage}
           onReactToMessage={reactToMessage}
           onDeleteConversation={deleteConversation}

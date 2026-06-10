@@ -8,6 +8,7 @@ const {
   sendMessage,
   reactToMessage,
   deleteMessage,
+  editMessage,
   deleteConversation,
   markConversationRead,
   getUnreadCount,
@@ -27,6 +28,8 @@ router.put("/conversations/:conversationId/read", markConversationRead);
 router.put("/conversations/:conversationId/pin", togglePinConversation);
 router.patch("/conversations/:conversationId/pin", togglePinConversation);
 router.post("/conversations/:conversationId/pin", togglePinConversation);
+router.patch("/conversations/:conversationId/messages/:messageId", editMessage);
+router.put("/conversations/:conversationId/messages/:messageId", editMessage);
 router.delete("/conversations/:conversationId/messages/:messageId", deleteMessage);
 router.delete("/messages/:messageId", deleteMessage);
 router.delete("/conversations/:conversationId", deleteConversation);

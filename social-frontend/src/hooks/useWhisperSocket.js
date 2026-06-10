@@ -123,9 +123,47 @@ function useWhisperSocket({
       });
     });
 
-    socket.on("whisper-message-deleted", ({ conversationId, messageId, conversation }) => {
+
+    socket.on("whisper-message-updated", ({ conversationId, message, conversation }) => {
+      if (!message?._id) return;
+
+      if (String(conversationId || message.conversation) === String(activeIdRef.current)) {
+        setMessages((prev) =>
+          prev.map((item) =>
+            String(item._id) === String(message._id)
+              ? { ...item, ...message }
+              : item
+          )
+        );
+      }
+
+      if (conversation?._id) {
+        setConversations((prev) => {
+          const next = prev.map((item) =>
+            String(item._id) === String(conversation._id)
+              ? { ...item, ...conversation }
+              : item
+          );
+          return sortConversations(next);
+        });
+      }
+
+      notifyWhisperCountChange();
+    });
+
+    socket.on("whisper-message-deleted", ({ conversationId, messageId, conversation, message }) => {
       if (String(conversationId) === String(activeIdRef.current)) {
-        setMessages((prev) => prev.filter((message) => String(message._id) !== String(messageId)));
+        setMessages((prev) => {
+          if (message?._id) {
+            return prev.map((item) =>
+              String(item._id) === String(message._id)
+                ? { ...item, ...message }
+                : item
+            );
+          }
+
+          return prev.filter((item) => String(item._id) !== String(messageId));
+        });
       }
 
       setConversations((prev) => {
@@ -202,6 +240,7 @@ function useWhisperSocket({
       socket.off("connect");
       socket.off("whisper-message-created");
       socket.off("whisper-inbox-updated");
+      socket.off("whisper-message-updated");
       socket.off("whisper-message-deleted");
       socket.off("whisper-conversation-deleted");
       socket.off("whisper-online-users");

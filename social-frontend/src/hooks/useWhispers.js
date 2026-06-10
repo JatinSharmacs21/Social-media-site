@@ -449,7 +449,13 @@ function useWhispers() {
 
         const res = await API.delete(endpoint);
 
-        setMessages((prev) => prev.filter((message) => String(message._id) !== String(messageId)));
+        if (res.data?.message?._id) {
+          setMessages((prev) =>
+            prev.map((message) => (String(message._id) === String(messageId) ? res.data.message : message))
+          );
+        } else {
+          setMessages((prev) => prev.filter((message) => String(message._id) !== String(messageId)));
+        }
         if (res.data?.conversation) updateConversation(res.data.conversation);
         notifyWhisperCountChange();
       } catch (err) {
@@ -461,6 +467,35 @@ function useWhispers() {
     },
     [activeId, deletingMessageId, updateConversation]
   );
+
+  const editMessage = useCallback(
+    async (messageId, newText) => {
+      const cleanText = String(newText || "").trim();
+      if (!activeId || !messageId || !cleanText) return false;
+
+      try {
+        const res = await API.patch(`/api/whispers/conversations/${activeId}/messages/${messageId}`, { text: cleanText });
+        const updatedMessage = res.data?.message;
+
+        if (updatedMessage?._id) {
+          setMessages((prev) =>
+            prev.map((message) =>
+              String(message._id) === String(updatedMessage._id) ? { ...message, ...updatedMessage } : message
+            )
+          );
+        }
+
+        if (res.data?.conversation) updateConversation(res.data.conversation);
+        return true;
+      } catch (err) {
+        logger.error(err.response?.data || err);
+        setError(err.response?.data?.message || "Message could not be edited.");
+        return false;
+      }
+    },
+    [activeId, updateConversation]
+  );
+
 
   const deleteConversation = useCallback(async (conversationId = activeId) => {
     if (!conversationId || deletingConversation) return;
@@ -573,6 +608,7 @@ function useWhispers() {
     sendMessage,
     retryMessage,
     deleteMessage,
+    editMessage,
     reactToMessage,
     deleteConversation,
     togglePinConversation,

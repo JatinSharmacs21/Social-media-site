@@ -16,9 +16,11 @@ function ReplySnippet({ replyTo, mine, onJumpToMessage }) {
     }
   };
 
-  const previewText = replyTo.sharedVybe?.postId
-    ? "Shared Vybe"
-    : replyTo.text || (replyTo.media?.type === "video" ? "Video" : replyTo.media?.type === "image" ? "Image" : "Message");
+  const previewText = replyTo.isDeleted
+    ? "Deleted message"
+    : replyTo.sharedVybe?.postId
+      ? "Shared Vybe"
+      : replyTo.text || (replyTo.media?.type === "video" ? "Video" : replyTo.media?.type === "image" ? "Image" : "Message");
 
   return (
     <div
@@ -200,7 +202,7 @@ function DeleteConfirmDialog({ open, deleting, onCancel, onConfirm }) {
           </div>
           <h3 className="text-[16px] font-semibold text-white">Delete message?</h3>
           <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">
-            This message will be removed from the conversation. This action cannot be undone.
+            This will replace the message with a deleted-message note for everyone.
           </p>
         </div>
 
@@ -227,8 +229,9 @@ function DeleteConfirmDialog({ open, deleting, onCancel, onConfirm }) {
   );
 }
 
-function DesktopMenu({ mine, message, deleting, selectedEmoji, onClose, onReplyToMessage, onRequestDelete, onReactToMessage }) {
+function DesktopMenu({ mine, message, deleting, selectedEmoji, onClose, onReplyToMessage, onRequestDelete, onEditMessage, onReactToMessage }) {
   const copyAvailable = typeof navigator !== "undefined" && navigator.clipboard;
+  const canEdit = mine && !message.isDeleted && !message.media?.url && !message.sharedVybe?.postId && Boolean(message.text);
 
   const handleReaction = (emoji) => {
     onClose();
@@ -251,7 +254,7 @@ function DesktopMenu({ mine, message, deleting, selectedEmoji, onClose, onReplyT
             onReplyToMessage?.(message);
           }}
         />
-        {copyAvailable && (
+        {copyAvailable && !message.isDeleted && (
           <MenuAction
             label="Copy"
             icon="⧉"
@@ -261,7 +264,17 @@ function DesktopMenu({ mine, message, deleting, selectedEmoji, onClose, onReplyT
             }}
           />
         )}
-        {mine && (
+        {canEdit && (
+          <MenuAction
+            label="Edit"
+            icon="✎"
+            onClick={() => {
+              onClose();
+              onEditMessage?.(message);
+            }}
+          />
+        )}
+        {mine && !message.isDeleted && (
           <MenuAction
             label={deleting ? "Deleting..." : "Delete"}
             icon="✕"
@@ -278,8 +291,9 @@ function DesktopMenu({ mine, message, deleting, selectedEmoji, onClose, onReplyT
   );
 }
 
-function MobileSheet({ mine, message, deleting, selectedEmoji, onClose, onReplyToMessage, onRequestDelete, onReactToMessage }) {
+function MobileSheet({ mine, message, deleting, selectedEmoji, onClose, onReplyToMessage, onRequestDelete, onEditMessage, onReactToMessage }) {
   const copyAvailable = typeof navigator !== "undefined" && navigator.clipboard;
+  const canEdit = mine && !message.isDeleted && !message.media?.url && !message.sharedVybe?.postId && Boolean(message.text);
 
   const handleReaction = (emoji) => {
     onClose();
@@ -307,7 +321,7 @@ function MobileSheet({ mine, message, deleting, selectedEmoji, onClose, onReplyT
               onReplyToMessage?.(message);
             }}
           />
-          {copyAvailable && (
+          {copyAvailable && !message.isDeleted && (
             <MenuAction
               label="Copy"
               icon="⧉"
@@ -317,7 +331,17 @@ function MobileSheet({ mine, message, deleting, selectedEmoji, onClose, onReplyT
               }}
             />
           )}
-          {mine && (
+          {canEdit && (
+            <MenuAction
+              label="Edit"
+              icon="✎"
+              onClick={() => {
+                onClose();
+                onEditMessage?.(message);
+              }}
+            />
+          )}
+          {mine && !message.isDeleted && (
             <MenuAction
               label={deleting ? "Deleting..." : "Delete"}
               icon="✕"
@@ -378,6 +402,7 @@ function WhisperMessageBubble({
   deleting,
   onReplyToMessage,
   onDeleteMessage,
+  onEditMessage,
   onRetryMessage,
   onReactToMessage,
   onJumpToMessage,
@@ -385,6 +410,8 @@ function WhisperMessageBubble({
   const [menuOpen, setMenuOpen] = useState(false);
   const [reactionBarOpen, setReactionBarOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(message.text || "");
   const senderLabel = activePerson?.name || activePerson?.username;
   const readBy = Array.isArray(message.readBy) ? message.readBy.map(String) : [];
   const reactions = Array.isArray(message.reactions) ? message.reactions : [];
@@ -393,12 +420,37 @@ function WhisperMessageBubble({
   const pending = message.status === "sending";
   const failed = message.status === "failed";
   const isSharedVybe = Boolean(message.sharedVybe?.postId);
+  const isDeleted = Boolean(message.isDeleted);
+  const isEdited = Boolean(message.editedAt) && !isDeleted;
 
   const openActions = () => {
-    if (pending || failed) return;
+    if (pending || failed || isDeleted) return;
     setMenuOpen(true);
   };
   const closeActions = () => setMenuOpen(false);
+
+  const startEdit = () => {
+    if (!mine || isDeleted || message.media?.url || message.sharedVybe?.postId) return;
+    setEditText(message.text || "");
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setEditText(message.text || "");
+    setEditing(false);
+  };
+
+  const submitEdit = async (event) => {
+    event?.preventDefault?.();
+    const cleanText = editText.trim();
+    if (!cleanText || cleanText === (message.text || "").trim()) {
+      cancelEdit();
+      return;
+    }
+
+    const ok = await onEditMessage?.(message._id, cleanText);
+    if (ok !== false) setEditing(false);
+  };
 
   const requestDelete = () => {
     if (!mine || deleting) return;
@@ -413,7 +465,10 @@ function WhisperMessageBubble({
     setDeleteConfirmOpen(false);
   };
 
-  const handleBubbleDoubleClick = () => setReactionBarOpen((open) => !open);
+  const handleBubbleDoubleClick = () => {
+    if (isDeleted || editing) return;
+    setReactionBarOpen((open) => !open);
+  };
   const handleReact = (emoji) => {
     setReactionBarOpen(false);
     onReactToMessage?.(message._id, emoji);
@@ -444,10 +499,11 @@ function WhisperMessageBubble({
         )}
 
         <div className={`relative flex min-w-0 max-w-full flex-col ${mine ? "items-end" : "items-start"}`}>
-          {reactionBarOpen && <ReactionBar mine={mine} selectedEmoji={myReaction?.emoji} onReactToMessage={handleReact} />}
+          {reactionBarOpen && !isDeleted && <ReactionBar mine={mine} selectedEmoji={myReaction?.emoji} onReactToMessage={handleReact} />}
 
-          <button
-            type="button"
+          <div
+            role="button"
+            tabIndex={0}
             onClick={openActions}
             onDoubleClick={handleBubbleDoubleClick}
             onContextMenu={(event) => {
@@ -466,11 +522,57 @@ function WhisperMessageBubble({
           >
             <div className={`${isSharedVybe ? "max-w-full p-0" : "max-w-full px-3.5 py-2.5 md:max-w-[620px] md:px-4 md:py-2.5"}`}>
               <ReplySnippet replyTo={message.replyTo} mine={mine} onJumpToMessage={onJumpToMessage} />
-              {message.sharedVybe?.postId ? <SharedVybeCard sharedVybe={message.sharedVybe} mine={mine} /> : null}
-              <MediaContent media={message.media} mine={mine} />
-              {message.text && !isSharedVybe ? (
-                <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[14.5px] font-normal leading-relaxed text-white/95 md:text-[15px]">{message.text}</p>
-              ) : null}
+              {isDeleted ? (
+                <p className="italic text-[14px] font-medium leading-relaxed text-white/62">
+                  This message was deleted
+                </p>
+              ) : (
+                <>
+                  {message.sharedVybe?.postId ? <SharedVybeCard sharedVybe={message.sharedVybe} mine={mine} /> : null}
+                  <MediaContent media={message.media} mine={mine} />
+                  {editing ? (
+                    <form onSubmit={submitEdit} className="min-w-[220px]">
+                      <textarea
+                        value={editText}
+                        onChange={(event) => setEditText(event.target.value)}
+                        autoFocus
+                        rows={Math.min(4, Math.max(2, editText.split("\n").length))}
+                        className="w-full resize-none rounded-2xl border border-white/15 bg-black/20 px-3 py-2 text-[14.5px] font-normal leading-relaxed text-white outline-none placeholder:text-white/40 focus:border-cyan-200/35"
+                        maxLength={1200}
+                        onClick={(event) => event.stopPropagation()}
+                      />
+                      <div className="mt-2 flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            cancelEdit();
+                          }}
+                          className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-[11px] font-bold text-white/70 transition hover:bg-white/[0.08]"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          onClick={(event) => event.stopPropagation()}
+                          className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-zinc-950 transition hover:scale-[1.02] active:scale-95"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </form>
+                  ) : message.text && !isSharedVybe ? (
+                    <>
+                      <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[14.5px] font-normal leading-relaxed text-white/95 md:text-[15px]">{message.text}</p>
+                      {isEdited && (
+                        <p className={`mt-1 text-[10px] font-medium ${mine ? "text-white/45" : "text-zinc-500"}`}>
+                          edited
+                        </p>
+                      )}
+                    </>
+                  ) : null}
+                </>
+              )}
               {isLastInGroup && !isSharedVybe && (
                 <div className={`mt-1.5 flex items-center justify-end gap-2 text-[10px] font-medium ${mine ? "text-white/58" : "text-zinc-500"}`}>
                   <span>{formatWhisperTime(message.createdAt)}</span>
@@ -478,7 +580,7 @@ function WhisperMessageBubble({
                 </div>
               )}
             </div>
-          </button>
+          </div>
 
           {isLastInGroup && isSharedVybe && (
             <div
@@ -491,7 +593,7 @@ function WhisperMessageBubble({
             </div>
           )}
 
-          <ReactionSummary reactions={reactions} currentUserId={currentUserId} mine={mine} />
+          {!isDeleted && <ReactionSummary reactions={reactions} currentUserId={currentUserId} mine={mine} />}
 
           <div className={`relative mt-1 h-0 ${mine ? "self-end" : "self-start"}`}>
             <button
@@ -516,6 +618,7 @@ function WhisperMessageBubble({
                   onClose={closeActions}
                   onReplyToMessage={onReplyToMessage}
                   onRequestDelete={requestDelete}
+                  onEditMessage={startEdit}
                   onReactToMessage={onReactToMessage}
                 />
                 <MobileSheet
@@ -526,6 +629,7 @@ function WhisperMessageBubble({
                   onClose={closeActions}
                   onReplyToMessage={onReplyToMessage}
                   onRequestDelete={requestDelete}
+                  onEditMessage={startEdit}
                   onReactToMessage={onReactToMessage}
                 />
               </>

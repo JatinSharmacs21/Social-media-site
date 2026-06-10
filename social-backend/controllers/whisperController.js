@@ -23,7 +23,7 @@ const populateMessage = (query) =>
     .populate("reactions.user", userFields)
     .populate({
       path: "replyTo",
-      select: "text media sharedVybe sender createdAt",
+      select: "text media sharedVybe sender createdAt isDeleted editedAt deletedAt",
       populate: { path: "sender", select: userFields },
     });
 
@@ -36,7 +36,7 @@ const populateConversation = async (conversationId) =>
         { path: "sender", select: userFields },
         {
           path: "replyTo",
-          select: "text media sharedVybe sender createdAt",
+          select: "text media sharedVybe sender createdAt isDeleted editedAt deletedAt",
           populate: { path: "sender", select: userFields },
         },
       ],
@@ -116,7 +116,7 @@ const getConversations = async (req, res) => {
           { path: "reactions.user", select: userFields },
           {
             path: "replyTo",
-            select: "text media sharedVybe sender createdAt",
+            select: "text media sharedVybe sender createdAt isDeleted editedAt deletedAt",
             populate: { path: "sender", select: userFields },
           },
         ],
@@ -395,21 +395,112 @@ const deleteMessage = async (req, res) => {
       return res.status(403).json({ message: "You can delete only your own messages" });
     }
 
-    await WhisperMessage.updateMany({ replyTo: message._id }, { $set: { replyTo: null } });
-    await WhisperMessage.deleteOne({ _id: message._id });
+    if (message.isDeleted) {
+      const alreadyDeletedMessage = await populateMessage(WhisperMessage.findById(message._id));
+      return res.json({
+        deleted: true,
+        softDeleted: true,
+        conversationId: conversation._id.toString(),
+        messageId: message._id.toString(),
+        message: alreadyDeletedMessage,
+        conversation: await populateConversation(conversation._id),
+      });
+    }
+
+    message.originalText = message.originalText || message.text || "";
+    message.text = "";
+    message.media = undefined;
+    message.sharedVybe = undefined;
+    message.reactions = [];
+    message.isDeleted = true;
+    message.deletedAt = new Date();
+    message.editedAt = null;
+    await message.save();
+
+    const populatedMessage = await populateMessage(WhisperMessage.findById(message._id));
     await refreshConversationLastMessage(conversation._id);
 
     const populatedConversation = await populateConversation(conversation._id);
     const payload = {
       deleted: true,
+      softDeleted: true,
       conversationId: conversation._id.toString(),
       messageId: message._id.toString(),
+      message: populatedMessage,
       conversation: populatedConversation,
     };
 
     const io = req.app.get("io");
-    if (io) io.to(getConversationRoom(conversation._id)).emit("whisper-message-deleted", payload);
-    emitToParticipants(req, populatedConversation || conversation, "whisper-message-deleted", payload);
+    if (io) {
+      io.to(getConversationRoom(conversation._id)).emit("whisper-message-updated", payload);
+    }
+    emitToParticipants(req, populatedConversation || conversation, "whisper-message-updated", payload);
+
+    return res.json(payload);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+const editMessage = async (req, res) => {
+  try {
+    const currentUserId = getCurrentUserId(req);
+    const { conversationId, messageId } = req.params;
+    const text = String(req.body.text || "").trim();
+
+    if (!isObjectId(conversationId) || !isObjectId(messageId)) {
+      return res.status(400).json({ message: "Valid conversation and message are required" });
+    }
+
+    if (!text) {
+      return res.status(400).json({ message: "Message cannot be empty" });
+    }
+
+    if (text.length > 1200) {
+      return res.status(400).json({ message: "Message is too long" });
+    }
+
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) return res.status(404).json({ message: "Conversation not found" });
+
+    if (!ensureParticipant(conversation, currentUserId)) {
+      return res.status(403).json({ message: "You are not part of this whisper" });
+    }
+
+    const message = await WhisperMessage.findOne({ _id: messageId, conversation: conversationId });
+    if (!message) return res.status(404).json({ message: "Message not found" });
+
+    const senderId = message.sender?._id || message.sender;
+    if (String(senderId) !== String(currentUserId)) {
+      return res.status(403).json({ message: "You can edit only your own messages" });
+    }
+
+    if (message.isDeleted) {
+      return res.status(400).json({ message: "Deleted message cannot be edited" });
+    }
+
+    if (message.media?.url || message.sharedVybe?.postId) {
+      return res.status(400).json({ message: "Only text messages can be edited" });
+    }
+
+    if (!message.originalText) message.originalText = message.text || "";
+    message.text = text;
+    message.editedAt = new Date();
+    await message.save();
+
+    const populatedMessage = await populateMessage(WhisperMessage.findById(message._id));
+    const populatedConversation = await populateConversation(conversation._id);
+
+    const payload = {
+      conversationId: conversation._id.toString(),
+      messageId: message._id.toString(),
+      message: populatedMessage,
+      conversation: populatedConversation,
+    };
+
+    const io = req.app.get("io");
+    if (io) io.to(getConversationRoom(conversation._id)).emit("whisper-message-updated", payload);
+    emitToParticipants(req, populatedConversation || conversation, "whisper-message-updated", payload);
 
     return res.json(payload);
   } catch (error) {
@@ -505,6 +596,7 @@ module.exports = {
   sendMessage,
   reactToMessage,
   deleteMessage,
+  editMessage,
   deleteConversation,
   markConversationRead,
   getUnreadCount,

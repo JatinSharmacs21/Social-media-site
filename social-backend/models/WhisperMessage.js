@@ -19,6 +19,25 @@ const whisperMessageSchema = new mongoose.Schema(
       maxlength: 1200,
       default: "",
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    editedAt: {
+      type: Date,
+      default: null,
+    },
+    originalText: {
+      type: String,
+      trim: true,
+      maxlength: 1200,
+      default: "",
+    },
     media: {
       url: { type: String, trim: true, default: "" },
       type: { type: String, enum: ["image", "video", ""], default: "" },
@@ -103,6 +122,8 @@ whisperMessageSchema.index({ sender: 1, createdAt: -1 });
 whisperMessageSchema.index({ replyTo: 1 });
 
 whisperMessageSchema.pre("validate", function validateTextOrMedia() {
+  if (this.isDeleted) return;
+
   const hasText = Boolean(String(this.text || "").trim());
   const hasMedia = Boolean(this.media?.url && this.media?.type);
   const hasSharedVybe = Boolean(this.sharedVybe?.postId);
