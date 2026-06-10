@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { formatWhisperTime, getInitials } from "../../utils/whisperHelpers";
+import SharedVybeCard from "./SharedVybeCard";
 
 const REACTION_OPTIONS = ["❤️", "😂", "🔥", "👀", "😮"];
 
@@ -15,7 +16,9 @@ function ReplySnippet({ replyTo, mine, onJumpToMessage }) {
     }
   };
 
-  const previewText = replyTo.text || (replyTo.media?.type === "video" ? "Video" : replyTo.media?.type === "image" ? "Image" : "Message");
+  const previewText = replyTo.sharedVybe?.postId
+    ? "Shared Vybe"
+    : replyTo.text || (replyTo.media?.type === "video" ? "Video" : replyTo.media?.type === "image" ? "Image" : "Message");
 
   return (
     <div
@@ -254,7 +257,7 @@ function DesktopMenu({ mine, message, deleting, selectedEmoji, onClose, onReplyT
             icon="⧉"
             onClick={() => {
               onClose();
-              navigator.clipboard.writeText(message.text || "");
+              navigator.clipboard.writeText(message.text || message.sharedVybe?.caption || "");
             }}
           />
         )}
@@ -310,7 +313,7 @@ function MobileSheet({ mine, message, deleting, selectedEmoji, onClose, onReplyT
               icon="⧉"
               onClick={() => {
                 onClose();
-                navigator.clipboard.writeText(message.text || "");
+                navigator.clipboard.writeText(message.text || message.sharedVybe?.caption || "");
               }}
             />
           )}
@@ -389,6 +392,7 @@ function WhisperMessageBubble({
   const myReaction = reactions.find((reaction) => String(reaction.user?._id || reaction.user) === String(currentUserId));
   const pending = message.status === "sending";
   const failed = message.status === "failed";
+  const isSharedVybe = Boolean(message.sharedVybe?.postId);
 
   const openActions = () => {
     if (pending || failed) return;
@@ -450,19 +454,24 @@ function WhisperMessageBubble({
               event.preventDefault();
               openActions();
             }}
-            className={`relative max-w-full overflow-hidden ${bubbleRadius} text-left shadow-md transition active:scale-[0.995] ${
-              mine
-                ? "bg-gradient-to-br from-[#c84ec0] via-[#7d5cf0] to-[#19a8c7] text-white shadow-violet-950/18"
-                : "border border-white/[0.07] bg-white/[0.055] text-zinc-100 shadow-black/20 backdrop-blur-xl"
+            className={`relative max-w-full overflow-hidden text-left transition active:scale-[0.995] ${
+              isSharedVybe
+                ? "rounded-[22px] bg-transparent shadow-none"
+                : `${bubbleRadius} shadow-md ${
+                    mine
+                      ? "bg-gradient-to-br from-[#c84ec0] via-[#7d5cf0] to-[#19a8c7] text-white shadow-violet-950/18"
+                      : "border border-white/[0.07] bg-white/[0.055] text-zinc-100 shadow-black/20 backdrop-blur-xl"
+                  }`
             } ${pending ? "opacity-70" : ""} ${failed ? "ring-1 ring-red-300/35" : ""}`}
           >
-            <div className="max-w-full px-3.5 py-2.5 md:max-w-[620px] md:px-4 md:py-2.5">
+            <div className={`${isSharedVybe ? "max-w-full p-0" : "max-w-full px-3.5 py-2.5 md:max-w-[620px] md:px-4 md:py-2.5"}`}>
               <ReplySnippet replyTo={message.replyTo} mine={mine} onJumpToMessage={onJumpToMessage} />
+              {message.sharedVybe?.postId ? <SharedVybeCard sharedVybe={message.sharedVybe} mine={mine} /> : null}
               <MediaContent media={message.media} mine={mine} />
-              {message.text ? (
+              {message.text && !isSharedVybe ? (
                 <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[14.5px] font-normal leading-relaxed text-white/95 md:text-[15px]">{message.text}</p>
               ) : null}
-              {isLastInGroup && (
+              {isLastInGroup && !isSharedVybe && (
                 <div className={`mt-1.5 flex items-center justify-end gap-2 text-[10px] font-medium ${mine ? "text-white/58" : "text-zinc-500"}`}>
                   <span>{formatWhisperTime(message.createdAt)}</span>
                   <DeliveryStatus message={message} mine={mine} seen={seen} isLastInGroup={isLastInGroup} onRetryMessage={onRetryMessage} />
@@ -470,6 +479,17 @@ function WhisperMessageBubble({
               )}
             </div>
           </button>
+
+          {isLastInGroup && isSharedVybe && (
+            <div
+              className={`mt-1.5 flex w-[min(68vw,300px)] items-center justify-end gap-2 pr-1 text-[10px] font-medium ${
+                mine ? "text-white/58" : "text-zinc-500"
+              }`}
+            >
+              <span>{formatWhisperTime(message.createdAt)}</span>
+              <DeliveryStatus message={message} mine={mine} seen={seen} isLastInGroup={isLastInGroup} onRetryMessage={onRetryMessage} />
+            </div>
+          )}
 
           <ReactionSummary reactions={reactions} currentUserId={currentUserId} mine={mine} />
 

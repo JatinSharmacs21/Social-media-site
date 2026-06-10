@@ -253,11 +253,11 @@ function Navbar() {
   ];
 
   const mobileNavItems = [
-    navItems.find((item) => item.path === "/feed"),
-    navItems.find((item) => item.path === "/search"),
-    navItems.find((item) => item.path === "/whispers"),
-    navItems.find((item) => item.path === "/profile"),
-  ].filter(Boolean);
+  navItems.find((item) => item.path === "/feed"),
+  navItems.find((item) => item.path === "/search"),
+  navItems.find((item) => item.path === "/reels"), // Clips
+  navItems.find((item) => item.path === "/profile"),
+].filter(Boolean);
 
   const Logo = ({ compact = false }) => (
     <div onClick={() => go(token ? "/feed" : "/")} className="flex items-center gap-3 cursor-pointer select-none">

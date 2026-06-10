@@ -120,7 +120,9 @@ function useWhispers() {
       const res = await API.get("/api/whispers/conversations");
       const sortedConversations = sortConversations(res.data || [], currentUserId);
       setConversations(sortedConversations);
-      setActiveConversation((current) => current || sortedConversations?.[0] || null);
+      // Do not auto-open the first conversation.
+      // Auto-opening was marking messages as seen when the user only visited Whispers.
+      setActiveConversation((current) => current);
     } catch (err) {
       logger.error(err.response?.data || err);
       setError("Whispers could not be loaded. Please refresh and try again.");
@@ -137,6 +139,15 @@ function useWhispers() {
         setMessagesLoading(true);
         const res = await API.get(`/api/whispers/conversations/${conversation._id}/messages`);
         setMessages(res.data || []);
+
+        // Mark read only after the user actually opens this conversation.
+        // The conversations list/inbox load should never mark messages as seen.
+        try {
+          await API.put(`/api/whispers/conversations/${conversation._id}/read`);
+        } catch (readError) {
+          logger.error(readError.response?.data || readError);
+        }
+
         setConversations((prev) =>
           sortConversations(prev.map((item) => (item._id === conversation._id ? { ...item, unreadCount: 0 } : item)), currentUserId)
         );
@@ -477,7 +488,19 @@ function useWhispers() {
     return messages.filter((message) => {
       const textMatch = String(message.text || "").toLowerCase().includes(term);
       const mediaMatch = String(message.media?.name || message.media?.type || "").toLowerCase().includes(term);
-      return textMatch || mediaMatch;
+      const sharedMatch = [
+        message.sharedVybe?.caption,
+        message.sharedVybe?.type,
+        message.sharedVybe?.mood,
+        message.sharedVybe?.vybeTag,
+        message.sharedVybe?.author?.name,
+        message.sharedVybe?.author?.username,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(term);
+      return textMatch || mediaMatch || sharedMatch;
     });
   }, [messages, messageSearch]);
 

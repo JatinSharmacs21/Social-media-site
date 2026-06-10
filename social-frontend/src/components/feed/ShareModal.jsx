@@ -93,11 +93,35 @@ function ShareModal({
 
   if (!post) return null;
 
-  const buildWhisperText = () => {
-    const author = post.user?.name || post.user?.username || "someone";
-    const caption = post.caption || post.content || "Vybeo vybe";
-    const preview = caption.length > 150 ? `${caption.slice(0, 150)}...` : caption;
-    return `Shared a vybe from ${author}\n\n${preview}\n\n${getPostShareUrl(post._id)}`;
+  const getVybeKind = () => {
+    const firstMedia = Array.isArray(post.media) ? post.media[0] : null;
+    if (firstMedia?.type === "video") return "Spark";
+    if (firstMedia?.type === "image") return "Moment";
+    return "Thought";
+  };
+
+  const buildSharedVybePayload = () => {
+    const firstMedia = Array.isArray(post.media) ? post.media[0] : null;
+    const caption = post.caption || post.content || "A quiet Vybe was shared.";
+    return {
+      postId: post._id,
+      type: getVybeKind(),
+      caption: caption.length > 700 ? `${caption.slice(0, 697)}...` : caption,
+      mood: post.mood || "",
+      vybeTag: post.vybeTag || "",
+      media: firstMedia?.url
+        ? {
+            url: firstMedia.url,
+            type: firstMedia.type === "video" ? "video" : "image",
+          }
+        : null,
+      author: {
+        id: post.user?._id || post.user?.id || null,
+        name: post.user?.name || "User",
+        username: post.user?.username || "",
+        profilePic: post.user?.profilePic || "",
+      },
+    };
   };
 
   const sendToConversation = async (conversationId, targetId) => {
@@ -106,7 +130,7 @@ function ShareModal({
       setSendError("");
       setSentTarget("");
       setSendingTarget(targetId || conversationId);
-      await API.post(`/api/whispers/conversations/${conversationId}/messages`, { text: buildWhisperText() });
+      await API.post(`/api/whispers/conversations/${conversationId}/messages`, { sharedVybe: buildSharedVybePayload() });
       setSentTarget(targetId || conversationId);
     } catch (error) {
       logger.error(error.response?.data || error);
@@ -123,7 +147,7 @@ function ShareModal({
       setSentTarget("");
       setSendingTarget(user._id);
       const conversationRes = await API.post("/api/whispers/conversations", { participantId: user._id });
-      await API.post(`/api/whispers/conversations/${conversationRes.data._id}/messages`, { text: buildWhisperText() });
+      await API.post(`/api/whispers/conversations/${conversationRes.data._id}/messages`, { sharedVybe: buildSharedVybePayload() });
       setSentTarget(user._id);
       setConversations((prev) => [conversationRes.data, ...prev.filter((item) => item._id !== conversationRes.data._id)]);
     } catch (error) {
@@ -162,7 +186,7 @@ function ShareModal({
           </div>
 
           <p className="line-clamp-2 text-sm text-gray-300">{post.caption || post.content || "Vybeo vybe"}</p>
-          <p className="mt-2 truncate text-xs text-gray-500">{getPostShareUrl(post._id)}</p>
+          <p className="mt-2 text-xs font-semibold text-cyan-200/70">Will be sent as a Vybe card, not a raw link.</p>
         </div>
 
         <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">

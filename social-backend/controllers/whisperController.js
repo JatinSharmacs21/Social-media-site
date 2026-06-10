@@ -23,7 +23,7 @@ const populateMessage = (query) =>
     .populate("reactions.user", userFields)
     .populate({
       path: "replyTo",
-      select: "text media sender createdAt",
+      select: "text media sharedVybe sender createdAt",
       populate: { path: "sender", select: userFields },
     });
 
@@ -36,7 +36,7 @@ const populateConversation = async (conversationId) =>
         { path: "sender", select: userFields },
         {
           path: "replyTo",
-          select: "text media sender createdAt",
+          select: "text media sharedVybe sender createdAt",
           populate: { path: "sender", select: userFields },
         },
       ],
@@ -116,7 +116,7 @@ const getConversations = async (req, res) => {
           { path: "reactions.user", select: userFields },
           {
             path: "replyTo",
-            select: "text media sender createdAt",
+            select: "text media sharedVybe sender createdAt",
             populate: { path: "sender", select: userFields },
           },
         ],
@@ -171,20 +171,8 @@ const getMessages = async (req, res) => {
       WhisperMessage.find({ conversation: conversationId }).sort({ createdAt: 1 }).limit(120)
     );
 
-    await WhisperMessage.updateMany(
-      {
-        conversation: conversationId,
-        sender: { $ne: currentUserId },
-        readBy: { $ne: currentUserId },
-      },
-      { $addToSet: { readBy: currentUserId } }
-    );
-
-    emitToParticipants(req, conversation, "whisper-seen", {
-      conversationId,
-      seenBy: currentUserId.toString(),
-    });
-
+    // Only return messages here.
+    // Seen/read state is updated by the explicit /read endpoint when the chat is actually opened.
     res.json(messages);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -198,6 +186,7 @@ const sendMessage = async (req, res) => {
     const text = String(req.body.text || "").trim();
     const replyTo = req.body.replyTo || null;
     const mediaInput = req.body.media && typeof req.body.media === "object" ? req.body.media : null;
+    const sharedVybeInput = req.body.sharedVybe && typeof req.body.sharedVybe === "object" ? req.body.sharedVybe : null;
     const media = mediaInput?.url
       ? {
           url: String(mediaInput.url || "").trim(),
@@ -207,7 +196,33 @@ const sendMessage = async (req, res) => {
         }
       : null;
 
-    if (!text && !media?.url) return res.status(400).json({ message: "Message or media is required" });
+    if (sharedVybeInput?.postId && !isObjectId(sharedVybeInput.postId)) {
+      return res.status(400).json({ message: "Valid shared vybe is required" });
+    }
+
+    const sharedVybe = sharedVybeInput?.postId
+      ? {
+          postId: sharedVybeInput.postId,
+          type: ["Thought", "Moment", "Spark"].includes(sharedVybeInput.type) ? sharedVybeInput.type : "Thought",
+          caption: String(sharedVybeInput.caption || "").slice(0, 700),
+          mood: String(sharedVybeInput.mood || "").slice(0, 40),
+          vybeTag: String(sharedVybeInput.vybeTag || "").slice(0, 40),
+          media: sharedVybeInput.media?.url
+            ? {
+                url: String(sharedVybeInput.media.url || "").trim(),
+                type: sharedVybeInput.media.type === "video" ? "video" : "image",
+              }
+            : undefined,
+          author: {
+            id: isObjectId(sharedVybeInput.author?.id) ? sharedVybeInput.author.id : null,
+            name: String(sharedVybeInput.author?.name || "").slice(0, 80),
+            username: String(sharedVybeInput.author?.username || "").slice(0, 40),
+            profilePic: String(sharedVybeInput.author?.profilePic || ""),
+          },
+        }
+      : null;
+
+    if (!text && !media?.url && !sharedVybe?.postId) return res.status(400).json({ message: "Message, media, or shared vybe is required" });
     if (text.length > 1200) {
       return res.status(400).json({ message: "Message is too long" });
     }
@@ -230,6 +245,7 @@ const sendMessage = async (req, res) => {
       sender: currentUserId,
       text,
       media: media || undefined,
+      sharedVybe: sharedVybe || undefined,
       replyTo: validReplyTo,
       readBy: [currentUserId],
     });
