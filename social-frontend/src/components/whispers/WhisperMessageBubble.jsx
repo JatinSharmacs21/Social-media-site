@@ -1,8 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { formatWhisperTime, getInitials } from "../../utils/whisperHelpers";
 import SharedVybeCard from "./SharedVybeCard";
 
 const REACTION_OPTIONS = ["❤️", "😂", "🔥", "👀", "😮"];
+const SWIPE_REPLY_THRESHOLD = 58;
+const SWIPE_REPLY_LIMIT = 86;
 
 function ReplySnippet({ replyTo, mine, onJumpToMessage }) {
   if (!replyTo) return null;
@@ -412,6 +414,10 @@ function WhisperMessageBubble({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(message.text || "");
+  const touchStartRef = useRef(null);
+  const swipeTriggeredRef = useRef(false);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [swiping, setSwiping] = useState(false);
   const senderLabel = activePerson?.name || activePerson?.username;
   const readBy = Array.isArray(message.readBy) ? message.readBy.map(String) : [];
   const reactions = Array.isArray(message.reactions) ? message.reactions : [];
@@ -482,12 +488,89 @@ function WhisperMessageBubble({
       ? "rounded-[22px] rounded-bl-[8px]"
       : "rounded-[22px] rounded-bl-[18px]";
 
+  const canSwipeReply = !pending && !failed && !editing && !message.isPending && !isDeleted;
+
+  const handleSwipeStart = (event) => {
+    if (!canSwipeReply) return;
+
+    const touch = event.touches?.[0];
+    if (!touch) return;
+
+    touchStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+    };
+    swipeTriggeredRef.current = false;
+    setSwiping(false);
+    setSwipeOffset(0);
+  };
+
+  const handleSwipeMove = (event) => {
+    if (!touchStartRef.current || !canSwipeReply) return;
+
+    const touch = event.touches?.[0];
+    if (!touch) return;
+
+    const deltaX = touch.clientX - touchStartRef.current.x;
+    const deltaY = touch.clientY - touchStartRef.current.y;
+
+    if (Math.abs(deltaY) > 38 && Math.abs(deltaY) > Math.abs(deltaX)) {
+      touchStartRef.current = null;
+      setSwiping(false);
+      setSwipeOffset(0);
+      return;
+    }
+
+    const allowedDirection = mine ? deltaX < 0 : deltaX > 0;
+    if (!allowedDirection || Math.abs(deltaX) < 8) return;
+
+    event.preventDefault();
+
+    const distance = Math.min(Math.abs(deltaX), SWIPE_REPLY_LIMIT);
+    setSwiping(true);
+    setSwipeOffset(mine ? -distance : distance);
+
+    if (distance >= SWIPE_REPLY_THRESHOLD) {
+      swipeTriggeredRef.current = true;
+    }
+  };
+
+  const handleSwipeEnd = () => {
+    if (swipeTriggeredRef.current && canSwipeReply) {
+      onReplyToMessage?.(message);
+    }
+
+    touchStartRef.current = null;
+    swipeTriggeredRef.current = false;
+    setSwiping(false);
+    setSwipeOffset(0);
+  };
+
   return (
     <div
       id={`whisper-message-${message._id}`}
-      className={`group flex scroll-mt-24 transition ${mine ? "justify-end" : "justify-start"} ${isFirstInGroup ? "mt-2.5" : "mt-0.5"}`}
+      onTouchStart={handleSwipeStart}
+      onTouchMove={handleSwipeMove}
+      onTouchEnd={handleSwipeEnd}
+      onTouchCancel={handleSwipeEnd}
+      className={`group flex touch-pan-y scroll-mt-24 transition ${mine ? "justify-end" : "justify-start"} ${isFirstInGroup ? "mt-2.5" : "mt-0.5"}`}
     >
-      <div className={`flex min-w-0 max-w-[88%] gap-2 sm:max-w-[76%] md:max-w-[66%] ${mine ? "flex-row-reverse" : "flex-row"}`}>
+      <div
+        className={`relative flex min-w-0 max-w-[88%] gap-2 sm:max-w-[76%] md:max-w-[66%] ${mine ? "flex-row-reverse" : "flex-row"}`}
+        style={{
+          transform: swipeOffset ? `translateX(${swipeOffset}px)` : undefined,
+          transition: swiping ? "none" : "transform 180ms ease",
+        }}
+      >
+        {swiping && (
+          <div
+            className={`pointer-events-none absolute top-1/2 z-0 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/[0.1] bg-white/[0.075] text-sm text-white/75 shadow-lg shadow-black/20 ${
+              mine ? "-right-11" : "-left-11"
+            }`}
+          >
+            ↩
+          </div>
+        )}
         {!mine && (
           <div
             className={`mt-auto hidden h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/[0.07] bg-white/[0.04] text-[10px] font-semibold text-zinc-500 sm:flex ${
