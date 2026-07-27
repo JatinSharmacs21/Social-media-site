@@ -52,9 +52,40 @@ const hasUserReacted = (reply, type, userId) =>
       r.type === type
   ) || false;
 
+const getTotalReactionCount = (reply) => reply?.vybeReactions?.length || 0;
+
+// Only crown a reply as "top" once it has real engagement (2+ reactions)
+// and there is more than one reply to compare against.
+const getTopReplyId = (replies = []) => {
+  if (replies.length < 2) return null;
+
+  let topId = null;
+  let topCount = 1;
+
+  replies.forEach((reply) => {
+    const count = getTotalReactionCount(reply);
+    if (count > topCount) {
+      topCount = count;
+      topId = reply._id;
+    }
+  });
+
+  return topId;
+};
+
 function VybeDrops() {
   const socketRef = useRef(null);
   const userId = localStorage.getItem("userId");
+
+  const [streak, setStreak] = useState(() => {
+    try {
+      const cachedUser = JSON.parse(localStorage.getItem("user") || "null");
+      return cachedUser?.dropStreak || { current: 0, longest: 0 };
+    } catch {
+      return { current: 0, longest: 0 };
+    }
+  });
+  const [streakBump, setStreakBump] = useState(false);
 
   const [drops, setDrops] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -90,6 +121,26 @@ function VybeDrops() {
 
   useEffect(() => {
     fetchDrops();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const refreshStreak = async () => {
+      try {
+        const res = await API.get("/api/users/me");
+        if (!cancelled && res.data?.dropStreak) {
+          setStreak(res.data.dropStreak);
+        }
+      } catch {
+        // Best-effort only; keep whatever streak we already have cached.
+      }
+    };
+
+    refreshStreak();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -267,10 +318,22 @@ const openThread = async (dropId) => {
 
       const dropId = selectedDrop._id;
 
-      await API.post(`/api/posts/drops/${dropId}/reply`, {
+      const res = await API.post(`/api/posts/drops/${dropId}/reply`, {
         caption: replyText.trim(),
         isAnonymous,
       });
+
+      if (res.data?.dropStreak) {
+        setStreak((prev) => {
+          const next = res.data.dropStreak;
+          if (next.current > (prev?.current || 0)) {
+            setStreakBump(true);
+            setTimeout(() => setStreakBump(false), 1600);
+          }
+          return next;
+        });
+      }
+
       socketRef.current?.emit("drop-typing-stop", {
     dropId,
     });
@@ -507,7 +570,7 @@ const deleteDropReply = async () => {
     );
   };
 
-  const renderReplyCard = (reply, dropId) => {
+  const renderReplyCard = (reply, dropId, isTop = false) => {
     const isAnon = reply.isAnonymous;
     const displayName = isAnon
       ? getAnonName(reply._id)
@@ -525,8 +588,18 @@ const canDeleteReply =
     return (
       <div
         key={reply._id}
-        className="relative rounded-2xl border-l-2 border-pink-500/35 bg-white/[0.035] p-3 sm:p-4 shadow-inner"
+        className={`relative rounded-2xl p-3 sm:p-4 shadow-inner ${
+          isTop
+            ? "border-l-4 border-amber-400/70 bg-gradient-to-br from-amber-500/10 via-white/[0.035] to-white/[0.035] ring-1 ring-amber-400/25"
+            : "border-l-2 border-pink-500/35 bg-white/[0.035]"
+        }`}
       >
+        {isTop && (
+          <div className="mb-2.5 inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-200">
+            🔥 Top reply
+          </div>
+        )}
+
        <div className="flex items-start justify-between gap-2.5 mb-2">
   <div className="flex items-center gap-2.5 min-w-0">
     <div className="w-7 h-7 rounded-full bg-gradient-to-r from-pink-500 to-indigo-500 flex items-center justify-center text-xs font-black shrink-0">
@@ -761,9 +834,19 @@ const canDeleteReply =
                 <p className="text-gray-500 text-sm">Loading replies...</p>
               ) : replies.length ? (
                 <>
-                  {replies.slice(0, 3).map((reply) =>
-                    renderReplyCard(reply, drop._id)
-                  )}
+                  {(() => {
+                    const topReplyId = getTopReplyId(replies);
+                    const previewReplies = topReplyId
+                      ? [
+                          replies.find((r) => r._id === topReplyId),
+                          ...replies.filter((r) => r._id !== topReplyId),
+                        ].filter(Boolean).slice(0, 3)
+                      : replies.slice(0, 3);
+
+                    return previewReplies.map((reply) =>
+                      renderReplyCard(reply, drop._id, reply._id === topReplyId)
+                    );
+                  })()}
 
                   {replies.length > 3 && (
                     <button
@@ -814,12 +897,23 @@ const canDeleteReply =
                 </p>
               </div>
 
-              {/* <a
-                href="/room"
-                className="self-start sm:self-end inline-flex items-center gap-2 rounded-full bg-white/[0.06] border border-white/10 px-3 py-2 text-xs sm:text-sm font-bold text-gray-200 hover:bg-white/10 hover:text-white transition"
+              <div
+                className={`self-start sm:self-end inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-xs sm:text-sm font-bold shadow-lg transition-transform ${
+                  streak.current > 0
+                    ? "border-orange-300/25 bg-gradient-to-r from-orange-500/20 to-pink-500/20 text-orange-100"
+                    : "border-white/10 bg-white/[0.06] text-gray-300"
+                } ${streakBump ? "scale-110" : "scale-100"}`}
+                title={
+                  streak.longest > streak.current
+                    ? `Longest streak: ${streak.longest} days`
+                    : "Reply to a drop every day to keep this going"
+                }
               >
-                Room <span className="text-pink-300">→</span>
-              </a> */}
+                <span className={streakBump ? "animate-bounce" : ""}>🔥</span>
+                {streak.current > 0
+                  ? `${streak.current} day${streak.current === 1 ? "" : "s"} streak`
+                  : "Start a streak today"}
+              </div>
             </div>
           </div>
         </div>
@@ -1010,9 +1104,12 @@ const canDeleteReply =
               {loadingReplies[detailDrop._id] && !detailReplies.length ? (
                 <p className="text-gray-500 text-sm">Loading replies...</p>
               ) : detailReplies.length ? (
-                detailReplies.map((reply) =>
-                  renderReplyCard(reply, detailDrop._id)
-                )
+                (() => {
+                  const detailTopReplyId = getTopReplyId(detailReplies);
+                  return detailReplies.map((reply) =>
+                    renderReplyCard(reply, detailDrop._id, reply._id === detailTopReplyId)
+                  );
+                })()
               ) : (
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-5 text-gray-400">
                   No replies yet. Start this thread with your vybe.

@@ -1,11 +1,40 @@
 const Post = require("../models/Post");
 const Notification = require("../models/Notification");
+const User = require("../models/User");
 
 const MAX_COMMENT_LENGTH = 300;
 
 const getUserId = (req) => req.user?._id || req.user?.id;
 
 const cleanTextInput = (value = "") => value.trim();
+
+const getUtcDateString = (date = new Date()) => date.toISOString().slice(0, 10);
+
+const updateDropStreak = async (userId) => {
+  const user = await User.findById(userId).select("dropStreak");
+  if (!user) return null;
+
+  const today = getUtcDateString();
+  const streak = user.dropStreak || { current: 0, longest: 0, lastReplyDate: null };
+
+  if (streak.lastReplyDate === today) {
+    return streak;
+  }
+
+  const yesterday = getUtcDateString(new Date(Date.now() - 24 * 60 * 60 * 1000));
+  const nextCurrent = streak.lastReplyDate === yesterday ? (streak.current || 0) + 1 : 1;
+
+  const nextStreak = {
+    current: nextCurrent,
+    longest: Math.max(streak.longest || 0, nextCurrent),
+    lastReplyDate: today,
+  };
+
+  user.dropStreak = nextStreak;
+  await user.save();
+
+  return nextStreak;
+};
 
 const getPostKind = (post) => {
   const media = Array.isArray(post?.media) ? post.media : [];
@@ -344,6 +373,8 @@ const replyToVybeDrop = async (req, res) => {
       "name username profilePic"
     );
 
+    const dropStreak = await updateDropStreak(userId);
+
     const io = req.app.get("io");
 
     if (io) {
@@ -358,7 +389,7 @@ const replyToVybeDrop = async (req, res) => {
       });
     }
 
-    res.status(201).json(populatedReply);
+    res.status(201).json({ ...populatedReply.toObject(), dropStreak });
   } catch (error) {
     console.log("Vybe reply error:", error);
     res.status(500).json({

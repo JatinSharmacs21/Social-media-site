@@ -123,7 +123,7 @@ function WhisperComposer({
                 placeholder={mediaPreview ? "Add a caption..." : replyTo ? "Write your reply..." : "Message..."}
                 rows={1}
                 maxLength={1200}
-                className="max-h-28 min-h-[42px] flex-1 resize-none overflow-y-auto bg-transparent px-3 py-2.5 text-[15px] font-normal leading-relaxed text-white placeholder:text-zinc-600 outline-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                className="max-h-28 min-h-[42px] flex-1 resize-none overflow-y-auto bg-transparent px-3 py-2.5 text-[16px] md:text-[15px] font-normal leading-relaxed text-white placeholder:text-zinc-600 outline-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               />
             </div>
 

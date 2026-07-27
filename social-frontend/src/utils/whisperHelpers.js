@@ -53,6 +53,20 @@ export const getDisplayMessageText = (message, currentUserId) => {
   return `${mine ? "You: " : ""}${message.text}`;
 };
 
+const EMOJI_ONLY_REGEX = /^[\p{Extended_Pictographic}\p{Emoji_Presentation}\u200d\ufe0f\s]+$/u;
+
+export const getEmojiOnlyInfo = (text) => {
+  const trimmed = (text || "").trim();
+  if (!trimmed || !EMOJI_ONLY_REGEX.test(trimmed)) return { isEmojiOnly: false, count: 0 };
+
+  const graphemes =
+    typeof Intl !== "undefined" && typeof Intl.Segmenter === "function"
+      ? Array.from(new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(trimmed), (item) => item.segment)
+      : Array.from(trimmed);
+
+  return { isEmojiOnly: graphemes.length > 0 && graphemes.length <= 2, count: graphemes.length };
+};
+
 const whisperHelpers = {
   getUserId,
   formatWhisperTime,
@@ -62,6 +76,7 @@ const whisperHelpers = {
   getInitials,
   getMessageSenderId,
   getDisplayMessageText,
+  getEmojiOnlyInfo,
 };
 
 export default whisperHelpers;

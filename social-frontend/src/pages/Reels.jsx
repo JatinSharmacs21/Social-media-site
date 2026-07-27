@@ -5,6 +5,43 @@ import { useNavigate } from "react-router-dom";
 import { SOCKET_URL } from "../config/env";
 import logger from "../utils/logger";
 
+function ReelSkeletonCard() {
+  return (
+    <section className="relative h-full w-full max-w-full snap-start flex items-center justify-center bg-black overflow-hidden">
+      <div className="relative h-full w-full max-w-full sm:h-[94svh] sm:max-w-[430px] md:max-w-[460px] sm:rounded-[2rem] overflow-hidden bg-zinc-950 shadow-2xl shadow-black/60 border-x border-white/10 animate-pulse">
+        <div className="absolute inset-0 bg-white/10" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-black/45" />
+
+        <div className="absolute top-0 left-0 right-0 z-20 px-3 sm:px-4 pt-3 sm:pt-5 pb-3 flex items-center justify-between">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/10" />
+          <div className="h-8 w-24 rounded-full bg-white/10" />
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/10" />
+        </div>
+
+        <div className="absolute right-3 sm:right-4 bottom-28 sm:bottom-32 z-[65] flex flex-col items-center gap-2.5">
+          <div className="h-16 w-11 sm:w-12 rounded-2xl bg-white/10" />
+          <div className="h-16 w-11 sm:w-12 rounded-2xl bg-white/10" />
+          <div className="h-12 w-11 sm:w-12 rounded-2xl bg-white/10" />
+        </div>
+
+        <div className="absolute left-0 right-16 sm:right-20 bottom-0 z-[60] p-4 pb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-white/10 shrink-0" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="h-3 w-28 rounded bg-white/10" />
+              <div className="h-3 w-20 rounded bg-white/10" />
+            </div>
+          </div>
+          <div className="mt-3 space-y-2">
+            <div className="h-3 w-4/5 rounded bg-white/10" />
+            <div className="h-3 w-2/3 rounded bg-white/10" />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Reels() {
   const navigate = useNavigate();
 
@@ -788,10 +825,11 @@ function Reels() {
 
   if (loading) {
     return (
-      <div className="fixed inset-x-0 top-[72px] bottom-[68px] md:top-0 md:bottom-0 bg-black text-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 rounded-full border-4 border-white/20 border-t-pink-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-400">Loading clips</p>
+      <div className="fixed inset-x-0 top-[72px] bottom-[68px] md:top-0 md:bottom-0 bg-black text-white overflow-hidden">
+        <div className="h-full w-full overflow-y-scroll overflow-x-hidden snap-y snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <ReelSkeletonCard key={index} />
+          ))}
         </div>
       </div>
     );

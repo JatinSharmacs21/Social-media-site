@@ -76,6 +76,12 @@ const userSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+
+    dropStreak: {
+      current: { type: Number, default: 0 },
+      longest: { type: Number, default: 0 },
+      lastReplyDate: { type: String, default: null },
+    },
   },
   {
     timestamps: true,

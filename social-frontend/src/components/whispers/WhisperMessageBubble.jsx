@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
-import { formatWhisperTime, getInitials } from "../../utils/whisperHelpers";
+import { formatWhisperTime, getInitials, getEmojiOnlyInfo } from "../../utils/whisperHelpers";
 import SharedVybeCard from "./SharedVybeCard";
 
 const REACTION_OPTIONS = ["❤️", "😂", "🔥", "👀", "😮"];
@@ -428,6 +428,9 @@ function WhisperMessageBubble({
   const isSharedVybe = Boolean(message.sharedVybe?.postId);
   const isDeleted = Boolean(message.isDeleted);
   const isEdited = Boolean(message.editedAt) && !isDeleted;
+  const emojiInfo = useMemo(() => getEmojiOnlyInfo(message.text), [message.text]);
+  const isEmojiOnly =
+    emojiInfo.isEmojiOnly && !editing && !isDeleted && !isSharedVybe && !message.media?.url;
 
   const openActions = () => {
     if (pending || failed || isDeleted) return;
@@ -594,7 +597,7 @@ function WhisperMessageBubble({
               openActions();
             }}
             className={`relative max-w-full overflow-hidden text-left transition active:scale-[0.995] ${
-              isSharedVybe
+              isSharedVybe || isEmojiOnly
                 ? "rounded-[22px] bg-transparent shadow-none"
                 : `${bubbleRadius} shadow-md ${
                     mine
@@ -603,7 +606,7 @@ function WhisperMessageBubble({
                   }`
             } ${pending ? "opacity-70" : ""} ${failed ? "ring-1 ring-red-300/35" : ""}`}
           >
-            <div className={`${isSharedVybe ? "max-w-full p-0" : "max-w-full px-3.5 py-2.5 md:max-w-[620px] md:px-4 md:py-2.5"}`}>
+            <div className={`${isSharedVybe || isEmojiOnly ? "max-w-full p-0" : "max-w-full px-3.5 py-2.5 md:max-w-[620px] md:px-4 md:py-2.5"}`}>
               <ReplySnippet replyTo={message.replyTo} mine={mine} onJumpToMessage={onJumpToMessage} />
               {isDeleted ? (
                 <p className="italic text-[14px] font-medium leading-relaxed text-white/62">
@@ -645,14 +648,24 @@ function WhisperMessageBubble({
                       </div>
                     </form>
                   ) : message.text && !isSharedVybe ? (
-                    <>
-                      <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[14.5px] font-normal leading-relaxed text-white/95 md:text-[15px]">{message.text}</p>
-                      {isEdited && (
-                        <p className={`mt-1 text-[10px] font-medium ${mine ? "text-white/45" : "text-zinc-500"}`}>
-                          edited
-                        </p>
-                      )}
-                    </>
+                    isEmojiOnly ? (
+                      <span
+                        className={`whisper-emoji-pop select-none leading-none ${
+                          emojiInfo.count === 1 ? "text-[64px]" : "text-[46px]"
+                        }`}
+                      >
+                        {message.text.trim()}
+                      </span>
+                    ) : (
+                      <>
+                        <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[14.5px] font-normal leading-relaxed text-white/95 md:text-[15px]">{message.text}</p>
+                        {isEdited && (
+                          <p className={`mt-1 text-[10px] font-medium ${mine ? "text-white/45" : "text-zinc-500"}`}>
+                            edited
+                          </p>
+                        )}
+                      </>
+                    )
                   ) : null}
                 </>
               )}

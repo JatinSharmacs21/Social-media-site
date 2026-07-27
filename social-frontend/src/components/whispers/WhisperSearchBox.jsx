@@ -10,7 +10,7 @@ function WhisperSearchBox({ query, setQuery, users, searching, onStartConversati
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search people"
-          className="w-full bg-transparent text-[13px] font-medium text-white placeholder:text-zinc-600 outline-none"
+          className="w-full bg-transparent text-[16px] md:text-[13px] font-medium text-white placeholder:text-zinc-600 outline-none"
         />
         {query && (
           <button

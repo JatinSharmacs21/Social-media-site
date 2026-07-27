@@ -132,8 +132,8 @@ function WhisperConversationItem({ conversation, activeId, currentUserId, deleti
 
       {menuOpen && (
         <>
-          <button type="button" aria-label="Close menu" className="fixed inset-0 z-20 cursor-default bg-black/35 backdrop-blur-[2px]" onClick={() => setMenuOpen(false)} />
-          <div className="absolute right-2 top-12 z-30 w-48 overflow-hidden rounded-2xl border border-white/[0.16] bg-[#11121a]/82 p-1.5 shadow-2xl shadow-black/80 backdrop-blur-3xl">
+          <button type="button" aria-label="Close menu" className="fixed inset-0 z-40 cursor-default bg-black/45 backdrop-blur-[2px]" onClick={() => setMenuOpen(false)} />
+          <div className="absolute right-2 top-12 z-50 w-48 overflow-hidden rounded-2xl border border-white/[0.14] bg-[#15131c] p-1.5 shadow-2xl shadow-black/70 ring-1 ring-white/[0.06]">
             <button
               type="button"
               onClick={(event) => {
@@ -141,19 +141,19 @@ function WhisperConversationItem({ conversation, activeId, currentUserId, deleti
                 setMenuOpen(false);
                 onTogglePinConversation?.(conversation._id);
               }}
-              className="mb-1 flex w-full items-center justify-between rounded-xl border border-white/[0.07] bg-white/[0.045] px-3 py-2.5 text-left text-sm font-semibold text-zinc-100 transition hover:bg-white/[0.08]"
+              className="mb-1 flex w-full items-center justify-between rounded-xl border border-white/[0.07] bg-white/[0.06] px-3 py-2.5 text-left text-sm font-semibold text-zinc-100 transition hover:bg-white/[0.1]"
             >
               <span>{pinned ? "Unpin chat" : "Pin chat"}</span>
-              <span className="text-pink-200/70">📌</span>
+              <span className="text-pink-200/80">📌</span>
             </button>
             <button
               type="button"
               disabled={deletingConversation}
               onClick={openDeleteConfirm}
-              className="flex w-full items-center justify-between rounded-xl border border-red-300/10 bg-red-500/[0.08] px-3 py-2.5 text-left text-sm font-semibold text-red-100 transition hover:bg-red-500/16 disabled:opacity-50"
+              className="flex w-full items-center justify-between rounded-xl border border-red-300/15 bg-red-500/[0.12] px-3 py-2.5 text-left text-sm font-semibold text-red-100 transition hover:bg-red-500/20 disabled:opacity-50"
             >
               <span>{deletingConversation ? "Deleting..." : "Delete chat"}</span>
-              <span className="text-red-300/50">✕</span>
+              <span className="text-red-300/60">✕</span>
             </button>
           </div>
         </>

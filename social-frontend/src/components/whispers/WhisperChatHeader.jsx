@@ -68,7 +68,7 @@ function WhisperChatHeader({ activePerson, typingUser, onlineUserIds = [], delet
   const statusText = typingUser ? "Typing..." : isOnline ? "Online now" : formatWhisperLastSeen(activePerson?.lastSeen);
 
   return (
-    <div className="relative z-30 shrink-0 border-b border-white/[0.07] bg-[#08090d]/92 px-3 py-2 shadow-lg shadow-black/25 backdrop-blur-xl md:px-5 md:py-2.5">
+    <div className="sticky top-0 relative z-30 shrink-0 border-b border-white/[0.07] bg-[#08090d]/92 px-3 py-2 shadow-lg shadow-black/25 backdrop-blur-xl md:px-5 md:py-2.5">
       {menuOpen && (
         <button
           type="button"
@@ -127,11 +127,11 @@ function WhisperChatHeader({ activePerson, typingUser, onlineUserIds = [], delet
           </button>
 
           {menuOpen && (
-            <div className="absolute right-0 top-11 z-50 w-52 overflow-hidden rounded-2xl border border-white/[0.16] bg-[#11121a]/84 p-1.5 shadow-2xl shadow-black/85 backdrop-blur-3xl">
+            <div className="absolute right-0 top-11 z-50 w-52 overflow-hidden rounded-2xl border border-white/[0.14] bg-[#15131c] p-1.5 shadow-2xl shadow-black/70 ring-1 ring-white/[0.06]">
               <button
                 type="button"
                 onClick={openProfile}
-                className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-medium text-zinc-100 transition hover:bg-white/[0.08]"
+                className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-medium text-zinc-100 transition hover:bg-white/[0.1]"
               >
                 <span>View profile</span>
                 <span className="text-zinc-500">›</span>
@@ -140,7 +140,7 @@ function WhisperChatHeader({ activePerson, typingUser, onlineUserIds = [], delet
                 type="button"
                 disabled={deletingConversation}
                 onClick={openDeleteConfirm}
-                className="flex w-full items-center justify-between rounded-xl border border-red-300/10 bg-red-500/[0.08] px-3 py-2.5 text-left text-sm font-medium text-red-100 transition hover:bg-red-500/18 disabled:opacity-50"
+                className="flex w-full items-center justify-between rounded-xl border border-red-300/15 bg-red-500/[0.12] px-3 py-2.5 text-left text-sm font-medium text-red-100 transition hover:bg-red-500/20 disabled:opacity-50"
               >
                 <span>{deletingConversation ? "Deleting..." : "Delete chat"}</span>
                 <span className="text-red-300/60">✕</span>
@@ -156,7 +156,7 @@ function WhisperChatHeader({ activePerson, typingUser, onlineUserIds = [], delet
           value={messageSearch}
           onChange={(event) => setMessageSearch?.(event.target.value)}
           placeholder="Search in this chat"
-          className="min-w-0 flex-1 bg-transparent text-[12px] font-medium text-white placeholder:text-zinc-600 outline-none"
+          className="min-w-0 flex-1 bg-transparent text-[16px] md:text-[12px] font-medium text-white placeholder:text-zinc-600 outline-none"
         />
         {messageSearch && (
           <>
