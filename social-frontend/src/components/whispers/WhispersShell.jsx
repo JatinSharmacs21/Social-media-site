@@ -2,7 +2,7 @@ import React from "react";
 
 function WhispersShell({ totalUnread, error, onClearError, children }) {
   return (
-    <main className="relative h-[calc(100dvh-76px-80px)] overflow-hidden bg-[#030306] text-white md:h-screen md:p-4">
+    <main className="fixed inset-x-0 top-[76px] bottom-[80px] z-10 overflow-hidden bg-[#030306] text-white md:static md:z-auto md:h-screen md:p-4">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-[#030306]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_8%,rgba(236,72,153,0.075),transparent_34%),radial-gradient(circle_at_8%_88%,rgba(34,211,238,0.055),transparent_35%),linear-gradient(180deg,rgba(255,255,255,0.018),transparent_30%)]" />
