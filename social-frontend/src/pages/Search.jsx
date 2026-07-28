@@ -19,6 +19,7 @@ function Search() {
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [followLoading, setFollowLoading] = useState(null);
   const [followingIds, setFollowingIds] = useState(new Set());
+  const [requestedIds, setRequestedIds] = useState(new Set());
   const [suggestionSeed, setSuggestionSeed] = useState(() => Date.now());
   const [visibleSuggestionCount, setVisibleSuggestionCount] = useState(4);
   const [recentSearches, setRecentSearches] = useState(() => {
@@ -115,6 +116,9 @@ function Search() {
         )
       );
       setFollowingIds(ids);
+
+      const sentRes = await API.get("/api/users/tune-requests/sent", authConfig);
+      setRequestedIds(new Set((sentRes.data || []).map((id) => id.toString())));
     } catch (err) {
       logger.error(err.response?.data || err);
     }
@@ -184,14 +188,6 @@ function Search() {
   const followUser = async (userId) => {
     try {
       setFollowLoading(userId);
-      const wasFollowing = followingIds.has(userId);
-
-      setFollowingIds((prev) => {
-        const next = new Set(prev);
-        if (wasFollowing) next.delete(userId);
-        else next.add(userId);
-        return next;
-      });
 
       const res = await API.put(`/api/users/follow/${userId}`, {}, authConfig);
       const updatedUser = res.data.user || res.data;
@@ -201,6 +197,13 @@ function Search() {
       setFollowingIds((prev) => {
         const next = new Set(prev);
         if (res.data?.following) next.add(userId);
+        else next.delete(userId);
+        return next;
+      });
+
+      setRequestedIds((prev) => {
+        const next = new Set(prev);
+        if (res.data?.requested) next.add(userId);
         else next.delete(userId);
         return next;
       });
@@ -224,6 +227,7 @@ function Search() {
 
   const UserCard = ({ user }) => {
     const isFollowing = followingIds.has(user._id);
+    const isRequested = !isFollowing && requestedIds.has(user._id);
 
     return (
       <article className="group rounded-[1.15rem] border border-white/10 bg-zinc-950/80 p-3 shadow-lg shadow-black/20 backdrop-blur-xl transition hover:border-pink-400/25 hover:bg-white/[0.045]">
@@ -244,6 +248,7 @@ function Search() {
             </h3>
             <p className="truncate text-xs font-semibold text-white/45">
               {user.username ? `@${user.username}` : "@vybeo"}
+              {user.isPrivate && <span className="ml-1 text-white/30">🔒</span>}
             </p>
             {user.bio && (
               <p className="mt-1 line-clamp-1 text-xs text-white/55">{user.bio}</p>
@@ -254,12 +259,18 @@ function Search() {
             onClick={() => followUser(user._id)}
             disabled={followLoading === user._id}
             className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-black transition active:scale-95 disabled:opacity-60 ${
-              isFollowing
+              isFollowing || isRequested
                 ? "border border-white/10 bg-white/[0.08] text-white/80 hover:bg-white/[0.12]"
                 : "bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-lg shadow-pink-500/15 hover:scale-[1.03]"
             }`}
           >
-            {followLoading === user._id ? "..." : isFollowing ? "Tuned" : "Tune In"}
+            {followLoading === user._id
+              ? "..."
+              : isFollowing
+              ? "Tuned"
+              : isRequested
+              ? "Requested"
+              : "Tune In"}
           </button>
         </div>
 

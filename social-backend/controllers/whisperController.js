@@ -82,7 +82,7 @@ const getOrCreateConversation = async (req, res) => {
       return res.status(400).json({ message: "You cannot whisper yourself" });
     }
 
-    const participant = await User.findById(participantId).select(userFields);
+    const participant = await User.findById(participantId).select(`${userFields} isPrivate`);
     if (!participant) return res.status(404).json({ message: "User not found" });
 
     let conversation = await Conversation.findOne({
@@ -90,6 +90,23 @@ const getOrCreateConversation = async (req, res) => {
     });
 
     if (!conversation) {
+      // Private Vybe Space: only an accepted tune-in (follower) can start a
+      // fresh whisper. Existing conversations from before going private
+      // are left untouched above.
+      if (participant.isPrivate) {
+        const isAcceptedFollower = await User.exists({
+          _id: participantId,
+          followers: currentUserId,
+        });
+
+        if (!isAcceptedFollower) {
+          return res.status(403).json({
+            message: "This is a private Vybe Space. Tune in and wait for acceptance before you can whisper them.",
+            isPrivate: true,
+          });
+        }
+      }
+
       conversation = await Conversation.create({
         participants: [currentUserId, participantId],
         lastMessageAt: new Date(),

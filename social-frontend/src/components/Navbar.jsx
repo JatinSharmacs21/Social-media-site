@@ -16,6 +16,7 @@ function Navbar() {
   const [toast, setToast] = useState(null);
   const [mobileVybeOpen, setMobileVybeOpen] = useState(false);
   const [spaceControlOpen, setSpaceControlOpen] = useState(false);
+  const [spacePrivacy, setSpacePrivacy] = useState({ isPrivate: false, loaded: false, saving: false });
 
   useEffect(() => {
     const fetchUnreadCount = async () => {
@@ -616,6 +617,40 @@ function Navbar() {
     );
   };
 
+  useEffect(() => {
+    if (!spaceControlOpen || spacePrivacy.loaded) return;
+
+    let cancelled = false;
+
+    API.get("/api/users/me")
+      .then((res) => {
+        if (!cancelled) {
+          setSpacePrivacy({ isPrivate: Boolean(res.data?.isPrivate), loaded: true, saving: false });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setSpacePrivacy((prev) => ({ ...prev, loaded: true }));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [spaceControlOpen, spacePrivacy.loaded]);
+
+  const toggleSpacePrivacy = async () => {
+    const nextValue = !spacePrivacy.isPrivate;
+    setSpacePrivacy((prev) => ({ ...prev, isPrivate: nextValue, saving: true }));
+
+    try {
+      await API.put("/api/users/me", { isPrivate: nextValue });
+      setSpacePrivacy({ isPrivate: nextValue, loaded: true, saving: false });
+    } catch (error) {
+      // Revert on failure
+      setSpacePrivacy((prev) => ({ ...prev, isPrivate: !nextValue, saving: false }));
+      logger.error("Failed to update Vybe Space privacy:", error.message);
+    }
+  };
+
   const SpaceControlPanel = () => {
     if (!spaceControlOpen) return null;
 
@@ -698,6 +733,35 @@ function Navbar() {
 
               <SectionTitle>Privacy & Safety</SectionTitle>
               <div className="space-y-2 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={toggleSpacePrivacy}
+                  disabled={spacePrivacy.saving}
+                  className="group flex w-full items-center justify-between gap-3 rounded-[22px] border border-white/10 bg-white/[0.04] px-4 py-3 text-left transition-all hover:border-pink-300/20 hover:bg-white/[0.07] disabled:opacity-70"
+                >
+                  <span className="min-w-0">
+                    <span className="block text-sm font-black text-white">
+                      {spacePrivacy.isPrivate ? "Private Vybe Space" : "Public Vybe Space"}
+                    </span>
+                    <span className="mt-0.5 block text-[11px] font-semibold text-slate-500">
+                      {spacePrivacy.isPrivate
+                        ? "Only accepted tune-ins can see your vybes and whisper you."
+                        : "Anyone can view your vybes, tune in, and whisper you."}
+                    </span>
+                  </span>
+                  <span
+                    className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                      spacePrivacy.isPrivate ? "bg-gradient-to-r from-pink-500 to-purple-500" : "bg-white/15"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                        spacePrivacy.isPrivate ? "translate-x-5" : "translate-x-0.5"
+                      }`}
+                    />
+                  </span>
+                </button>
+
                 <PanelItem title="Blocked users" subtitle="Coming soon: view and unblock users" disabled />
                 <PanelItem title="Muted users" subtitle="Coming soon: control muted spaces" disabled />
                 <PanelItem title="Report history" subtitle="Coming soon: track reports and reviews" disabled />

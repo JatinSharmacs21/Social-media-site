@@ -41,6 +41,14 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
 
+    // When true, this user's Vybe Space is private:
+    // profile details, posts, and whispers (DMs) are locked behind
+    // an accepted tune-in request (see TuneRequest model).
+    isPrivate: {
+      type: Boolean,
+      default: false,
+    },
+
     resetPasswordToken: String,
     resetPasswordExpire: Date,
 

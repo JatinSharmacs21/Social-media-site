@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { protect } = require("../middleware/authMiddleware");
+const { protect, optionalAuth } = require("../middleware/authMiddleware");
 
 const {
   createPost,
@@ -52,7 +52,7 @@ router.delete(
 );
 
 // GET ALL POSTS
-router.get("/", getPosts);
+router.get("/", optionalAuth, getPosts);
 
 // CREATE POST
 router.post("/create", protect, createPost);
@@ -61,13 +61,13 @@ router.post("/create", protect, createPost);
 router.get("/my-posts", protect, getMyPosts);
 
 // USER POSTS
-router.get("/user/:userId", getUserPosts);
+router.get("/user/:userId", optionalAuth, getUserPosts);
 
 // SEARCH POSTS
-router.get("/search", searchPosts);
+router.get("/search", optionalAuth, searchPosts);
 
 // SINGLE POST
-router.get("/:postId", getPostById);
+router.get("/:postId", optionalAuth, getPostById);
 
 // LIKE / UNLIKE POST
 router.put("/like/:postId", protect, toggleLikePost);

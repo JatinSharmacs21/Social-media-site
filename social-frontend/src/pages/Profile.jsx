@@ -19,6 +19,7 @@ function Profile() {
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
+  const [postsLocked, setPostsLocked] = useState(false);
   const [profileFile, setProfileFile] = useState(null);
   const [previewPic, setPreviewPic] = useState("");
   const [saving, setSaving] = useState(false);
@@ -145,13 +146,31 @@ function Profile() {
       setUsername(loadedUser.username || "");
       setBio(loadedUser.bio || "");
       setPreviewPic(loadedUser.profilePic || "");
+      setPostsLocked(false);
+
+      // A locked (private, not-yet-accepted) profile response has no real
+      // posts to fetch — skip the call instead of hitting a guaranteed 403.
+      if (loadedUser.isLocked) {
+        setPosts([]);
+        setPostsLocked(true);
+        return;
+      }
 
       const postsEndpoint = isOwnProfile
         ? "/api/posts/my-posts"
         : `/api/posts/user/${loadedUser._id}`;
 
-      const postsRes = await API.get(postsEndpoint, authConfig);
-      setPosts(Array.isArray(postsRes.data) ? postsRes.data : []);
+      try {
+        const postsRes = await API.get(postsEndpoint, authConfig);
+        setPosts(Array.isArray(postsRes.data) ? postsRes.data : []);
+      } catch (postsErr) {
+        setPosts([]);
+        if (postsErr.response?.data?.isPrivate) {
+          setPostsLocked(true);
+        } else {
+          throw postsErr;
+        }
+      }
     } catch (err) {
       setPosts([]);
       setError(err.response?.data?.message || "Profile load nahi ho payi");
@@ -286,9 +305,19 @@ function Profile() {
   const followUser = async () => {
     try {
       const res = await API.put(`/api/users/follow/${user._id}`, {}, authConfig);
-      setUser(res.data.user);
+
+      setUser((prev) => ({
+        ...res.data.user,
+        // A locked profile keeps its limited shape until the request is accepted.
+        isLocked: prev?.isLocked && !res.data.following,
+        hasPendingRequest: res.data.requested,
+        isFollowing: res.data.following,
+      }));
+
+      if (res.data.message) showNotice(res.data.message);
     } catch (err) {
       logger.error(err.response?.data || err);
+      showNotice(err.response?.data?.message || "Kuch gadbad ho gayi");
     }
   };
 
@@ -450,7 +479,10 @@ function Profile() {
     }
   };
 
-  const isTunedIn = user?.followers?.some((f) => f._id === currentUserId);
+  const isTunedIn =
+    user?.isFollowing ?? user?.followers?.some((f) => f._id === currentUserId);
+  const isLockedProfile = Boolean(user?.isLocked);
+  const hasPendingTuneRequest = Boolean(user?.hasPendingRequest);
 
   const activeList = listModal === "followers" ? user?.followers || [] : user?.following || [];
   const listTitle = listModal === "followers" ? "Circle" : "Tuned In";
@@ -748,8 +780,16 @@ function Profile() {
                   </h1>
 
                   {user?.username && (
-                    <p className="mt-0.5 truncate text-[13px] font-black text-pink-200 sm:text-base">
+                    <p className="mt-0.5 flex items-center gap-1.5 truncate text-[13px] font-black text-pink-200 sm:text-base">
                       @{user.username}
+                      {user?.isPrivate && (
+                        <span
+                          title="Private Vybe Space"
+                          className="rounded-full border border-white/15 bg-white/[0.08] px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-slate-300"
+                        >
+                          🔒 Private
+                        </span>
+                      )}
                     </p>
                   )}
 
@@ -769,12 +809,12 @@ function Profile() {
                       <button
                         onClick={followUser}
                         className={`rounded-[13px] px-3 py-1.5 text-xs font-black transition-all active:scale-[0.98] sm:min-w-[128px] sm:px-4 sm:py-2.5 sm:text-sm ${
-                          isTunedIn
+                          isTunedIn || hasPendingTuneRequest
                             ? "border border-white/10 bg-white/[0.08] hover:bg-white/[0.13]"
                             : "bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 shadow-lg shadow-pink-500/15"
                         }`}
                       >
-                        {isTunedIn ? "Tuned In" : "Tune In"}
+                        {isTunedIn ? "Tuned In" : hasPendingTuneRequest ? "Requested" : "Tune In"}
                       </button>
                     )}
 
@@ -840,6 +880,18 @@ function Profile() {
             </div>
           </div>
 
+          {!isViewingOwnProfile && (isLockedProfile || postsLocked) ? (
+            <div className="relative overflow-hidden rounded-[22px] border border-white/10 bg-black/30 p-8 text-center shadow-inner shadow-white/5">
+              <div className="text-4xl">🔒</div>
+              <h3 className="mt-3 text-lg font-black text-white">This Vybe Space is private</h3>
+              <p className="mx-auto mt-1.5 max-w-xs text-[12px] font-medium text-slate-400">
+                {hasPendingTuneRequest
+                  ? "Your tune-in request is waiting to be accepted."
+                  : "Tune in and wait for them to accept before you can see their vybes."}
+              </p>
+            </div>
+          ) : (
+          <>
           <div className="sticky top-2 z-20 mb-3 flex items-center gap-2 rounded-[17px] border border-white/10 bg-black/80 p-1 shadow-2xl shadow-black/35 backdrop-blur-xl sm:static sm:bg-zinc-950/90">
             <div className="grid min-w-0 flex-1 grid-cols-4 gap-1">
               {[
@@ -931,6 +983,8 @@ function Profile() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
               {visibleDropsPosts.map(renderThoughtCard)}
             </div>
+          )}
+          </>
           )}
         </section>
       </div>

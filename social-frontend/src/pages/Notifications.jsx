@@ -11,6 +11,8 @@ function Notifications() {
   const [actionLoading, setActionLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState("All");
   const [error, setError] = useState("");
+  const [requestActionLoading, setRequestActionLoading] = useState(null);
+  const [resolvedRequests, setResolvedRequests] = useState({});
 
   const signalFilters = useMemo(
     () => ["All", "Unread", "Felt", "Replies", "Circle"],
@@ -57,7 +59,9 @@ function Notifications() {
       if (activeFilter === "Replies") {
         return notification.type === "comment" || notification.type === "reply";
       }
-      if (activeFilter === "Circle") return notification.type === "follow";
+      if (activeFilter === "Circle") {
+        return ["follow", "tune_request", "tune_accept"].includes(notification.type);
+      }
       return true;
     });
   }, [activeFilter, notifications]);
@@ -165,6 +169,28 @@ function Notifications() {
     }
   };
 
+  const respondToTuneRequest = async (notification, action) => {
+    const requestId = notification.relatedId;
+    if (!requestId || requestActionLoading) return;
+
+    try {
+      setRequestActionLoading(notification._id);
+      await API.put(`/api/users/tune-requests/${requestId}`, { action });
+
+      setResolvedRequests((prev) => ({
+        ...prev,
+        [requestId]: action === "accept" ? "accepted" : "declined",
+      }));
+
+      if (!notification.isRead) markOneAsRead(notification._id);
+    } catch (err) {
+      logger.error(err.response?.data || err);
+      setError(err.response?.data?.message || "Tune-in request update nahi ho paaya.");
+    } finally {
+      setRequestActionLoading(null);
+    }
+  };
+
   const getPostKind = (post) => {
     const media = Array.isArray(post?.media) ? post.media : [];
     if (media.some((item) => item?.type === "video")) return "clip";
@@ -179,7 +205,10 @@ function Notifications() {
       markOneAsRead(notification._id);
     }
 
-    if (notification?.type === "follow" && notification?.sender?._id) {
+    if (
+      ["follow", "tune_request", "tune_accept"].includes(notification?.type) &&
+      notification?.sender?._id
+    ) {
       navigate(`/profile/${notification.sender._id}`);
       return;
     }
@@ -200,6 +229,8 @@ function Notifications() {
     if (type === "comment") return "💬";
     if (type === "follow") return "✨";
     if (type === "reply") return "↩️";
+    if (type === "tune_request") return "🔒";
+    if (type === "tune_accept") return "🔓";
     return "⚡";
   };
 
@@ -208,6 +239,8 @@ function Notifications() {
     if (type === "comment") return "Commented";
     if (type === "follow") return "Circle";
     if (type === "reply") return "Replied";
+    if (type === "tune_request") return "Tune Request";
+    if (type === "tune_accept") return "Accepted";
     return "Signal";
   };
 
@@ -216,6 +249,9 @@ function Notifications() {
     if (type === "comment") return "border-cyan-400/25 bg-cyan-500/10 text-cyan-200";
     if (type === "follow") return "border-purple-400/25 bg-purple-500/10 text-purple-200";
     if (type === "reply") return "border-amber-400/25 bg-amber-500/10 text-amber-200";
+    if (type === "tune_request" || type === "tune_accept") {
+      return "border-purple-400/25 bg-purple-500/10 text-purple-200";
+    }
     return "border-white/10 bg-white/[0.05] text-gray-300";
   };
 
@@ -228,6 +264,8 @@ function Notifications() {
     if (notification.type === "comment") return `${senderName} commented on your ${postKind}`;
     if (notification.type === "follow") return `${senderName} tuned into your Vybe Space`;
     if (notification.type === "reply") return `${senderName} replied to your comment`;
+    if (notification.type === "tune_request") return `${senderName} wants to tune into your Vybe Space`;
+    if (notification.type === "tune_accept") return `${senderName} accepted your tune-in request`;
 
     return storedMessage || "A new signal just came in";
   };
@@ -459,10 +497,14 @@ function Notifications() {
                           </span>
                         </button>
 
-                        <button
-                          type="button"
+                        <div
+                          role="button"
+                          tabIndex={0}
                           onClick={() => openNotification(notification)}
-                          className="flex-1 min-w-0 text-left focus:outline-none"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") openNotification(notification);
+                          }}
+                          className="flex-1 min-w-0 text-left focus:outline-none cursor-pointer"
                         >
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <span
@@ -499,7 +541,57 @@ function Notifications() {
                               “{notification.post.caption}”
                             </p>
                           )}
-                        </button>
+
+                          {notification.type === "tune_request" &&
+                            notification.relatedId &&
+                            (() => {
+                              const status = resolvedRequests[notification.relatedId];
+                              const busy = requestActionLoading === notification._id;
+
+                              if (status === "accepted") {
+                                return (
+                                  <p className="mt-2 inline-flex rounded-full border border-purple-400/25 bg-purple-500/10 px-3 py-1 text-[11px] font-black text-purple-200">
+                                    Accepted — they're tuned in now
+                                  </p>
+                                );
+                              }
+
+                              if (status === "declined") {
+                                return (
+                                  <p className="mt-2 inline-flex rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[11px] font-black text-gray-400">
+                                    Declined
+                                  </p>
+                                );
+                              }
+
+                              return (
+                                <div className="mt-2 flex gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      respondToTuneRequest(notification, "accept");
+                                    }}
+                                    className="rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-3.5 py-1.5 text-xs font-black text-white transition active:scale-95 disabled:opacity-60"
+                                  >
+                                    {busy ? "..." : "Accept"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      respondToTuneRequest(notification, "decline");
+                                    }}
+                                    className="rounded-full border border-white/10 bg-white/[0.06] px-3.5 py-1.5 text-xs font-black text-gray-200 transition hover:bg-white/[0.1] active:scale-95 disabled:opacity-60"
+                                  >
+                                    Decline
+                                  </button>
+                                </div>
+                              );
+                            })()}
+                        </div>
 
                         <button
                           type="button"

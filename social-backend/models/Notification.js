@@ -16,13 +16,20 @@ const notificationSchema = new mongoose.Schema(
 
     type: {
       type: String,
-      enum: ["like", "comment", "follow", "reply"],
+      enum: ["like", "comment", "follow", "reply", "tune_request", "tune_accept"],
       required: true,
     },
 
     post: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Post",
+      default: null,
+    },
+
+    // Used by "tune_request" notifications to point back at the
+    // TuneRequest document so the recipient can accept/decline it.
+    relatedId: {
+      type: mongoose.Schema.Types.ObjectId,
       default: null,
     },
 

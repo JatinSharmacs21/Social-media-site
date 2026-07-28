@@ -1,5 +1,6 @@
 const User = require("../models/User");
 const Notification = require("../models/Notification");
+const TuneRequest = require("../models/TuneRequest");
 
 const emitRealtimeNotification = async (req, recipientId, data) => {
   try {
@@ -21,13 +22,50 @@ const emitRealtimeNotification = async (req, recipientId, data) => {
   const escapeRegex = (value = "") =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const publicUserFields = "name username profilePic bio followers following createdAt";
+const publicUserFields = "name username profilePic bio followers following createdAt isPrivate";
 const populatedUserFields = "name username profilePic bio";
 
 const normalizeUsername = (username = "") =>
   username.toString().trim().toLowerCase();
 
 const validateUsername = (username) => /^[a-z0-9_]{3,20}$/.test(username);
+
+const getViewerId = (req) => {
+  const id = req.user?._id || req.user?.id;
+  return id ? id.toString() : null;
+};
+
+// Shape returned for a private Vybe Space when the viewer hasn't been
+// accepted yet — only the bare minimum needed to show a locked profile card.
+const buildLockedProfileView = async (user, viewerId) => {
+  let hasPendingRequest = false;
+
+  if (viewerId) {
+    const pending = await TuneRequest.findOne({
+      sender: viewerId,
+      recipient: user._id,
+      status: "pending",
+    });
+    hasPendingRequest = !!pending;
+  }
+
+  return {
+    _id: user._id,
+    name: user.name,
+    username: user.username,
+    profilePic: user.profilePic,
+    bio: user.bio,
+    isPrivate: true,
+    isLocked: true,
+    followersCount: user.followers?.length || 0,
+    followingCount: user.following?.length || 0,
+    followers: [],
+    following: [],
+    isFollowing: false,
+    hasPendingRequest,
+    createdAt: user.createdAt,
+  };
+};
 
 // GET MY PROFILE
 const getMyProfile = async (req, res) => {
@@ -48,7 +86,7 @@ const getMyProfile = async (req, res) => {
 // UPDATE MY PROFILE
 const updateMyProfile = async (req, res) => {
   try {
-    const { name, bio, profilePic } = req.body;
+    const { name, bio, profilePic, isPrivate } = req.body;
     const incomingUsername = req.body.username;
 
     const user = await User.findById(req.user.id);
@@ -57,6 +95,7 @@ const updateMyProfile = async (req, res) => {
     if (name !== undefined) user.name = name.toString().trim().slice(0, 40);
     if (bio !== undefined) user.bio = bio.toString().trim().slice(0, 160);
     if (profilePic !== undefined) user.profilePic = profilePic;
+    if (isPrivate !== undefined) user.isPrivate = Boolean(isPrivate);
 
     if (incomingUsername !== undefined) {
       const username = normalizeUsername(incomingUsername);
@@ -119,7 +158,19 @@ const getUserProfile = async (req, res) => {
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    res.json(user);
+    const viewerId = getViewerId(req);
+    const isOwner = viewerId && viewerId === user._id.toString();
+    const isFollowing = viewerId
+      ? user.followers.some((follower) => follower._id.toString() === viewerId)
+      : false;
+
+    if (!isOwner && user.isPrivate && !isFollowing) {
+      const lockedView = await buildLockedProfileView(user, viewerId);
+      return res.json(lockedView);
+    }
+
+    const fullProfile = user.toObject();
+    res.json({ ...fullProfile, isLocked: false, isFollowing, hasPendingRequest: false });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -157,7 +208,10 @@ const searchUsers = async (req, res) => {
   }
 };
 
-// FOLLOW / UNFOLLOW USER
+// FOLLOW / UNFOLLOW / TUNE-IN REQUEST
+// Public Vybe Space -> tunes in immediately (existing behaviour).
+// Private Vybe Space -> sends a tune-in request that must be accepted
+// before the follow relationship, full profile, and whispers unlock.
 const followUser = async (req, res) => {
   try {
     const targetUserId = req.params.id;
@@ -178,6 +232,7 @@ const followUser = async (req, res) => {
       (id) => id.toString() === targetUserId
     );
 
+    // Already tuned in -> untune (works the same for public and private spaces).
     if (isFollowing) {
       currentUser.following = currentUser.following.filter(
         (id) => id.toString() !== targetUserId
@@ -186,15 +241,61 @@ const followUser = async (req, res) => {
       userToFollow.followers = userToFollow.followers.filter(
         (id) => id.toString() !== currentUserId
       );
-    } else {
-      currentUser.following.push(targetUserId);
-      userToFollow.followers.push(currentUserId);
+
+      await currentUser.save();
+      await userToFollow.save();
+
+      const updatedUser = await User.findById(targetUserId)
+        .select("-password")
+        .populate("followers", populatedUserFields)
+        .populate("following", populatedUserFields);
+
+      return res.json({
+        success: true,
+        following: false,
+        requested: false,
+        user: updatedUser,
+      });
+    }
+
+    // Private Vybe Space and not yet an accepted follower -> request flow.
+    if (userToFollow.isPrivate) {
+      const existingRequest = await TuneRequest.findOne({
+        sender: currentUserId,
+        recipient: targetUserId,
+        status: "pending",
+      });
+
+      // Tapping again while a request is pending cancels it.
+      if (existingRequest) {
+        await TuneRequest.deleteOne({ _id: existingRequest._id });
+
+        const updatedUser = await User.findById(targetUserId)
+          .select("-password")
+          .populate("followers", populatedUserFields)
+          .populate("following", populatedUserFields);
+
+        return res.json({
+          success: true,
+          following: false,
+          requested: false,
+          user: updatedUser,
+          message: "Tune-in request cancelled",
+        });
+      }
+
+      const request = await TuneRequest.findOneAndUpdate(
+        { sender: currentUserId, recipient: targetUserId },
+        { sender: currentUserId, recipient: targetUserId, status: "pending" },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
 
       const notification = await Notification.create({
         recipient: targetUserId,
         sender: currentUserId,
-        type: "follow",
-        message: "started following you",
+        type: "tune_request",
+        relatedId: request._id,
+        message: "wants to tune into your Vybe Space",
       });
 
       await emitRealtimeNotification(req, targetUserId, {
@@ -206,12 +307,52 @@ const followUser = async (req, res) => {
           username: currentUser.username,
           profilePic: currentUser.profilePic,
         },
-        type: "follow",
-        message: `${currentUser.name || "Someone"} started following you`,
+        type: "tune_request",
+        relatedId: request._id,
+        message: `${currentUser.name || "Someone"} wants to tune into your Vybe Space`,
         createdAt: notification.createdAt,
         isRead: false,
       });
+
+      const updatedUser = await User.findById(targetUserId)
+        .select("-password")
+        .populate("followers", populatedUserFields)
+        .populate("following", populatedUserFields);
+
+      return res.json({
+        success: true,
+        following: false,
+        requested: true,
+        user: updatedUser,
+        message: "Tune-in request sent",
+      });
     }
+
+    // Public Vybe Space -> tune in right away.
+    currentUser.following.push(targetUserId);
+    userToFollow.followers.push(currentUserId);
+
+    const notification = await Notification.create({
+      recipient: targetUserId,
+      sender: currentUserId,
+      type: "follow",
+      message: "started following you",
+    });
+
+    await emitRealtimeNotification(req, targetUserId, {
+      _id: notification._id,
+      recipient: targetUserId,
+      sender: {
+        _id: currentUser._id,
+        name: currentUser.name,
+        username: currentUser.username,
+        profilePic: currentUser.profilePic,
+      },
+      type: "follow",
+      message: `${currentUser.name || "Someone"} started following you`,
+      createdAt: notification.createdAt,
+      isRead: false,
+    });
 
     await currentUser.save();
     await userToFollow.save();
@@ -221,7 +362,120 @@ const followUser = async (req, res) => {
       .populate("followers", populatedUserFields)
       .populate("following", populatedUserFields);
 
-    res.json({ success: true, following: !isFollowing, user: updatedUser });
+    res.json({ success: true, following: true, requested: false, user: updatedUser });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// GET INCOMING PENDING TUNE-IN REQUESTS (for the logged-in user)
+const getTuneRequests = async (req, res) => {
+  try {
+    const currentUserId = req.user._id.toString();
+
+    const requests = await TuneRequest.find({
+      recipient: currentUserId,
+      status: "pending",
+    })
+      .populate("sender", populatedUserFields)
+      .sort({ createdAt: -1 });
+
+    res.json(requests);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// GET IDS OF ACCOUNTS I'VE SENT A PENDING TUNE-IN REQUEST TO
+const getSentTuneRequests = async (req, res) => {
+  try {
+    const currentUserId = req.user._id.toString();
+
+    const requests = await TuneRequest.find({
+      sender: currentUserId,
+      status: "pending",
+    }).select("recipient");
+
+    res.json(requests.map((request) => request.recipient));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ACCEPT / DECLINE A TUNE-IN REQUEST
+const respondToTuneRequest = async (req, res) => {
+  try {
+    const currentUserId = req.user._id.toString();
+    const { requestId } = req.params;
+    const action = String(req.body.action || "").toLowerCase();
+
+    if (!["accept", "decline"].includes(action)) {
+      return res.status(400).json({ message: "Action must be accept or decline" });
+    }
+
+    const request = await TuneRequest.findById(requestId);
+    if (!request) return res.status(404).json({ message: "Request not found" });
+
+    if (request.recipient.toString() !== currentUserId) {
+      return res.status(403).json({ message: "You cannot respond to this request" });
+    }
+
+    if (request.status !== "pending") {
+      return res.status(400).json({ message: "This request has already been handled" });
+    }
+
+    if (action === "decline") {
+      request.status = "declined";
+      await request.save();
+      return res.json({ success: true, status: "declined" });
+    }
+
+    request.status = "accepted";
+    await request.save();
+
+    const [sender, recipient] = await Promise.all([
+      User.findById(request.sender),
+      User.findById(currentUserId),
+    ]);
+
+    if (!sender || !recipient) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!sender.following.some((id) => id.toString() === recipient._id.toString())) {
+      sender.following.push(recipient._id);
+    }
+
+    if (!recipient.followers.some((id) => id.toString() === sender._id.toString())) {
+      recipient.followers.push(sender._id);
+    }
+
+    await sender.save();
+    await recipient.save();
+
+    const notification = await Notification.create({
+      recipient: sender._id,
+      sender: recipient._id,
+      type: "tune_accept",
+      message: "accepted your tune-in request",
+    });
+
+    await emitRealtimeNotification(req, sender._id, {
+      _id: notification._id,
+      recipient: sender._id,
+      sender: {
+        _id: recipient._id,
+        name: recipient.name,
+        username: recipient.username,
+        profilePic: recipient.profilePic,
+      },
+      type: "tune_accept",
+      message: `${recipient.name || "Someone"} accepted your tune-in request`,
+      createdAt: notification.createdAt,
+      isRead: false,
+    });
+
+    res.json({ success: true, status: "accepted" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -233,4 +487,7 @@ module.exports = {
   getUserProfile,
   searchUsers,
   followUser,
+  getTuneRequests,
+  getSentTuneRequests,
+  respondToTuneRequest,
 };

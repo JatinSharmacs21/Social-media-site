@@ -6,6 +6,25 @@ const MAX_COMMENT_LENGTH = 300;
 
 const getUserId = (req) => req.user?._id || req.user?.id;
 
+// Returns the ids of private Vybe Space authors whose posts the given
+// viewer should NOT see: private + viewer isn't the author + viewer
+// hasn't been accepted as a follower. Used to keep private accounts'
+// posts out of the main feed, search, reels, and single-post views.
+const getHiddenPrivateAuthorIds = async (viewerId) => {
+  const privateUsers = await User.find({ isPrivate: true }).select("followers");
+  if (!privateUsers.length) return [];
+
+  const viewerIdStr = viewerId ? viewerId.toString() : null;
+
+  return privateUsers
+    .filter((privateUser) => {
+      if (viewerIdStr && privateUser._id.toString() === viewerIdStr) return false;
+      if (!viewerIdStr) return true;
+      return !privateUser.followers.some((id) => id.toString() === viewerIdStr);
+    })
+    .map((privateUser) => privateUser._id);
+};
+
 const cleanTextInput = (value = "") => value.trim();
 
 const getUtcDateString = (date = new Date()) => date.toISOString().slice(0, 10);
@@ -150,6 +169,11 @@ const getPosts = async (req, res) => {
       filter.mood = requestedMood;
     }
 
+    const hiddenAuthorIds = await getHiddenPrivateAuthorIds(getUserId(req));
+    if (hiddenAuthorIds.length) {
+      filter.user = { $nin: hiddenAuthorIds };
+    }
+
     const [posts, total] = await Promise.all([
       Post.find(filter)
         .populate("user", "name username profilePic")
@@ -207,6 +231,11 @@ const searchPosts = async (req, res) => {
       filter.$or = [{ media: { $exists: false } }, { media: { $size: 0 } }];
     }
 
+    const hiddenAuthorIds = await getHiddenPrivateAuthorIds(getUserId(req));
+    if (hiddenAuthorIds.length) {
+      filter.user = { $nin: hiddenAuthorIds };
+    }
+
     const posts = await Post.find(filter)
       .populate("user", "name username profilePic")
       .populate("likes", "name username profilePic")
@@ -226,6 +255,22 @@ const getPostById = async (req, res) => {
 
     if (!post || (post.postType && post.postType !== "normal")) {
       return res.status(404).json({ message: "Post not found" });
+    }
+
+    const authorId = post.user?._id?.toString();
+    const viewerId = getUserId(req)?.toString();
+
+    if (authorId && viewerId !== authorId) {
+      const author = await User.findById(authorId).select("isPrivate followers");
+      const isAcceptedFollower =
+        viewerId && author?.followers?.some((id) => id.toString() === viewerId);
+
+      if (author?.isPrivate && !isAcceptedFollower) {
+        return res.status(403).json({
+          message: "This Vybe Space is private. Tune in and wait for acceptance to see this vybe.",
+          isPrivate: true,
+        });
+      }
     }
 
     res.json(post);
@@ -1020,6 +1065,24 @@ const getMyPosts = async (req, res) => {
 
 const getUserPosts = async (req, res) => {
   try {
+    const targetUserId = req.params.userId;
+    const viewerId = getUserId(req);
+
+    const targetUser = await User.findById(targetUserId).select("isPrivate followers");
+    if (!targetUser) return res.status(404).json({ message: "User not found" });
+
+    const isOwner = viewerId && viewerId.toString() === targetUserId.toString();
+    const isAcceptedFollower = viewerId
+      ? targetUser.followers.some((id) => id.toString() === viewerId.toString())
+      : false;
+
+    if (targetUser.isPrivate && !isOwner && !isAcceptedFollower) {
+      return res.status(403).json({
+        message: "This Vybe Space is private. Tune in and wait for acceptance to see their vybes.",
+        isPrivate: true,
+      });
+    }
+
     const posts = await Post.find({
       user: req.params.userId,
       postType: { $in: ["normal", null] },
