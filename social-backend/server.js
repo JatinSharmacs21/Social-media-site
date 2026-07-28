@@ -163,6 +163,36 @@ const vybeRoomUsers = new Map();
 const normalizeVybeRoom = (room = "general") =>
   String(room || "general").trim().toLowerCase().slice(0, 50) || "general";
 
+const VYBE_ROOM_LABELS = {
+  general: "General",
+  deep: "Deep",
+  funny: "Funny",
+  chaos: "Chaos",
+  "late-night": "Late Night",
+  college: "College",
+};
+
+// Room heating-up: roomId -> last time we broadcast a "heating up" signal
+const vybeRoomHeatingCooldown = new Map();
+const VYBE_ROOM_HEATING_THRESHOLD = 4;
+const VYBE_ROOM_HEATING_COOLDOWN_MS = 20 * 60 * 1000; // 20 minutes
+
+const maybeAnnounceRoomHeatingUp = (room, count) => {
+  const roomId = normalizeVybeRoom(room);
+  if (count < VYBE_ROOM_HEATING_THRESHOLD) return;
+
+  const lastAnnounced = vybeRoomHeatingCooldown.get(roomId) || 0;
+  if (Date.now() - lastAnnounced < VYBE_ROOM_HEATING_COOLDOWN_MS) return;
+
+  vybeRoomHeatingCooldown.set(roomId, Date.now());
+
+  io.emit("vybe-room-heating-up", {
+    room: roomId,
+    label: VYBE_ROOM_LABELS[roomId] || roomId,
+    count,
+  });
+};
+
 const addVybeRoomUser = (room, userId) => {
   const roomId = normalizeVybeRoom(room);
   const id = userId?.toString();
@@ -271,6 +301,7 @@ socket.on("join-vybe-room", ({ room = "general" }) => {
   }
 
   emitVybeRoomCount(roomId);
+  maybeAnnounceRoomHeatingUp(roomId, vybeRoomUsers.get(roomId)?.size || 0);
 });
 
   socket.on("vybe-typing", ({ room, typing }) => {

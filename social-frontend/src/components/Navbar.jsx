@@ -121,9 +121,24 @@ function Navbar() {
       window.dispatchEvent(new CustomEvent("vybeo:whispers-count"));
     });
 
+    socket.on("vybe-room-heating-up", ({ room, label, count }) => {
+      if (location.pathname === "/vybe-room") return;
+
+      setToast({
+        title: "Room heating up",
+        icon: "🔥",
+        message: `${count} people are vibing in ${label || "a room"} right now.`,
+        link: `/vybe-room?room=${room}`,
+        type: "room-heating",
+      });
+
+      setTimeout(() => setToast(null), 5000);
+    });
+
     return () => {
       socket.off("new-notification");
       socket.off("whisper-inbox-updated");
+      socket.off("vybe-room-heating-up");
       socket.disconnect();
     };
   }, [token, location.pathname]);
@@ -364,22 +379,40 @@ function Navbar() {
   const NotificationToast = () => {
     if (!toast) return null;
 
+    const handleClick = () => {
+      if (toast.link) {
+        navigate(toast.link);
+        setToast(null);
+      }
+    };
+
     return (
       <div className="fixed top-24 right-4 z-[9999] animate-[slideIn_.3s_ease]">
-        <div className="min-w-[280px] max-w-[360px] rounded-2xl border border-white/10 bg-black/90 backdrop-blur-2xl shadow-2xl shadow-cyan-500/10 overflow-hidden">
+        <div
+          onClick={toast.link ? handleClick : undefined}
+          className={`min-w-[280px] max-w-[360px] rounded-2xl border border-white/10 bg-black/90 backdrop-blur-2xl shadow-2xl shadow-cyan-500/10 overflow-hidden ${
+            toast.link ? "cursor-pointer transition hover:bg-black/95" : ""
+          }`}
+        >
           <div className="h-1 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500" />
 
           <div className="p-4 flex items-start gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-pink-500/20 to-cyan-500/20 flex items-center justify-center shrink-0">
-              ⚡
+              {toast.icon || "⚡"}
             </div>
 
             <div className="flex-1">
-              <p className="text-sm font-semibold text-white">New Signal</p>
+              <p className="text-sm font-semibold text-white">{toast.title || "New Signal"}</p>
               <p className="text-sm text-gray-300 mt-1 leading-relaxed">{toast.message}</p>
             </div>
 
-            <button onClick={() => setToast(null)} className="text-gray-500 hover:text-white transition-colors">
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                setToast(null);
+              }}
+              className="text-gray-500 hover:text-white transition-colors"
+            >
               ✕
             </button>
           </div>

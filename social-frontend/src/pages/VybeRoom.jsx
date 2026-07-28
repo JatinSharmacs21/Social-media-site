@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { io } from "socket.io-client";
 import API from "../services/api";
 import logger from "../utils/logger";
@@ -54,9 +55,15 @@ const reactionItems = [
 function VybeRoom() {
   const token = localStorage.getItem("token");
   const currentUserId = localStorage.getItem("userId");
+  const [searchParams] = useSearchParams();
+
+  const requestedRoom = searchParams.get("room");
+  const initialRoom = fallbackRooms.some((room) => room.id === requestedRoom)
+    ? requestedRoom
+    : "general";
 
   const [rooms, setRooms] = useState(fallbackRooms);
-  const [activeRoom, setActiveRoom] = useState("general");
+  const [activeRoom, setActiveRoom] = useState(initialRoom);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [replyText, setReplyText] = useState({});
@@ -77,7 +84,7 @@ function VybeRoom() {
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
   const typingTimeoutRef = useRef(null);
-  const joinedRoomRef = useRef(activeRoom);
+  const joinedRoomRef = useRef(initialRoom);
 
   const authConfig = useMemo(
     () => ({
@@ -196,7 +203,7 @@ function VybeRoom() {
 
   useEffect(() => {
     fetchRooms();
-    fetchMessages("general");
+    fetchMessages(initialRoom);
 
     const socket = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
