@@ -65,6 +65,7 @@ function WhisperComposer({
   mediaPreview,
   mediaUploading,
   replyTo,
+  isBlocked = false,
   onChangeText,
   onSendMessage,
   onCancelReply,
@@ -89,6 +90,19 @@ function WhisperComposer({
     if (file) onSelectMedia?.(file);
     event.target.value = "";
   };
+
+  if (isBlocked) {
+    return (
+      <div className="shrink-0 border-t border-white/[0.06] bg-[#06070b]/96 px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-center md:px-5">
+        <p className="text-sm font-semibold text-red-300/80">
+          You can't message this Vybe Space
+        </p>
+        <p className="mt-0.5 text-xs text-zinc-600">
+          Unblock them from Space Control to whisper again.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <form

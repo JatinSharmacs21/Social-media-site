@@ -6,23 +6,77 @@ const MAX_COMMENT_LENGTH = 300;
 
 const getUserId = (req) => req.user?._id || req.user?.id;
 
-// Returns the ids of private Vybe Space authors whose posts the given
-// viewer should NOT see: private + viewer isn't the author + viewer
-// hasn't been accepted as a follower. Used to keep private accounts'
-// posts out of the main feed, search, reels, and single-post views.
-const getHiddenPrivateAuthorIds = async (viewerId) => {
-  const privateUsers = await User.find({ isPrivate: true }).select("followers");
-  if (!privateUsers.length) return [];
-
+// Returns the ids of authors whose posts the given viewer should NOT see:
+// - private Vybe Space authors who haven't accepted this viewer, and
+// - anyone blocked in either direction (blocker or blocked).
+// Used to keep such posts out of the main feed, search, reels, and
+// single-post views.
+const getHiddenAuthorIds = async (viewerId) => {
+  const hiddenIds = new Set();
   const viewerIdStr = viewerId ? viewerId.toString() : null;
 
-  return privateUsers
-    .filter((privateUser) => {
-      if (viewerIdStr && privateUser._id.toString() === viewerIdStr) return false;
-      if (!viewerIdStr) return true;
-      return !privateUser.followers.some((id) => id.toString() === viewerIdStr);
-    })
-    .map((privateUser) => privateUser._id);
+  const privateUsers = await User.find({ isPrivate: true }).select("followers");
+
+  privateUsers.forEach((privateUser) => {
+    if (viewerIdStr && privateUser._id.toString() === viewerIdStr) return;
+
+    const isAccepted = viewerIdStr
+      ? privateUser.followers.some((id) => id.toString() === viewerIdStr)
+      : false;
+
+    if (!isAccepted) hiddenIds.add(privateUser._id.toString());
+  });
+
+  if (viewerIdStr) {
+    const viewer = await User.findById(viewerIdStr).select("blockedUsers blockedBy");
+
+    if (viewer) {
+      (viewer.blockedUsers || []).forEach((id) => hiddenIds.add(id.toString()));
+      (viewer.blockedBy || []).forEach((id) => hiddenIds.add(id.toString()));
+    }
+  }
+
+  return Array.from(hiddenIds);
+};
+
+// Ids of everyone blocked in either direction with the viewer (people the
+// viewer blocked, plus people who blocked the viewer). Used to scrub their
+// likes/comments off posts the viewer can otherwise still see.
+const getBlockedIds = async (viewerId) => {
+  if (!viewerId) return [];
+
+  const viewer = await User.findById(viewerId).select("blockedUsers blockedBy");
+  if (!viewer) return [];
+
+  return [...(viewer.blockedUsers || []), ...(viewer.blockedBy || [])].map((id) =>
+    id.toString()
+  );
+};
+
+// Removes likes/comments (and comment likes/replies) made by blocked-either-way
+// users from a post before it's sent to this viewer.
+const stripBlockedInteractions = (post, blockedIds) => {
+  if (!blockedIds.length) return post;
+
+  const blockedSet = new Set(blockedIds);
+  const plain = typeof post.toObject === "function" ? post.toObject() : post;
+
+  const belongsToBlocked = (userRef) => {
+    const id = userRef?._id || userRef;
+    return id ? blockedSet.has(id.toString()) : false;
+  };
+
+  plain.likes = (plain.likes || []).filter((user) => !belongsToBlocked(user));
+
+  plain.comments = (plain.comments || [])
+    .filter((comment) => !belongsToBlocked(comment.user))
+    .map((comment) => ({
+      ...comment,
+      likes: (comment.likes || []).filter((user) => !belongsToBlocked(user)),
+      replies: (comment.replies || []).filter((reply) => !belongsToBlocked(reply.user)),
+    }));
+
+  return plain;
 };
 
 const cleanTextInput = (value = "") => value.trim();
@@ -169,12 +223,14 @@ const getPosts = async (req, res) => {
       filter.mood = requestedMood;
     }
 
-    const hiddenAuthorIds = await getHiddenPrivateAuthorIds(getUserId(req));
+    const hiddenAuthorIds = await getHiddenAuthorIds(getUserId(req));
     if (hiddenAuthorIds.length) {
       filter.user = { $nin: hiddenAuthorIds };
     }
 
-    const [posts, total] = await Promise.all([
+    const viewerId = getUserId(req);
+
+    const [posts, total, blockedIds] = await Promise.all([
       Post.find(filter)
         .populate("user", "name username profilePic")
         .populate("likes", "name username profilePic")
@@ -186,10 +242,13 @@ const getPosts = async (req, res) => {
         .limit(limit),
 
       Post.countDocuments(filter),
+      getBlockedIds(viewerId),
     ]);
 
+    const cleanedPosts = posts.map((post) => stripBlockedInteractions(post, blockedIds));
+
     res.json({
-      posts,
+      posts: cleanedPosts,
       page,
       limit,
       total,
@@ -231,7 +290,7 @@ const searchPosts = async (req, res) => {
       filter.$or = [{ media: { $exists: false } }, { media: { $size: 0 } }];
     }
 
-    const hiddenAuthorIds = await getHiddenPrivateAuthorIds(getUserId(req));
+    const hiddenAuthorIds = await getHiddenAuthorIds(getUserId(req));
     if (hiddenAuthorIds.length) {
       filter.user = { $nin: hiddenAuthorIds };
     }
@@ -243,7 +302,10 @@ const searchPosts = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(limit);
 
-    res.json({ posts });
+    const blockedIds = await getBlockedIds(getUserId(req));
+    const cleanedPosts = posts.map((post) => stripBlockedInteractions(post, blockedIds));
+
+    res.json({ posts: cleanedPosts });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -261,7 +323,20 @@ const getPostById = async (req, res) => {
     const viewerId = getUserId(req)?.toString();
 
     if (authorId && viewerId !== authorId) {
-      const author = await User.findById(authorId).select("isPrivate followers");
+      const author = await User.findById(authorId).select(
+        "isPrivate followers blockedUsers blockedBy"
+      );
+
+      const isBlocked =
+        viewerId &&
+        author &&
+        ((author.blockedUsers || []).some((id) => id.toString() === viewerId) ||
+          (author.blockedBy || []).some((id) => id.toString() === viewerId));
+
+      if (isBlocked) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+
       const isAcceptedFollower =
         viewerId && author?.followers?.some((id) => id.toString() === viewerId);
 
@@ -273,7 +348,7 @@ const getPostById = async (req, res) => {
       }
     }
 
-    res.json(post);
+    res.json(stripBlockedInteractions(post, await getBlockedIds(viewerId)));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -1068,10 +1143,31 @@ const getUserPosts = async (req, res) => {
     const targetUserId = req.params.userId;
     const viewerId = getUserId(req);
 
-    const targetUser = await User.findById(targetUserId).select("isPrivate followers");
+    const targetUser = await User.findById(targetUserId).select(
+      "isPrivate followers blockedUsers blockedBy"
+    );
     if (!targetUser) return res.status(404).json({ message: "User not found" });
 
     const isOwner = viewerId && viewerId.toString() === targetUserId.toString();
+
+    const theyBlockedMe =
+      viewerId &&
+      !isOwner &&
+      (targetUser.blockedUsers || []).some((id) => id.toString() === viewerId.toString());
+
+    if (theyBlockedMe) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const iBlockedThem =
+      viewerId &&
+      !isOwner &&
+      (targetUser.blockedBy || []).some((id) => id.toString() === viewerId.toString());
+
+    if (iBlockedThem) {
+      return res.json([]);
+    }
+
     const isAcceptedFollower = viewerId
       ? targetUser.followers.some((id) => id.toString() === viewerId.toString())
       : false;
@@ -1094,7 +1190,10 @@ const getUserPosts = async (req, res) => {
       .populate("comments.replies.user", "name username profilePic")
       .sort({ createdAt: -1 });
 
-    res.json(posts);
+    const blockedIds = await getBlockedIds(viewerId);
+    const cleanedPosts = posts.map((post) => stripBlockedInteractions(post, blockedIds));
+
+    res.json(cleanedPosts);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

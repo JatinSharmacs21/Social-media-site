@@ -14,12 +14,14 @@ import Whispers from "./pages/Whispers";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import MainLayout from "./components/MainLayout";
+import ScrollToTop from "./components/ScrollToTop";
 import VybeRoom from "./pages/VybeRoom";
 import VybeDrops from "./pages/VybeDrops";
 
 function App() {
   return (
     <Router>
+      <ScrollToTop />
       <Routes>
         <Route path="/" element={<Landing />} />
 

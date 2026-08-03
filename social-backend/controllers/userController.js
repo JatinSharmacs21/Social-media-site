@@ -9,10 +9,12 @@ const emitRealtimeNotification = async (req, recipientId, data) => {
 
     if (!io || !onlineUsers || !recipientId) return;
 
-    const receiverSocketId = onlineUsers.get(recipientId.toString());
+    const receiverSockets = onlineUsers.get(recipientId.toString());
 
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("new-notification", data);
+    if (receiverSockets && receiverSockets.size) {
+      receiverSockets.forEach((socketId) => {
+        io.to(socketId).emit("new-notification", data);
+      });
     }
   } catch (error) {
     console.log("Socket notification error:", error.message);
@@ -33,6 +35,20 @@ const validateUsername = (username) => /^[a-z0-9_]{3,20}$/.test(username);
 const getViewerId = (req) => {
   const id = req.user?._id || req.user?.id;
   return id ? id.toString() : null;
+};
+
+// Given a user document (with blockedUsers + blockedBy selected/populated)
+// and another user's id, tells us if the two have blocked each other in
+// either direction. Works with just one loaded document because we keep
+// blockedBy as a synced reverse-index of the other side's blockedUsers.
+const isBlockedEitherWay = (user, otherId) => {
+  if (!user || !otherId) return false;
+  const otherIdStr = otherId.toString();
+
+  const blocked = (user.blockedUsers || []).some((id) => id.toString() === otherIdStr);
+  const blockedByOther = (user.blockedBy || []).some((id) => id.toString() === otherIdStr);
+
+  return blocked || blockedByOther;
 };
 
 // Shape returned for a private Vybe Space when the viewer hasn't been
@@ -160,17 +176,48 @@ const getUserProfile = async (req, res) => {
 
     const viewerId = getViewerId(req);
     const isOwner = viewerId && viewerId === user._id.toString();
+
+    const theyBlockedMe = viewerId
+      ? (user.blockedUsers || []).some((id) => id.toString() === viewerId)
+      : false;
+
+    if (!isOwner && theyBlockedMe) {
+      // Pretend the account doesn't exist rather than revealing a block.
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const iBlockedThem = viewerId
+      ? (user.blockedBy || []).some((id) => id.toString() === viewerId)
+      : false;
+
     const isFollowing = viewerId
       ? user.followers.some((follower) => follower._id.toString() === viewerId)
       : false;
 
+    if (!isOwner && iBlockedThem) {
+      const fullProfile = user.toObject();
+      return res.json({
+        ...fullProfile,
+        isLocked: false,
+        isFollowing: false,
+        hasPendingRequest: false,
+        isBlockedByMe: true,
+      });
+    }
+
     if (!isOwner && user.isPrivate && !isFollowing) {
       const lockedView = await buildLockedProfileView(user, viewerId);
-      return res.json(lockedView);
+      return res.json({ ...lockedView, isBlockedByMe: false });
     }
 
     const fullProfile = user.toObject();
-    res.json({ ...fullProfile, isLocked: false, isFollowing, hasPendingRequest: false });
+    res.json({
+      ...fullProfile,
+      isLocked: false,
+      isFollowing,
+      hasPendingRequest: false,
+      isBlockedByMe: false,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -179,10 +226,24 @@ const getUserProfile = async (req, res) => {
 // SEARCH USERS BY NAME OR USERNAME
 const searchUsers = async (req, res) => {
   try {
+    const viewerId = getViewerId(req);
+    let excludeIds = [];
+
+    if (viewerId) {
+      const viewer = await User.findById(viewerId).select("blockedUsers blockedBy");
+      if (viewer) {
+        excludeIds = [...(viewer.blockedUsers || []), ...(viewer.blockedBy || [])].map((id) =>
+          id.toString()
+        );
+      }
+    }
+
     const q = String(req.query.q || req.query.name || "").trim().slice(0, 40);
 
     if (!q) {
-      const suggestedUsers = await User.find({})
+      const suggestedUsers = await User.find({
+        ...(excludeIds.length ? { _id: { $nin: excludeIds } } : {}),
+      })
         .select(publicUserFields)
         .sort({ createdAt: -1 })
         .limit(12);
@@ -197,6 +258,7 @@ const searchUsers = async (req, res) => {
         { name: { $regex: safeQuery, $options: "i" } },
         { username: { $regex: safeQuery, $options: "i" } },
       ],
+      ...(excludeIds.length ? { _id: { $nin: excludeIds } } : {}),
     })
       .select(publicUserFields)
       .limit(20);
@@ -226,6 +288,10 @@ const followUser = async (req, res) => {
 
     if (!userToFollow || !currentUser) {
       return res.status(404).json({ message: "User not found" });
+    }
+
+    if (isBlockedEitherWay(userToFollow, currentUserId) || isBlockedEitherWay(currentUser, targetUserId)) {
+      return res.status(403).json({ message: "You can't tune in with this Vybe Space" });
     }
 
     const isFollowing = currentUser.following.some(
@@ -481,6 +547,97 @@ const respondToTuneRequest = async (req, res) => {
   }
 };
 
+// BLOCK / UNBLOCK A USER
+// Blocking is silent (no notification), removes any existing tune-in
+// relationship and pending requests in both directions, and hides each
+// person's Vybe Space, posts, and whispers from the other completely.
+const toggleBlockUser = async (req, res) => {
+  try {
+    const targetUserId = req.params.id;
+    const currentUserId = req.user._id.toString();
+
+    if (targetUserId === currentUserId) {
+      return res.status(400).json({ message: "You cannot block yourself" });
+    }
+
+    const [currentUser, targetUser] = await Promise.all([
+      User.findById(currentUserId),
+      User.findById(targetUserId),
+    ]);
+
+    if (!currentUser || !targetUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const isBlocked = currentUser.blockedUsers.some(
+      (id) => id.toString() === targetUserId
+    );
+
+    if (isBlocked) {
+      // UNBLOCK
+      currentUser.blockedUsers = currentUser.blockedUsers.filter(
+        (id) => id.toString() !== targetUserId
+      );
+      targetUser.blockedBy = targetUser.blockedBy.filter(
+        (id) => id.toString() !== currentUserId
+      );
+
+      await currentUser.save();
+      await targetUser.save();
+
+      return res.json({ success: true, blocked: false });
+    }
+
+    // BLOCK: sever any existing tune-in relationship, both directions.
+    currentUser.following = currentUser.following.filter(
+      (id) => id.toString() !== targetUserId
+    );
+    currentUser.followers = currentUser.followers.filter(
+      (id) => id.toString() !== targetUserId
+    );
+    targetUser.following = targetUser.following.filter(
+      (id) => id.toString() !== currentUserId
+    );
+    targetUser.followers = targetUser.followers.filter(
+      (id) => id.toString() !== currentUserId
+    );
+
+    currentUser.blockedUsers.push(targetUserId);
+    targetUser.blockedBy.push(currentUserId);
+
+    await Promise.all([
+      currentUser.save(),
+      targetUser.save(),
+      TuneRequest.deleteMany({
+        $or: [
+          { sender: currentUserId, recipient: targetUserId },
+          { sender: targetUserId, recipient: currentUserId },
+        ],
+      }),
+    ]);
+
+    res.json({ success: true, blocked: true });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// LIST PEOPLE I HAVE BLOCKED
+const getBlockedUsers = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).populate(
+      "blockedUsers",
+      populatedUserFields
+    );
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    res.json(user.blockedUsers || []);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getMyProfile,
   updateMyProfile,
@@ -490,4 +647,6 @@ module.exports = {
   getTuneRequests,
   getSentTuneRequests,
   respondToTuneRequest,
+  toggleBlockUser,
+  getBlockedUsers,
 };

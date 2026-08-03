@@ -70,10 +70,19 @@ function useWhispers() {
 
   const activeId = activeConversation?._id;
 
-  const activePerson = useMemo(
-    () => getOtherParticipant(activeConversation, currentUserId),
-    [activeConversation, currentUserId]
-  );
+  const activePerson = useMemo(() => {
+    const person = getOtherParticipant(activeConversation, currentUserId);
+    if (!person) return null;
+
+    const liveConversation = conversations.find(
+      (item) => String(item._id) === String(activeConversation?._id)
+    );
+
+    return {
+      ...person,
+      isBlocked: Boolean(liveConversation?.isBlocked ?? activeConversation?.isBlocked),
+    };
+  }, [activeConversation, conversations, currentUserId]);
 
   const totalUnread = useMemo(
     () => conversations.reduce((total, item) => total + Number(item.unreadCount || 0), 0),

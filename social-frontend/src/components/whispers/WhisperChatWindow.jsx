@@ -163,6 +163,7 @@ function WhisperChatWindow({
             mediaPreview={mediaPreview}
             mediaUploading={mediaUploading}
             replyTo={replyTo}
+            isBlocked={Boolean(activePerson?.isBlocked)}
             onChangeText={onChangeText}
             onSendMessage={onSendMessage}
             onCancelReply={onCancelReply}

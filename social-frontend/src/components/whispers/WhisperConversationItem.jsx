@@ -49,8 +49,11 @@ function WhisperConversationItem({ conversation, activeId, currentUserId, deleti
   const active = conversation._id === activeId;
   const unread = Number(conversation.unreadCount || 0);
   const pinned = isConversationPinned(conversation, currentUserId);
-  const isOnline = Boolean(person?._id && onlineUserIds.map(String).includes(String(person._id)));
-  const lastText = conversation.lastMessage?.text
+  const isBlocked = Boolean(conversation.isBlocked);
+  const isOnline = !isBlocked && Boolean(person?._id && onlineUserIds.map(String).includes(String(person._id)));
+  const lastText = isBlocked
+    ? "Blocked"
+    : conversation.lastMessage?.text
     ? getDisplayMessageText(conversation.lastMessage, currentUserId)
     : isOnline
     ? "Online now"
@@ -104,7 +107,7 @@ function WhisperConversationItem({ conversation, activeId, currentUserId, deleti
             </span>
           </span>
           <span className="mt-1 flex min-w-0 items-center gap-2">
-            <span className={`block min-w-0 flex-1 truncate text-xs leading-relaxed ${unread ? "font-semibold text-zinc-100" : "font-medium text-zinc-500 group-hover:text-zinc-400"}`}>
+            <span className={`block min-w-0 flex-1 truncate text-xs leading-relaxed ${isBlocked ? "font-semibold text-red-300/70" : unread ? "font-semibold text-zinc-100" : "font-medium text-zinc-500 group-hover:text-zinc-400"}`}>
               {lastText}
             </span>
             {unread > 0 && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-pink-300 shadow-[0_0_10px_rgba(249,168,212,0.55)]" />}

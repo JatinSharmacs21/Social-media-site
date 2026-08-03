@@ -36,6 +36,28 @@ function Profile() {
   const [notice, setNotice] = useState("");
   const [librarySort, setLibrarySort] = useState("latest");
   const [sortPanelOpen, setSortPanelOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [profileMenuPos, setProfileMenuPos] = useState({ top: 0, left: 0 });
+  const profileMenuButtonRef = useRef(null);
+  const PROFILE_MENU_WIDTH = 176; // matches w-44
+
+  const openProfileMenu = () => {
+    if (profileMenuButtonRef.current) {
+      const rect = profileMenuButtonRef.current.getBoundingClientRect();
+      const viewportWidth = document.documentElement.clientWidth;
+
+      let left = rect.left;
+      if (left + PROFILE_MENU_WIDTH > viewportWidth - 12) {
+        left = viewportWidth - PROFILE_MENU_WIDTH - 12;
+      }
+      if (left < 12) left = 12;
+
+      setProfileMenuPos({ top: rect.bottom + 8, left });
+    }
+    setProfileMenuOpen((prev) => !prev);
+  };
+
+  const [blocking, setBlocking] = useState(false);
   const [editingPost, setEditingPost] = useState(null);
   const [editDraft, setEditDraft] = useState("");
   const [confirmDeletePost, setConfirmDeletePost] = useState(null);
@@ -181,6 +203,14 @@ function Profile() {
     fetchProfileAndPosts();
   }, [fetchProfileAndPosts]);
 
+  useEffect(() => {
+    if (!profileMenuOpen) return undefined;
+
+    const closeOnScroll = () => setProfileMenuOpen(false);
+    window.addEventListener("scroll", closeOnScroll, true);
+    return () => window.removeEventListener("scroll", closeOnScroll, true);
+  }, [profileMenuOpen]);
+
   const updatePostInState = (updatedPost) => {
     if (!updatedPost?._id) return;
 
@@ -318,6 +348,33 @@ function Profile() {
     } catch (err) {
       logger.error(err.response?.data || err);
       showNotice(err.response?.data?.message || "Kuch gadbad ho gayi");
+    }
+  };
+
+  const toggleBlockUserProfile = async () => {
+    if (!user?._id || blocking) return;
+
+    const wasBlocked = Boolean(user.isBlockedByMe);
+    setBlocking(true);
+
+    try {
+      await API.put(`/api/users/block/${user._id}`, {}, authConfig);
+      setProfileMenuOpen(false);
+
+      if (wasBlocked) {
+        showNotice(`Unblocked ${user.name || "this user"}`);
+      } else {
+        showNotice(`Blocked ${user.name || "this user"}`);
+      }
+
+      // Stay on this profile and refresh it in place instead of navigating
+      // away, so the ••• menu and posts grid immediately reflect the change.
+      await fetchProfileAndPosts();
+    } catch (err) {
+      logger.error(err.response?.data || err);
+      showNotice(err.response?.data?.message || "Kuch gadbad ho gayi");
+    } finally {
+      setBlocking(false);
     }
   };
 
@@ -824,6 +881,58 @@ function Profile() {
                     >
                       {shareCopied ? "Copied" : "Share"}
                     </button>
+
+                    {!isViewingOwnProfile && (
+                      <div className="relative">
+                        <button
+                          ref={profileMenuButtonRef}
+                          onClick={openProfileMenu}
+                          className="rounded-[13px] border border-white/10 bg-white/[0.075] px-3 py-1.5 text-xs font-black text-white shadow-inner shadow-white/5 transition-all hover:border-red-300/25 hover:bg-white/[0.11] active:scale-[0.98] sm:px-3.5 sm:py-2.5"
+                          aria-label="More options"
+                        >
+                          •••
+                        </button>
+
+                        {profileMenuOpen && (
+                          <>
+                            <button
+                              type="button"
+                              aria-label="Close menu"
+                              className="fixed inset-0 z-40 cursor-default bg-transparent"
+                              onClick={() => setProfileMenuOpen(false)}
+                            />
+                            <div
+                              style={{ position: "fixed", top: profileMenuPos.top, left: profileMenuPos.left }}
+                              className="z-50 w-44 overflow-hidden rounded-2xl border border-white/[0.14] bg-[#15131c] p-1.5 shadow-2xl shadow-black/70 ring-1 ring-white/[0.06]"
+                            >
+                              <button
+                                type="button"
+                                disabled={blocking}
+                                onClick={toggleBlockUserProfile}
+                                className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition disabled:opacity-50 ${
+                                  user?.isBlockedByMe
+                                    ? "border-white/10 bg-white/[0.08] text-white hover:bg-white/[0.12]"
+                                    : "border-red-300/15 bg-red-500/[0.12] text-red-100 hover:bg-red-500/20"
+                                }`}
+                              >
+                                <span>
+                                  {blocking
+                                    ? user?.isBlockedByMe
+                                      ? "Unblocking..."
+                                      : "Blocking..."
+                                    : user?.isBlockedByMe
+                                    ? `Unblock ${user?.name || "user"}`
+                                    : `Block ${user?.name || "user"}`}
+                                </span>
+                                <span className={user?.isBlockedByMe ? "text-slate-400" : "text-red-300/60"}>
+                                  {user?.isBlockedByMe ? "↺" : "⛔"}
+                                </span>
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -880,7 +989,15 @@ function Profile() {
             </div>
           </div>
 
-          {!isViewingOwnProfile && (isLockedProfile || postsLocked) ? (
+          {!isViewingOwnProfile && user?.isBlockedByMe ? (
+            <div className="relative overflow-hidden rounded-[22px] border border-white/10 bg-black/30 p-8 text-center shadow-inner shadow-white/5">
+              <div className="text-4xl">⛔</div>
+              <h3 className="mt-3 text-lg font-black text-white">You've blocked this account</h3>
+              <p className="mx-auto mt-1.5 max-w-xs text-[12px] font-medium text-slate-400">
+                Unblock them from the ••• menu above to see their vybes again.
+              </p>
+            </div>
+          ) : !isViewingOwnProfile && (isLockedProfile || postsLocked) ? (
             <div className="relative overflow-hidden rounded-[22px] border border-white/10 bg-black/30 p-8 text-center shadow-inner shadow-white/5">
               <div className="text-4xl">🔒</div>
               <h3 className="mt-3 text-lg font-black text-white">This Vybe Space is private</h3>

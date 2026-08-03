@@ -82,8 +82,18 @@ const getOrCreateConversation = async (req, res) => {
       return res.status(400).json({ message: "You cannot whisper yourself" });
     }
 
-    const participant = await User.findById(participantId).select(`${userFields} isPrivate`);
+    const participant = await User.findById(participantId).select(
+      `${userFields} isPrivate blockedUsers blockedBy`
+    );
     if (!participant) return res.status(404).json({ message: "User not found" });
+
+    const isBlocked =
+      (participant.blockedUsers || []).some((id) => id.toString() === currentUserId.toString()) ||
+      (participant.blockedBy || []).some((id) => id.toString() === currentUserId.toString());
+
+    if (isBlocked) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     let conversation = await Conversation.findOne({
       participants: { $all: [currentUserId, participantId], $size: 2 },
@@ -124,6 +134,13 @@ const getConversations = async (req, res) => {
   try {
     const currentUserId = getCurrentUserId(req);
 
+    const currentUser = await User.findById(currentUserId).select("blockedUsers blockedBy");
+    const blockedIdSet = new Set(
+      [...(currentUser?.blockedUsers || []), ...(currentUser?.blockedBy || [])].map((id) =>
+        id.toString()
+      )
+    );
+
     const conversations = await Conversation.find({ participants: currentUserId })
       .populate("participants", userFields)
       .populate({
@@ -158,10 +175,17 @@ const getConversations = async (req, res) => {
     }, {});
 
     res.json(
-      conversations.map((conversation) => ({
-        ...conversation.toObject(),
-        unreadCount: unreadMap[conversation._id.toString()] || 0,
-      }))
+      conversations.map((conversation) => {
+        const other = (conversation.participants || []).find(
+          (participant) => participant._id.toString() !== currentUserId.toString()
+        );
+
+        return {
+          ...conversation.toObject(),
+          unreadCount: unreadMap[conversation._id.toString()] || 0,
+          isBlocked: other ? blockedIdSet.has(other._id.toString()) : false,
+        };
+      })
     );
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -249,6 +273,25 @@ const sendMessage = async (req, res) => {
 
     if (!ensureParticipant(conversation, currentUserId)) {
       return res.status(403).json({ message: "You are not part of this whisper" });
+    }
+
+    const otherParticipantId = conversation.participants
+      .map((id) => id.toString())
+      .find((id) => id !== currentUserId.toString());
+
+    if (otherParticipantId) {
+      const otherParticipant = await User.findById(otherParticipantId).select(
+        "blockedUsers blockedBy"
+      );
+
+      const isBlocked =
+        otherParticipant &&
+        ((otherParticipant.blockedUsers || []).some((id) => id.toString() === currentUserId.toString()) ||
+          (otherParticipant.blockedBy || []).some((id) => id.toString() === currentUserId.toString()));
+
+      if (isBlocked) {
+        return res.status(403).json({ message: "You can't send messages in this whisper" });
+      }
     }
 
     let validReplyTo = null;

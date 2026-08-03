@@ -90,6 +90,25 @@ const userSchema = new mongoose.Schema(
       longest: { type: Number, default: 0 },
       lastReplyDate: { type: String, default: null },
     },
+
+    // People I have blocked. They can no longer see my Vybe Space,
+    // posts, or message me, and I stop seeing theirs too.
+    blockedUsers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+
+    // Reverse index: people who have blocked me. Kept in sync with
+    // their blockedUsers list so we can check "am I blocked" in O(1)
+    // without loading the other person's document.
+    blockedBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
   },
   {
     timestamps: true,

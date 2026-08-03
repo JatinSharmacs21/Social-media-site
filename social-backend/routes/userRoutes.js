@@ -10,12 +10,14 @@ const {
   getTuneRequests,
   getSentTuneRequests,
   respondToTuneRequest,
+  toggleBlockUser,
+  getBlockedUsers,
 } = require("../controllers/userController");
 
 const { protect, optionalAuth } = require("../middleware/authMiddleware");
 
 // SEARCH USERS
-router.get("/search", searchUsers);
+router.get("/search", optionalAuth, searchUsers);
 
 // MY PROFILE
 router.get("/me", protect, getMyProfile);
@@ -28,6 +30,10 @@ router.put("/tune-requests/:requestId", protect, respondToTuneRequest);
 
 // FOLLOW / UNFOLLOW / REQUEST TUNE-IN
 router.put("/follow/:id", protect, followUser);
+
+// BLOCK / UNBLOCK
+router.get("/blocked", protect, getBlockedUsers);
+router.put("/block/:id", protect, toggleBlockUser);
 
 // GET USER PROFILE (optionalAuth so we know the viewer for private spaces,
 // without forcing logged-out visitors to be blocked outright)

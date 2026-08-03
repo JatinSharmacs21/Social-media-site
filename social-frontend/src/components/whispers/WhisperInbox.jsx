@@ -42,6 +42,7 @@ function WhisperInbox({
   const pinnedConversations = conversations.filter((conversation) => isConversationPinned(conversation, currentUserId));
   const normalConversations = conversations.filter((conversation) => !isConversationPinned(conversation, currentUserId));
   const onlineConversations = conversations.filter((conversation) => {
+    if (conversation.isBlocked) return false;
     const person = conversation.participants?.find((participant) => String(participant?._id) !== String(currentUserId)) || conversation.participants?.[0];
     return person?._id && onlineSet.has(String(person._id));
   });

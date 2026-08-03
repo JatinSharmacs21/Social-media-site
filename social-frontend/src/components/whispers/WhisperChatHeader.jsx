@@ -64,8 +64,15 @@ function WhisperChatHeader({ activePerson, typingUser, onlineUserIds = [], delet
     setDeleteConfirmOpen(false);
   };
 
-  const isOnline = Boolean(activePerson?._id && onlineUserIds.map(String).includes(String(activePerson._id)));
-  const statusText = typingUser ? "Typing..." : isOnline ? "Online now" : formatWhisperLastSeen(activePerson?.lastSeen);
+  const isBlocked = Boolean(activePerson?.isBlocked);
+  const isOnline = !isBlocked && Boolean(activePerson?._id && onlineUserIds.map(String).includes(String(activePerson._id)));
+  const statusText = isBlocked
+    ? "Blocked"
+    : typingUser
+    ? "Typing..."
+    : isOnline
+    ? "Online now"
+    : formatWhisperLastSeen(activePerson?.lastSeen);
 
   return (
     <div className="sticky top-0 relative z-30 shrink-0 border-b border-white/[0.07] bg-[#08090d]/92 px-3 py-2 shadow-lg shadow-black/25 backdrop-blur-xl md:px-5 md:py-2.5">
@@ -106,7 +113,7 @@ function WhisperChatHeader({ activePerson, typingUser, onlineUserIds = [], delet
             <span className="block truncate text-[15px] font-medium leading-tight text-white transition group-hover:text-pink-100 md:text-[16px]">
               {title}
             </span>
-            <span className={`mt-0.5 block truncate text-[11px] font-medium ${typingUser ? "text-cyan-200" : isOnline ? "text-emerald-300/85" : "text-zinc-500"}`}>
+            <span className={`mt-0.5 block truncate text-[11px] font-medium ${isBlocked ? "text-red-300/80" : typingUser ? "text-cyan-200" : isOnline ? "text-emerald-300/85" : "text-zinc-500"}`}>
               {statusText}
             </span>
           </span>

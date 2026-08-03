@@ -330,58 +330,23 @@ function Notifications() {
             </button>
           </div>
 
-          <div className="relative overflow-hidden rounded-[28px] md:rounded-[34px] border border-white/10 bg-zinc-950/95 p-5 sm:p-7 shadow-xl shadow-black/30">
-            <div className="absolute -top-20 -right-20 w-56 h-56 rounded-full bg-pink-500/10 blur-3xl" />
-            <div className="absolute -bottom-20 -left-20 w-56 h-56 rounded-full bg-cyan-500/10 blur-3xl" />
-
-            <div className="relative flex items-start justify-between gap-4">
-              <div>
-                <div className="inline-flex items-center gap-2 bg-white/[0.045] border border-white/10 rounded-full px-3 py-1.5 text-[10px] font-black tracking-[0.18em] text-pink-300 mb-3">
-                  SIGNALS
-                </div>
-
-                <h1 className="text-3xl sm:text-5xl font-black tracking-tight bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
-                  Notifications
-                </h1>
-
-                <p className="text-gray-400 mt-2 text-sm sm:text-base max-w-xl">
-                  Felt, comments, replies, follows aur Vybe Space activity yahin milegi.
-                </p>
-              </div>
-
-              <div className="hidden sm:flex w-14 h-14 rounded-2xl bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 items-center justify-center text-2xl shadow-lg shadow-pink-500/20">
-                ⚡
-              </div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="truncate text-2xl sm:text-3xl font-black tracking-tight bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                Notifications
+              </h1>
+              <p className="mt-0.5 text-xs sm:text-sm font-medium text-gray-500">
+                {notifications.length} total · {unreadCount} unread
+              </p>
             </div>
 
-            <div className="relative grid grid-cols-3 gap-2 mt-6">
-              <div className="rounded-2xl bg-white/[0.045] border border-white/10 p-3">
-                <p className="text-xl font-black">{notifications.length}</p>
-                <p className="text-[11px] text-gray-500 font-semibold mt-0.5">
-                  Total
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-white/[0.045] border border-white/10 p-3">
-                <p className="text-xl font-black text-pink-200">{unreadCount}</p>
-                <p className="text-[11px] text-gray-500 font-semibold mt-0.5">
-                  Unread
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-white/[0.045] border border-white/10 p-3">
-                <p className="text-xl font-black">
-                  {notifications.filter((n) => n.type === "follow").length}
-                </p>
-                <p className="text-[11px] text-gray-500 font-semibold mt-0.5">
-                  Circle
-                </p>
-              </div>
+            <div className="hidden sm:flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 text-lg shadow-lg shadow-pink-500/20">
+              ⚡
             </div>
           </div>
         </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-5 mt-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-5 mt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {signalFilters.map((filter) => {
             const count =
               filter === "All"
@@ -399,14 +364,14 @@ function Notifications() {
                 key={filter}
                 type="button"
                 onClick={() => setActiveFilter(filter)}
-                className={`shrink-0 px-4 py-2 rounded-full border text-sm font-semibold transition-all ${
+                className={`shrink-0 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border text-xs sm:text-sm font-semibold transition-all ${
                   activeFilter === filter
                     ? "bg-gradient-to-r from-pink-500/25 to-cyan-500/20 border-pink-400/30 text-white shadow-lg shadow-pink-500/10"
                     : "bg-white/[0.04] border-white/10 text-gray-400 hover:text-white hover:bg-white/[0.07]"
                 }`}
               >
                 {filter}
-                <span className="ml-2 text-xs opacity-70">{count}</span>
+                <span className="ml-1.5 text-[11px] opacity-70">{count}</span>
               </button>
             );
           })}
@@ -436,63 +401,63 @@ function Notifications() {
             ))}
           </div>
         ) : filteredNotifications.length === 0 ? (
-          <div className="relative overflow-hidden bg-zinc-950/90 border border-white/10 rounded-[30px] p-10 text-center shadow-xl shadow-black/30">
+          <div className="relative overflow-hidden bg-zinc-950/90 border border-white/10 rounded-[24px] p-6 sm:p-10 text-center shadow-xl shadow-black/30">
             <div className="absolute -top-20 -right-20 w-52 h-52 rounded-full bg-pink-500/10 blur-3xl" />
             <div className="absolute -bottom-20 -left-20 w-52 h-52 rounded-full bg-cyan-500/10 blur-3xl" />
 
             <div className="relative">
-              <div className="text-5xl mb-4">⚡</div>
+              <div className="text-4xl sm:text-5xl mb-3 sm:mb-4">⚡</div>
 
-              <h2 className="text-2xl font-bold mb-2">
+              <h2 className="text-lg sm:text-2xl font-bold mb-2">
                 {activeFilter === "All" ? "No signals yet" : `No ${activeFilter} signals`}
               </h2>
 
-              <p className="text-gray-400 max-w-md mx-auto">
+              <p className="text-sm text-gray-400 max-w-md mx-auto">
                 Jab koi felt, comment, reply, follow ya interact karega to yahan clean signal card aayega.
               </p>
             </div>
           </div>
         ) : (
-          <div className="space-y-7">
+          <div className="space-y-5 sm:space-y-7">
             {groupedNotifications.map(([groupName, items]) => (
               <section key={groupName}>
-                <div className="flex items-center gap-3 mb-3">
+                <div className="flex items-center gap-3 mb-2.5 sm:mb-3">
                   <h2 className="text-xs font-black tracking-[0.18em] text-gray-500 uppercase">
                     {groupName}
                   </h2>
                   <div className="h-px flex-1 bg-white/10" />
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-2 sm:space-y-3">
                   {items.map((notification) => (
                     <div
                       key={notification._id}
-                      className={`group relative overflow-hidden border rounded-[26px] p-4 transition-all hover:bg-white/[0.055] shadow-xl shadow-black/20 ${
+                      className={`group relative overflow-hidden border rounded-2xl sm:rounded-[26px] p-3 sm:p-4 transition-all hover:bg-white/[0.055] shadow-lg shadow-black/20 ${
                         notification.isRead
                           ? "bg-zinc-950/80 border-white/10"
                           : "bg-gradient-to-r from-pink-500/[0.13] via-zinc-950 to-cyan-500/[0.08] border-pink-500/30 shadow-pink-500/10"
                       }`}
                     >
                       {!notification.isRead && (
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 h-10 w-1 rounded-r-full bg-gradient-to-b from-pink-400 to-cyan-400" />
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1 rounded-r-full bg-gradient-to-b from-pink-400 to-cyan-400" />
                       )}
 
-                      <div className="flex items-start gap-4">
+                      <div className="flex items-start gap-2.5 sm:gap-4">
                         <button
                           type="button"
                           onClick={() =>
                             notification.sender?._id &&
                             navigate(`/profile/${notification.sender._id}`)
                           }
-                          className="relative shrink-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-400/40"
+                          className="relative shrink-0 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-400/40"
                         >
                           <img
                             src={getAvatar(notification.sender)}
                             alt=""
-                            className="w-12 h-12 rounded-2xl object-cover border border-white/10 bg-white/5"
+                            className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl object-cover border border-white/10 bg-white/5"
                           />
 
-                          <span className="absolute -right-1 -bottom-1 w-7 h-7 rounded-full bg-black border border-white/10 flex items-center justify-center text-sm shadow-lg">
+                          <span className="absolute -right-1 -bottom-1 w-5 h-5 sm:w-7 sm:h-7 rounded-full bg-black border border-white/10 flex items-center justify-center text-[10px] sm:text-sm shadow-lg">
                             {getIcon(notification.type)}
                           </span>
                         </button>
@@ -506,9 +471,9 @@ function Notifications() {
                           }}
                           className="flex-1 min-w-0 text-left focus:outline-none cursor-pointer"
                         >
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                             <span
-                              className={`px-2 py-0.5 rounded-full border text-[10px] font-black tracking-wide ${getSignalStyle(
+                              className={`px-1.5 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-black tracking-wide ${getSignalStyle(
                                 notification.type
                               )}`}
                             >
@@ -516,28 +481,27 @@ function Notifications() {
                             </span>
 
                             {!notification.isRead && (
-                              <span className="px-2 py-0.5 rounded-full bg-pink-500/15 border border-pink-400/20 text-[10px] font-black text-pink-200">
+                              <span className="px-1.5 py-0.5 rounded-full bg-pink-500/15 border border-pink-400/20 text-[9px] sm:text-[10px] font-black text-pink-200">
                                 NEW
                               </span>
                             )}
 
-                            <span className="text-xs text-gray-500">
+                            <span className="text-[11px] sm:text-xs text-gray-500">
                               {formatSignalTime(notification.createdAt)}
                             </span>
                           </div>
 
-                          <p className="text-sm sm:text-base text-gray-100 leading-6">
+                          <p className="text-[13px] sm:text-base text-gray-100 leading-[1.35] sm:leading-6">
                             {getMessage(notification)}
+                            {notification.sender?.username && (
+                              <span className="ml-1.5 text-[11px] sm:text-xs font-medium text-gray-500">
+                                @{notification.sender.username}
+                              </span>
+                            )}
                           </p>
 
-                          {notification.sender?.username && (
-                            <p className="text-xs text-gray-500 mt-0.5">
-                              @{notification.sender.username}
-                            </p>
-                          )}
-
                           {notification.post?.caption && (
-                            <p className="text-sm text-gray-500 mt-2 line-clamp-2 rounded-2xl bg-white/[0.035] border border-white/5 px-3 py-2">
+                            <p className="text-xs text-gray-500 mt-1.5 sm:mt-2 truncate sm:line-clamp-2 sm:whitespace-normal overflow-hidden rounded-xl sm:rounded-2xl bg-white/[0.035] border border-white/5 px-2.5 py-1.5 sm:px-3 sm:py-2">
                               “{notification.post.caption}”
                             </p>
                           )}
