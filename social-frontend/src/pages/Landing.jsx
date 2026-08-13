@@ -195,7 +195,7 @@ const token = tokenFromQuery || tokenFromPath;
       <div className="absolute bottom-[-180px] right-[-140px] w-[430px] h-[430px] bg-cyan-500/15 rounded-full blur-3xl" />
       <div className="absolute top-[28%] right-[34%] w-[320px] h-[320px] bg-purple-500/10 rounded-full blur-3xl" />
 
-      <div className="relative z-10 min-h-screen grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_500px]">
+      <div className="relative z-10 min-h-screen grid content-start lg:content-normal grid-cols-1 lg:grid-cols-[minmax(0,1fr)_500px]">
         <section className="px-5 sm:px-8 md:px-14 lg:px-16 py-4 sm:py-8 lg:py-10 flex flex-col">
           <div className="flex items-center gap-3 mb-3 sm:mb-10 lg:mb-12">
             <div className="relative w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 flex items-center justify-center shadow-xl shadow-pink-500/25">
