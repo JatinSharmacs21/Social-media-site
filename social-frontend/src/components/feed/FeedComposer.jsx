@@ -60,8 +60,12 @@ function FeedComposer({
               e.preventDefault();
               if (!loading) createPost();
             }}
-            className={`relative overflow-visible bg-zinc-950/90 border border-white/10 rounded-[22px] sm:rounded-[28px] p-2.5 sm:p-4 mb-3.5 sm:mb-6 shadow-xl shadow-black/30 w-full transition-all duration-300 ${
-              selectedMood !== "All" ? "shadow-pink-500/10" : ""
+            className={`relative overflow-visible w-full mb-3.5 sm:mb-6 transition-all duration-300 ${
+              composerOpen || hasSelectedMedia || caption.trim()
+                ? `bg-zinc-950/90 border border-white/10 rounded-[22px] sm:rounded-[28px] p-2.5 sm:p-4 shadow-xl shadow-black/30 ${
+                    selectedMood !== "All" ? "shadow-pink-500/10" : ""
+                  }`
+                : ""
             }`}
           >
             {!composerOpen && !hasSelectedMedia && !caption.trim() && (
@@ -70,7 +74,6 @@ function FeedComposer({
                 onClick={() => setComposerOpen(true)}
                 className="group relative flex w-full items-center gap-3 overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.035] px-3 py-2.5 text-left transition hover:border-pink-400/25 hover:bg-white/[0.055] active:scale-[0.99]"
               >
-                <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-pink-500 via-purple-500 to-cyan-400 opacity-75" />
                 <Avatar
   src={currentUser?.profilePic}
   name={currentUser?.name || "User"}

@@ -366,30 +366,6 @@ function Search() {
   return (
     <div className="min-h-screen bg-black px-3 pb-28 pt-3 text-white sm:px-4 md:pb-10 md:pt-6">
       <div className="mx-auto w-full max-w-6xl">
-        <header className="mb-3 sm:mb-5">
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-pink-300">
-            Discover
-          </div>
-
-          <div className="flex items-end justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="text-[1.65rem] font-black leading-tight tracking-tight sm:text-4xl">
-                Find your next Vybe
-              </h1>
-              <p className="mt-1 max-w-xl text-[12px] leading-5 text-white/45 sm:text-sm">
-                Search creators, clips, thoughts and moments built around your mood.
-              </p>
-            </div>
-
-            <button
-              onClick={() => navigate("/vybe-drops")}
-              className="hidden rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-bold text-pink-100 transition hover:bg-pink-500/10 sm:inline-flex"
-            >
-              Drops
-            </button>
-          </div>
-        </header>
-
         <form onSubmit={handleSearchSubmit} className="mb-3 overflow-hidden rounded-[1.35rem] border border-white/10 bg-zinc-950/90 p-2 shadow-lg shadow-black/30 sm:rounded-[1.6rem] sm:p-3">
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 text-sm shadow-lg shadow-pink-500/20 sm:h-11 sm:w-11">
