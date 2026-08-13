@@ -196,9 +196,9 @@ const token = tokenFromQuery || tokenFromPath;
       <div className="absolute top-[28%] right-[34%] w-[320px] h-[320px] bg-purple-500/10 rounded-full blur-3xl" />
 
       <div className="relative z-10 min-h-screen grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_500px]">
-        <section className="px-5 sm:px-8 md:px-14 lg:px-16 py-6 sm:py-8 lg:py-10 flex flex-col">
-          <div className="flex items-center gap-3 mb-8 sm:mb-10 lg:mb-12">
-            <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 flex items-center justify-center shadow-xl shadow-pink-500/25">
+        <section className="px-5 sm:px-8 md:px-14 lg:px-16 py-4 sm:py-8 lg:py-10 flex flex-col">
+          <div className="flex items-center gap-3 mb-3 sm:mb-10 lg:mb-12">
+            <div className="relative w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 flex items-center justify-center shadow-xl shadow-pink-500/25">
               <div className="relative w-7 h-7 rounded-full border-[3px] border-white">
                 <div className="absolute top-1/2 left-1/2 w-2.5 h-2.5 rounded-full bg-white -translate-x-1/2 -translate-y-1/2" />
                 <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white" />
@@ -216,11 +216,11 @@ const token = tokenFromQuery || tokenFromPath;
           </div>
 
           <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 bg-white/[0.045] border border-white/10 rounded-full px-4 py-2 text-[11px] sm:text-xs font-black tracking-[0.18em] text-pink-300 mb-5 sm:mb-6">
+            <div className="inline-flex items-center gap-2 bg-white/[0.045] border border-white/10 rounded-full px-4 py-2 text-[11px] sm:text-xs font-black tracking-[0.18em] text-pink-300 mb-2 sm:mb-6">
               VIBE-FIRST SOCIAL SPACE
             </div>
 
-            <h2 className="text-[52px] sm:text-6xl md:text-7xl font-black leading-[0.98] tracking-tight">
+            <h2 className="hidden sm:block text-3xl sm:text-6xl md:text-7xl font-black leading-[1.05] sm:leading-[0.98] tracking-tight">
               Drop your
               <br />
               <span className="bg-gradient-to-r from-pink-400 via-purple-300 to-cyan-300 bg-clip-text text-transparent">
@@ -228,7 +228,7 @@ const token = tokenFromQuery || tokenFromPath;
               </span>
             </h2>
 
-            <p className="text-gray-400 text-base sm:text-xl md:text-2xl mt-6 leading-relaxed max-w-2xl">
+            <p className="hidden sm:block text-gray-400 text-base sm:text-xl md:text-2xl mt-6 leading-relaxed max-w-2xl">
               Thoughts, moments, drops and rooms — built around your current mood,
               not perfect content.
             </p>
@@ -258,17 +258,17 @@ const token = tokenFromQuery || tokenFromPath;
           </div>
         </section>
 
-        <section className="flex items-start lg:items-center justify-center px-5 sm:px-8 lg:pl-0 lg:pr-10 pb-8 lg:py-10">
-          <div className="w-full max-w-[460px] relative overflow-hidden bg-zinc-950/85 border border-white/10 backdrop-blur-2xl rounded-[30px] sm:rounded-[38px] p-5 sm:p-7 lg:p-8 shadow-[0_0_60px_rgba(0,0,0,0.55)]">
+        <section className="flex items-start lg:items-center justify-center px-5 sm:px-8 lg:pl-0 lg:pr-10 pb-4 sm:pb-8 lg:py-10">
+          <div className="w-full max-w-[460px] relative overflow-hidden bg-zinc-950/85 border border-white/10 backdrop-blur-2xl rounded-[24px] sm:rounded-[38px] p-4 sm:p-7 lg:p-8 shadow-[0_0_60px_rgba(0,0,0,0.55)]">
             <div className="absolute -top-24 -right-24 w-56 h-56 rounded-full bg-pink-500/10 blur-3xl" />
             <div className="absolute -bottom-24 -left-24 w-56 h-56 rounded-full bg-cyan-500/10 blur-3xl" />
 
             <div className="relative">
-              <div className="mb-5">
-                <p className="text-[11px] tracking-[0.22em] text-pink-300 font-black mb-2">
+              <div className="mb-3 sm:mb-5">
+                <p className="text-[11px] tracking-[0.22em] text-pink-300 font-black mb-1 sm:mb-2">
                   {isLogin ? "LOGIN" : isRegister ? "CREATE SPACE" : isForgot ? "RECOVER" : "RESET"}
                 </p>
-                <h2 className="text-3xl sm:text-4xl font-black mb-2">{getTitle()}</h2>
+                <h2 className="text-2xl sm:text-4xl font-black mb-1 sm:mb-2">{getTitle()}</h2>
                 <p className="text-gray-400 text-sm sm:text-base">{getSubtitle()}</p>
               </div>
 
@@ -291,12 +291,12 @@ const token = tokenFromQuery || tokenFromPath;
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className="w-full p-4 rounded-2xl bg-black/40 border border-white/10 outline-none mb-3.5 focus:border-pink-500 transition-all"
+                  className="w-full p-3.5 sm:p-4 rounded-2xl bg-black/40 border border-white/10 outline-none mb-2.5 sm:mb-3.5 focus:border-pink-500 transition-all"
                 />
               )}
 
               {(isLogin || isRegister) && (
-                <div className="relative mb-3.5">
+                <div className="relative mb-2.5 sm:mb-3.5">
                   <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500">@</span>
                   <input
                     type="text"
@@ -304,7 +304,7 @@ const token = tokenFromQuery || tokenFromPath;
                     value={username}
                     onChange={(e) => setUsername(cleanUsername(e.target.value))}
                     onKeyDown={handleKeyDown}
-                    className="w-full p-4 pl-10 rounded-2xl bg-black/40 border border-white/10 outline-none focus:border-pink-500 transition-all"
+                    className="w-full p-3.5 sm:p-4 pl-10 rounded-2xl bg-black/40 border border-white/10 outline-none focus:border-pink-500 transition-all"
                   />
                 </div>
               )}
@@ -316,7 +316,7 @@ const token = tokenFromQuery || tokenFromPath;
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className="w-full p-4 rounded-2xl bg-black/40 border border-white/10 outline-none mb-3.5 focus:border-pink-500 transition-all"
+                  className="w-full p-3.5 sm:p-4 rounded-2xl bg-black/40 border border-white/10 outline-none mb-2.5 sm:mb-3.5 focus:border-pink-500 transition-all"
                 />
               )}
 
@@ -328,7 +328,7 @@ const token = tokenFromQuery || tokenFromPath;
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    className="w-full p-4 pr-14 rounded-2xl bg-black/40 border border-white/10 outline-none focus:border-purple-500 transition-all"
+                    className="w-full p-3.5 sm:p-4 pr-14 rounded-2xl bg-black/40 border border-white/10 outline-none focus:border-purple-500 transition-all"
                   />
                   <button
                     type="button"
@@ -348,7 +348,7 @@ const token = tokenFromQuery || tokenFromPath;
               )}
 
               {isLogin && (
-                <div className="flex justify-end mt-3 mb-4">
+                <div className="flex justify-end mt-2 sm:mt-3 mb-2 sm:mb-4">
                   <button
                     type="button"
                     onClick={() => {
@@ -375,7 +375,7 @@ const token = tokenFromQuery || tokenFromPath;
                     : handleResetPassword
                 }
                 disabled={loading}
-                className="w-full mt-5 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 p-4 rounded-2xl font-black text-lg hover:scale-[1.02] transition-all duration-300 shadow-[0_0_30px_rgba(236,72,153,0.25)] disabled:opacity-60 disabled:hover:scale-100"
+                className="w-full mt-3 sm:mt-5 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 p-3.5 sm:p-4 rounded-2xl font-black text-base sm:text-lg hover:scale-[1.02] transition-all duration-300 shadow-[0_0_30px_rgba(236,72,153,0.25)] disabled:opacity-60 disabled:hover:scale-100"
               >
                 {loading
                   ? "Please wait..."
@@ -388,7 +388,7 @@ const token = tokenFromQuery || tokenFromPath;
                   : "Reset Password"}
               </button>
 
-              <p className="text-center text-gray-400 mt-6 text-sm">
+              <p className="text-center text-gray-400 mt-3 sm:mt-6 text-sm">
                 {isLogin && "New to Vybeo?"}
                 {isRegister && "Already have a Vybe Space?"}
                 {(isForgot || isReset) && "Remember your password?"}
@@ -407,7 +407,7 @@ const token = tokenFromQuery || tokenFromPath;
                 </button>
               </p>
 
-              <div className="mt-7 pt-5 border-t border-white/10">
+              <div className="mt-4 sm:mt-7 pt-3 sm:pt-5 border-t border-white/10">
                 <div className="flex items-center justify-center gap-4 text-gray-500 text-xs sm:text-sm flex-wrap">
                   <span>〰️ Flow</span>
                   <span>✦ Drops</span>

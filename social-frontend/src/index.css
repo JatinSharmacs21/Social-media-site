@@ -8,10 +8,38 @@
   box-sizing: border-box;
 }
 
+html {
+  color-scheme: dark;
+}
+
 body {
   background: #0f0f14;
   color: white;
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Dark, thin scrollbar app-wide instead of the default light/white one */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3f3f46 #0f0f14;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #0f0f14;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
 }
 
 a {
