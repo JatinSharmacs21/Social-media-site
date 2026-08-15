@@ -867,7 +867,7 @@ function Navbar() {
               <SectionTitle>Your Vybes</SectionTitle>
               <div className="space-y-2 overflow-hidden">
                 <PanelItem title="Archived vybes" subtitle="Coming soon: restore hidden posts" disabled />
-                <PanelItem title="Saved vybes" subtitle="Coming soon: revisit saved moments" disabled />
+                <PanelItem title="Saved vybes" subtitle="Revisit posts you've bookmarked" onClick={() => go("/saved")} />
               </div>
 
               <SectionTitle>Danger Zone</SectionTitle>

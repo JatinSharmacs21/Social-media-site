@@ -40,6 +40,20 @@ function PostCard({
 }) {
   const isPostOwner = post.user?._id === currentUserId;
   const isSaved = savedPosts.includes(post._id);
+
+  const [showSavedToast, setShowSavedToast] = React.useState(false);
+  const prevSavedRef = React.useRef(isSaved);
+
+  React.useEffect(() => {
+    if (isSaved && !prevSavedRef.current) {
+      setShowSavedToast(true);
+      const timer = setTimeout(() => setShowSavedToast(false), 1800);
+      prevSavedRef.current = isSaved;
+      return () => clearTimeout(timer);
+    }
+    prevSavedRef.current = isSaved;
+  }, [isSaved]);
+
   const postKind = getPostKind(post);
   const mediaList = post.media || [];
   const activeFeedMediaIndex = getFeedMediaIndex(post);
@@ -266,8 +280,8 @@ function PostCard({
           <button
             type="button"
             onClick={() => toggleSavePost(post._id)}
-            className={`rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1.5 transition-all hover:bg-white/[0.07] active:scale-95 ${
-              isSaved ? "text-yellow-400" : "text-gray-100 hover:text-yellow-300"
+            className={`rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1.5 transition-all duration-200 hover:bg-white/[0.07] active:scale-90 ${
+              isSaved ? "text-yellow-400 scale-105" : "text-gray-100 hover:text-yellow-300"
             }`}
             title={isSaved ? "Saved" : "Save"}
           >
@@ -275,11 +289,15 @@ function PostCard({
           </button>
         </div>
 
-        {isSaved && (
-          <p className="mt-2 rounded-2xl border border-yellow-300/10 bg-yellow-400/5 px-3 py-2 text-[11px] font-bold text-yellow-300/90">
-            Saved to your Vybe collection
+        <div
+          className={`overflow-hidden transition-all duration-300 ease-out ${
+            showSavedToast ? "mt-2 max-h-14 opacity-100" : "mt-0 max-h-0 opacity-0"
+          }`}
+        >
+          <p className="flex items-center gap-1.5 rounded-2xl border border-yellow-300/15 bg-yellow-400/10 px-3 py-2 text-[11px] font-bold text-yellow-300">
+            <span>✓</span> Saved to your Vybe collection
           </p>
-        )}
+        </div>
       </footer>
     </article>
   );

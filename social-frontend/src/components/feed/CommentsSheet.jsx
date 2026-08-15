@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useState } from "react";
 import Avatar from "../ui/Avatar";
 import { getReplyKey } from "../../utils/postUtils";
 import { HeartIcon } from "./FeedIcons";
@@ -21,18 +21,55 @@ function CommentsSheet({
   handleCommentLikeWithAnimation,
   heartCommentId,
 }) {
+  const dragState = useRef({ startY: 0, dragging: false });
+  const [dragY, setDragY] = useState(0);
+
   if (!activeCommentsPost) return null;
 
   const comments = activeCommentsPost.comments || [];
   const postOwnerId = activeCommentsPost.user?._id;
 
+  const handleDragStart = (e) => {
+    dragState.current.startY = e.touches[0].clientY;
+    dragState.current.dragging = true;
+  };
+
+  const handleDragMove = (e) => {
+    if (!dragState.current.dragging) return;
+    const delta = e.touches[0].clientY - dragState.current.startY;
+    if (delta > 0) setDragY(delta);
+  };
+
+  const handleDragEnd = () => {
+    if (!dragState.current.dragging) return;
+    dragState.current.dragging = false;
+    if (dragY > 90) {
+      setCommentsSheetPost(null);
+    }
+    setDragY(0);
+  };
+
   return (
     <div onClick={() => setCommentsSheetPost(null)} className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm sm:items-center sm:p-4">
-      <section onClick={(e) => e.stopPropagation()} className="w-full max-h-[86dvh] overflow-hidden rounded-t-[30px] border border-white/10 bg-zinc-950 shadow-2xl shadow-black/70 animate-vybe-sheet sm:max-w-xl sm:rounded-[32px]">
+      <section
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-h-[86dvh] overflow-hidden rounded-t-[30px] border border-white/10 bg-zinc-950 shadow-2xl shadow-black/70 animate-vybe-sheet sm:max-w-xl sm:rounded-[32px]"
+        style={{
+          transform: `translateY(${dragY}px)`,
+          transition: dragY === 0 ? "transform 0.25s ease" : "none",
+        }}
+      >
         <header className="relative overflow-hidden border-b border-white/10 bg-zinc-950/95 p-3.5 backdrop-blur-2xl sm:p-4">
           <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-pink-500/14 blur-3xl" />
           <div className="pointer-events-none absolute -left-16 -bottom-16 h-40 w-40 rounded-full bg-cyan-500/10 blur-3xl" />
-          <div className="relative mx-auto mb-3 h-1.5 w-12 rounded-full bg-white/15 sm:hidden" />
+          <div
+            onTouchStart={handleDragStart}
+            onTouchMove={handleDragMove}
+            onTouchEnd={handleDragEnd}
+            className="relative mx-auto -mt-1 mb-2 flex h-6 w-full cursor-grab items-center justify-center touch-none sm:hidden"
+          >
+            <span className="h-1.5 w-12 rounded-full bg-white/20" />
+          </div>
           <div className="relative flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[10px] font-black tracking-[0.22em] text-pink-300">VYBE REPLIES</p>

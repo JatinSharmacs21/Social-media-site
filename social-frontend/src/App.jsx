@@ -11,6 +11,7 @@ import Search from "./pages/Search";
 import Reels from "./pages/Reels";
 import Notifications from "./pages/Notifications";
 import Whispers from "./pages/Whispers";
+import SavedPosts from "./pages/SavedPosts";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import MainLayout from "./components/MainLayout";
@@ -76,6 +77,17 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <Profile />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/saved"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <SavedPosts />
               </MainLayout>
             </ProtectedRoute>
           }

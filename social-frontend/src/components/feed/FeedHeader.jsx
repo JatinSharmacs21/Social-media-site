@@ -8,7 +8,7 @@ function FeedHeader({
   onDailyDrop,
 }) {
   return (
-    <div className="mb-2.5 sm:mb-6">
+    <div className="pt-2.5 sm:pt-0 mb-2.5 sm:mb-6">
       <div className="hidden sm:flex items-center justify-end gap-3 mb-2 sm:mb-3">
         <button
           type="button"

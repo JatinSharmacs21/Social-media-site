@@ -9,6 +9,8 @@ const {
   searchPosts,
   getPostById,
   toggleLikePost,
+  toggleSavePost,
+  getSavedPosts,
   updatePost,
   deletePost,
   addComment,
@@ -66,11 +68,17 @@ router.get("/user/:userId", optionalAuth, getUserPosts);
 // SEARCH POSTS
 router.get("/search", optionalAuth, searchPosts);
 
+// SAVED POSTS (Vybe collection)
+router.get("/saved/me", protect, getSavedPosts);
+
 // SINGLE POST
 router.get("/:postId", optionalAuth, getPostById);
 
 // LIKE / UNLIKE POST
 router.put("/like/:postId", protect, toggleLikePost);
+
+// SAVE / UNSAVE POST
+router.put("/save/:postId", protect, toggleSavePost);
 
 // UPDATE POST CAPTION
 router.put("/:postId", protect, updatePost);

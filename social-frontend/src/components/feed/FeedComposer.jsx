@@ -53,6 +53,7 @@ function FeedComposer({
   moodChips,
   moodMeta,
   mediaInputMode,
+  setMediaItems,
 }) {
   return (
     <form
@@ -60,13 +61,18 @@ function FeedComposer({
               e.preventDefault();
               if (!loading) createPost();
             }}
-            className={`relative overflow-visible w-full mb-3.5 sm:mb-6 transition-all duration-300 ${
-              composerOpen || hasSelectedMedia || caption.trim()
-                ? `bg-zinc-950/90 border border-white/10 rounded-[22px] sm:rounded-[28px] p-2.5 sm:p-4 shadow-xl shadow-black/30 ${
-                    selectedMood !== "All" ? "shadow-pink-500/10" : ""
+            className={
+              hasSelectedMedia
+                ? "fixed inset-0 z-50 flex flex-col bg-[#050508]"
+                : `relative overflow-visible w-full mb-3.5 sm:mb-6 transition-all duration-300 ${
+                    composerOpen || caption.trim()
+                      ? `bg-zinc-950/90 border border-white/10 rounded-[22px] sm:rounded-[28px] p-2.5 sm:p-4 shadow-xl shadow-black/30 ${
+                          selectedMood !== "All" ? "shadow-pink-500/10" : ""
+                        }`
+                      : ""
                   }`
-                : ""
-            }`}
+            }
+            style={hasSelectedMedia ? { height: "100dvh" } : undefined}
           >
             {!composerOpen && !hasSelectedMedia && !caption.trim() && (
               <button
@@ -92,6 +98,38 @@ function FeedComposer({
 
             {(composerOpen || hasSelectedMedia || caption.trim()) && (
               <>
+            {hasSelectedMedia ? (
+              <div className="shrink-0 flex items-center justify-between gap-2 px-3 sm:px-4 pt-3 pb-2.5 border-b border-white/10 bg-black/40">
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                  {["Thought", "Moment", "Clip"].map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setComposerType(type)}
+                      className={`shrink-0 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full text-xs sm:text-sm font-bold border transition-all ${
+                        composerType === type
+                          ? "bg-gradient-to-r from-pink-500/25 to-cyan-500/20 border-pink-400/30 text-white"
+                          : "bg-white/[0.04] border-white/10 text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMediaItems([]);
+                    setMoodPickerOpen(false);
+                  }}
+                  className="shrink-0 h-9 w-9 grid place-items-center rounded-full border border-white/10 bg-white/5 text-gray-300 hover:text-white hover:bg-white/10 transition-all"
+                  title="Close"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
             <div className="flex items-center justify-between gap-2 mb-2.5 sm:mb-3">
               <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
                 {["Thought", "Moment", "Clip"].map((type) => (
@@ -123,7 +161,9 @@ function FeedComposer({
                 </button>
               )}
             </div>
+            )}
             
+            {!hasSelectedMedia && (
             <div className="flex items-start gap-2.5 sm:gap-3 mb-2.5 sm:mb-3">
   <Avatar
   src={currentUser?.profilePic}
@@ -132,117 +172,86 @@ function FeedComposer({
 />
 
   <div ref={moodPickerRef} className="relative flex-1 min-w-0">
-    {hasSelectedMedia && (
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-[10px] tracking-[0.18em] text-cyan-300 font-black">MEDIA CAPTION</p>
-        <span className="text-[10px] text-gray-500">Shift + Enter for new line</span>
-      </div>
-    )}
-
-    <textarea
-      ref={captionRef}
-      value={caption}
-      onChange={(e) => setCaption(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-          e.preventDefault();
-          if (!loading) createPost();
+      <textarea
+        ref={captionRef}
+        value={caption}
+        onChange={(e) => setCaption(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            if (!loading) createPost();
+          }
+        }}
+        placeholder={
+          composerType === "Thought"
+            ? moodMeta[selectedMood]?.placeholder || "Drop a real thought..."
+            : composerType === "Moment"
+            ? "Say something about this moment..."
+            : "Add a caption to your clip..."
         }
-      }}
-      placeholder={
-        hasSelectedMedia
-          ? isSelectedVideo
-            ? "Write a caption for this clip..."
-            : "Write a caption for this moment..."
-          : composerType === "Thought"
-          ? moodMeta[selectedMood]?.placeholder || "Drop a real thought..."
-          : composerType === "Moment"
-          ? "Say something about this moment..."
-          : "Add a caption to your clip..."
-      }
-      rows={1}
-      className={`w-full min-w-0 overflow-y-auto no-scrollbar border outline-none transition-all text-white placeholder:text-gray-400 resize-none leading-6 ${
-        hasSelectedMedia
-          ? "bg-black/35 border-cyan-400/15 rounded-[22px] px-4 py-3 pr-4 focus:border-cyan-400/40 focus:bg-black/45 shadow-inner shadow-black/30"
-          : "bg-white/5 border-white/10 rounded-2xl px-4 py-3 pr-24 focus:border-pink-500 focus:bg-white/[0.07]"
-      }`}
-      style={{ minHeight: hasSelectedMedia ? "50px" : "52px", maxHeight: "170px" }}
-    />
+        rows={1}
+        className="w-full min-w-0 overflow-y-auto no-scrollbar border outline-none transition-all text-white placeholder:text-gray-400 resize-none leading-6 bg-white/5 border-white/10 rounded-2xl px-4 py-3 pr-24 focus:border-pink-500 focus:bg-white/[0.07]"
+        style={{ minHeight: "52px", maxHeight: "170px" }}
+      />
 
-    <button
-      type="button"
-      onClick={() => setMoodPickerOpen((prev) => !prev)}
-      className={`${hasSelectedMedia ? "hidden" : "absolute"} right-2 top-2 h-9 px-3 rounded-xl border text-xs font-black transition-all ${
-        selectedMood !== "All"
-          ? `bg-gradient-to-r ${moodMeta[selectedMood]?.style} border-white/20 text-white`
-          : "bg-black/40 border-white/10 text-gray-400 hover:text-white hover:bg-white/10"
-      }`}
-    >
-      <span className="mr-1">{moodMeta[selectedMood]?.icon}</span>
-      {selectedMood === "All" ? "Mood" : selectedMood}
-    </button>
+      <button
+        type="button"
+        onClick={() => setMoodPickerOpen((prev) => !prev)}
+        className={`absolute right-2 top-2 h-9 px-3 rounded-xl border text-xs font-black transition-all ${
+          selectedMood !== "All"
+            ? `bg-gradient-to-r ${moodMeta[selectedMood]?.style} border-white/20 text-white`
+            : "bg-black/40 border-white/10 text-gray-400 hover:text-white hover:bg-white/10"
+        }`}
+      >
+        <span className="mr-1">{moodMeta[selectedMood]?.icon}</span>
+        {selectedMood === "All" ? "Mood" : selectedMood}
+      </button>
 
-    {hasSelectedMedia && (
-      <div className="mt-2 flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/[0.035] px-3 py-2">
-        <span className="text-[10px] font-black tracking-[0.18em] text-gray-500">MOOD</span>
-        <button
-          type="button"
-          onClick={() => setMoodPickerOpen((prev) => !prev)}
-          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-black transition-all ${
-            selectedMood !== "All"
-              ? `bg-gradient-to-r ${moodMeta[selectedMood]?.style} border-white/20 text-white`
-              : "bg-black/35 border-white/10 text-gray-400 hover:text-white"
-          }`}
-        >
-          <span>{moodMeta[selectedMood]?.icon}</span>
-          {selectedMood === "All" ? "Choose mood" : selectedMood}
-        </button>
-      </div>
-    )}
+      {moodPickerOpen && (
+        <div className="absolute right-0 top-12 z-30 w-[260px] rounded-3xl border border-white/10 bg-zinc-950/95 backdrop-blur-2xl shadow-2xl shadow-black/50 p-3">
+          <div className="flex items-center justify-between mb-3 px-1">
+            <p className="text-[10px] tracking-[0.2em] text-pink-300 font-black">
+              SELECT VYBE
+            </p>
 
-    {moodPickerOpen && (
-      <div className={`absolute right-0 ${hasSelectedMedia ? "top-[124px]" : "top-12"} z-30 w-[260px] rounded-3xl border border-white/10 bg-zinc-950/95 backdrop-blur-2xl shadow-2xl shadow-black/50 p-3`}>
-        <div className="flex items-center justify-between mb-3 px-1">
-          <p className="text-[10px] tracking-[0.2em] text-pink-300 font-black">
-            SELECT VYBE
-          </p>
-
-          <button
-            type="button"
-            onClick={() => setMoodPickerOpen(false)}
-            className="text-gray-500 hover:text-white text-sm"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          {moodChips.map((mood) => (
             <button
-              key={mood}
               type="button"
-              onClick={() => {
-                setSelectedMood(mood);
-                setMoodPickerOpen(false);
-              }}
-              className={`px-3 py-2.5 rounded-2xl border text-sm font-bold text-left transition-all ${
-                selectedMood === mood
-                  ? `bg-gradient-to-r ${moodMeta[mood]?.style} border-white/20 text-white`
-                  : "bg-white/[0.035] border-white/10 text-gray-400 hover:text-white hover:bg-white/[0.07]"
-              }`}
+              onClick={() => setMoodPickerOpen(false)}
+              className="text-gray-500 hover:text-white text-sm"
             >
-              <span className="mr-1">{moodMeta[mood]?.icon}</span>
-              {mood}
+              ✕
             </button>
-          ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            {moodChips.map((mood) => (
+              <button
+                key={mood}
+                type="button"
+                onClick={() => {
+                  setSelectedMood(mood);
+                  setMoodPickerOpen(false);
+                }}
+                className={`px-3 py-2.5 rounded-2xl border text-sm font-bold text-left transition-all ${
+                  selectedMood === mood
+                    ? `bg-gradient-to-r ${moodMeta[mood]?.style} border-white/20 text-white`
+                    : "bg-white/[0.035] border-white/10 text-gray-400 hover:text-white hover:bg-white/[0.07]"
+                }`}
+              >
+                <span className="mr-1">{moodMeta[mood]?.icon}</span>
+                {mood}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
-    )}
-  </div>
+      )}
+    </div>
 </div>
+            )}
 
             <MediaComposerPreview
               hasSelectedMedia={hasSelectedMedia}
+              fullScreen={hasSelectedMedia}
               uploadError={uploadError}
               mediaItems={mediaItems}
               isSelectedVideo={isSelectedVideo}
@@ -274,6 +283,18 @@ function FeedComposer({
               setMediaZoom={setMediaZoom}
               mediaFilter={mediaFilter}
               setMediaFilter={setMediaFilter}
+              caption={caption}
+              setCaption={setCaption}
+              captionRef={captionRef}
+              createPost={createPost}
+              selectedMood={selectedMood}
+              setSelectedMood={setSelectedMood}
+              moodPickerOpen={moodPickerOpen}
+              setMoodPickerOpen={setMoodPickerOpen}
+              moodPickerRef={moodPickerRef}
+              moodChips={moodChips}
+              moodMeta={moodMeta}
+              currentUser={currentUser}
             />
 
             <input
@@ -284,6 +305,22 @@ function FeedComposer({
               onChange={handleFileChange}
               className="hidden"
             />
+
+            {hasSelectedMedia ? (
+              <div className="shrink-0 px-3 sm:px-4 py-3 border-t border-white/10 bg-black/40">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 px-7 py-3 sm:py-3.5 rounded-2xl font-black hover:scale-[1.01] transition-all shadow-lg shadow-pink-500/15 disabled:opacity-60 disabled:hover:scale-100"
+                >
+                  {loading
+                    ? "Preparing media..."
+                    : composerType === "Clip"
+                    ? "Drop Clip"
+                    : "Drop Moment"}
+                </button>
+              </div>
+            ) : (
             <div className="flex items-center justify-between gap-3 flex-wrap">
               {!hasSelectedMedia && (
                 <button
@@ -304,9 +341,7 @@ function FeedComposer({
                 className="w-full sm:w-auto sm:ml-auto bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 px-7 py-2.5 sm:py-3 rounded-2xl font-black hover:scale-[1.02] transition-all shadow-lg shadow-pink-500/15 disabled:opacity-60 disabled:hover:scale-100"
               >
                 {loading
-                  ? hasSelectedMedia
-                    ? "Preparing media..."
-                    : "Dropping..."
+                  ? "Dropping..."
                   : composerType === "Thought"
                   ? "Drop Thought"
                   : composerType === "Moment"
@@ -314,6 +349,7 @@ function FeedComposer({
                   : "Drop Clip"}
               </button>
             </div>
+            )}
                         </>
             )}
     </form>

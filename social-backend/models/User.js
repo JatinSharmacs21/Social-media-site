@@ -109,6 +109,14 @@ const userSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+
+    // Posts this user has bookmarked to their private Vybe collection.
+    savedPosts: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Post",
+      },
+    ],
   },
   {
     timestamps: true,

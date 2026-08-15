@@ -129,13 +129,22 @@ function Feed() {
   const [heartPostId, setHeartPostId] = useState(null);
   const [heartCommentId, setHeartCommentId] = useState(null);
 
-  const [savedPosts, setSavedPosts] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("savedPosts") || "[]");
-    } catch {
-      return [];
-    }
-  });
+  const [savedPosts, setSavedPosts] = useState([]);
+
+  useEffect(() => {
+    const fetchSavedPostIds = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+        const res = await API.get("/api/posts/saved/me");
+        setSavedPosts((res.data || []).map((post) => post._id));
+      } catch (error) {
+        logger.error("Failed to load saved posts:", error.response?.data || error);
+      }
+    };
+
+    fetchSavedPostIds();
+  }, []);
 
   const [sharePost, setSharePost] = useState(null);
   const [copiedShare, setCopiedShare] = useState(false);
@@ -355,15 +364,21 @@ useEffect(() => {
     }
   };
 
-  const toggleSavePost = (postId) => {
-    setSavedPosts((prev) => {
-      const updated = prev.includes(postId)
-        ? prev.filter((id) => id !== postId)
-        : [...prev, postId];
+  const toggleSavePost = async (postId) => {
+    const wasSaved = savedPosts.includes(postId);
 
-      localStorage.setItem("savedPosts", JSON.stringify(updated));
-      return updated;
-    });
+    setSavedPosts((prev) =>
+      wasSaved ? prev.filter((id) => id !== postId) : [postId, ...prev]
+    );
+
+    try {
+      await API.put(`/api/posts/save/${postId}`);
+    } catch (error) {
+      logger.error("Failed to save/unsave post:", error.response?.data || error);
+      setSavedPosts((prev) =>
+        wasSaved ? [postId, ...prev] : prev.filter((id) => id !== postId)
+      );
+    }
   };
 
   const markMediaLoaded = (item) => {
@@ -612,6 +627,7 @@ useEffect(() => {
             composerOpen={composerOpen}
             setComposerOpen={setComposerOpen}
             hasSelectedMedia={hasSelectedMedia}
+            setMediaItems={setMediaItems}
             caption={caption}
             setCaption={setCaption}
             currentUser={currentUser}

@@ -800,6 +800,62 @@ res.json(updatedPost);
   }
 };
 
+const toggleSavePost = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const { postId } = req.params;
+
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const alreadySaved = user.savedPosts.some(
+      (id) => id.toString() === postId.toString()
+    );
+
+    if (alreadySaved) {
+      user.savedPosts = user.savedPosts.filter(
+        (id) => id.toString() !== postId.toString()
+      );
+    } else {
+      user.savedPosts.unshift(postId);
+    }
+
+    await user.save();
+
+    res.json({ saved: !alreadySaved, savedPosts: user.savedPosts });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getSavedPosts = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const user = await User.findById(userId).select("savedPosts");
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const posts = await Post.find({ _id: { $in: user.savedPosts } })
+      .populate("user", "name username profilePic")
+      .populate("likes", "name username profilePic")
+      .populate("comments.user", "name username profilePic")
+      .populate("comments.likes", "name username profilePic")
+      .populate("comments.replies.user", "name username profilePic");
+
+    const orderedPosts = user.savedPosts
+      .map((id) => posts.find((post) => post._id.toString() === id.toString()))
+      .filter(Boolean);
+
+    res.json(orderedPosts);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 const updatePost = async (req, res) => {
   try {
     const userId = getUserId(req);
@@ -1205,6 +1261,8 @@ module.exports = {
   searchPosts,
   getPostById,
   toggleLikePost,
+  toggleSavePost,
+  getSavedPosts,
   updatePost,
   deletePost,
   addComment,
