@@ -59,14 +59,18 @@ function CommentsSheet({
           transition: dragY === 0 ? "transform 0.25s ease" : "none",
         }}
       >
-        <header className="relative overflow-hidden border-b border-white/10 bg-zinc-950/95 p-3.5 backdrop-blur-2xl sm:p-4">
+        <header
+          className="relative overflow-hidden border-b border-white/10 bg-zinc-950/95 p-3.5 backdrop-blur-2xl sm:p-4"
+        >
           <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-pink-500/14 blur-3xl" />
           <div className="pointer-events-none absolute -left-16 -bottom-16 h-40 w-40 rounded-full bg-cyan-500/10 blur-3xl" />
           <div
             onTouchStart={handleDragStart}
             onTouchMove={handleDragMove}
             onTouchEnd={handleDragEnd}
-            className="relative mx-auto -mt-1 mb-2 flex h-6 w-full cursor-grab items-center justify-center touch-none sm:hidden"
+            onTouchCancel={handleDragEnd}
+            className="relative -mt-2 mb-1 flex h-8 w-full cursor-grab items-center justify-center sm:hidden"
+            style={{ touchAction: "none" }}
           >
             <span className="h-1.5 w-12 rounded-full bg-white/20" />
           </div>

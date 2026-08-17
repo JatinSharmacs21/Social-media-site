@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom";
 import API from "../services/api";
 import logger from "../utils/logger";
+import ShareModal from "../components/feed/ShareModal";
+import { HeartIcon, CommentIcon, ShareIcon, BookmarkIcon } from "../components/feed/FeedIcons";
 
 function Profile() {
   const { userId: profileIdentifier } = useParams();
@@ -29,6 +31,9 @@ function Profile() {
   const [listSearch, setListSearch] = useState("");
 
   const [selectedPost, setSelectedPost] = useState(null);
+  const [savedPosts, setSavedPosts] = useState([]);
+  const [sharePost, setSharePost] = useState(null);
+  const [copiedShare, setCopiedShare] = useState(false);
   const [profilePicOpen, setProfilePicOpen] = useState(false);
   const [animateLike, setAnimateLike] = useState(false);
   const [commentText, setCommentText] = useState("");
@@ -202,6 +207,71 @@ function Profile() {
   useEffect(() => {
     fetchProfileAndPosts();
   }, [fetchProfileAndPosts]);
+
+  useEffect(() => {
+    const fetchSavedPostIds = async () => {
+      try {
+        if (!token) return;
+        const res = await API.get("/api/posts/saved/me");
+        setSavedPosts((res.data || []).map((post) => post._id));
+      } catch (err) {
+        logger.error("Failed to load saved posts:", err.response?.data || err);
+      }
+    };
+
+    fetchSavedPostIds();
+  }, [token]);
+
+  const toggleSavePost = async (postId) => {
+    const wasSaved = savedPosts.includes(postId);
+
+    setSavedPosts((prev) =>
+      wasSaved ? prev.filter((id) => id !== postId) : [postId, ...prev]
+    );
+
+    try {
+      await API.put(`/api/posts/save/${postId}`);
+    } catch (err) {
+      logger.error("Failed to save/unsave post:", err.response?.data || err);
+      setSavedPosts((prev) =>
+        wasSaved ? [postId, ...prev] : prev.filter((id) => id !== postId)
+      );
+    }
+  };
+
+  const getPostShareUrl = (postId) => `${window.location.origin}/post/${postId}`;
+
+  const copyShareLink = async () => {
+    if (!sharePost?._id) return;
+
+    try {
+      await navigator.clipboard.writeText(getPostShareUrl(sharePost._id));
+      setCopiedShare(true);
+      setTimeout(() => setCopiedShare(false), 1500);
+    } catch (err) {
+      logger.error("Copy failed:", err);
+    }
+  };
+
+  const nativeSharePost = async () => {
+    if (!sharePost?._id) return;
+
+    const shareData = {
+      title: "Check this post on Vybeo",
+      text: sharePost.caption || sharePost.content || "Vybeo vybe",
+      url: getPostShareUrl(sharePost._id),
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await copyShareLink();
+      }
+    } catch (err) {
+      logger.error("Share cancelled or failed:", err);
+    }
+  };
 
   useEffect(() => {
     if (!profileMenuOpen) return undefined;
@@ -1237,6 +1307,20 @@ function Profile() {
           isPostOwner={isPostOwner(selectedPost)}
           onEditPost={openEditPost}
           onDeletePost={requestDeletePost}
+          savedPosts={savedPosts}
+          toggleSavePost={toggleSavePost}
+          setSharePost={setSharePost}
+        />
+      )}
+
+      {sharePost && (
+        <ShareModal
+          post={sharePost}
+          copiedShare={copiedShare}
+          getPostShareUrl={getPostShareUrl}
+          copyShareLink={copyShareLink}
+          nativeSharePost={nativeSharePost}
+          onClose={() => setSharePost(null)}
         />
       )}
 
@@ -1355,6 +1439,9 @@ function PostModal({
   isPostOwner,
   onEditPost,
   onDeletePost,
+  savedPosts,
+  toggleSavePost,
+  setSharePost,
 }) {
   const [muted, setMuted] = useState(true);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
@@ -1372,7 +1459,21 @@ function PostModal({
   const isImage = type.includes("image") || lowerUrl.endsWith(".jpg") || lowerUrl.endsWith(".jpeg") || lowerUrl.endsWith(".png") || lowerUrl.endsWith(".webp") || lowerUrl.endsWith(".gif");
   const isThought = mediaItems.length === 0;
   const liked = selectedPost.likes?.some((like) => like?._id === currentUserId || like === currentUserId);
+  const isSaved = savedPosts.includes(selectedPost._id);
   const headerTitle = isReel ? "Clip" : isImage ? "Moment" : "Thought";
+
+  const [showSavedToast, setShowSavedToast] = useState(false);
+  const prevSavedRef = useRef(isSaved);
+
+  useEffect(() => {
+    if (isSaved && !prevSavedRef.current) {
+      setShowSavedToast(true);
+      const timer = setTimeout(() => setShowSavedToast(false), 1800);
+      prevSavedRef.current = isSaved;
+      return () => clearTimeout(timer);
+    }
+    prevSavedRef.current = isSaved;
+  }, [isSaved]);
 
   useEffect(() => {
     setActiveMediaIndex(0);
@@ -1534,14 +1635,14 @@ function PostModal({
           </button>
         </div>
 
-        <div className={`${isReel ? "grid lg:grid-cols-[minmax(320px,460px)_1fr]" : "grid lg:grid-cols-2"} h-[calc(96dvh-58px)] sm:h-full`}>
+        <div className={`flex flex-col lg:grid ${isReel ? "lg:grid-cols-[minmax(320px,460px)_1fr]" : "lg:grid-cols-2"} h-[calc(96dvh-58px)] sm:h-full`}>
           <div
             onClick={handleMediaClick}
             onDoubleClick={handleMediaDoubleClick}
             className={`relative flex cursor-pointer select-none items-center justify-center overflow-hidden bg-black ${
               isReel
                 ? "h-[58dvh] sm:h-[92vh] lg:h-[92vh]"
-                : "h-[52dvh] sm:min-h-[420px] lg:h-auto lg:min-h-[620px] lg:max-h-[88vh]"
+                : "flex-1 min-h-[220px] sm:min-h-[420px] lg:h-auto lg:min-h-[620px] lg:max-h-[88vh]"
             }`}
           >
             {animateLike && (
@@ -1625,7 +1726,7 @@ function PostModal({
             )}
           </div>
 
-          <div className={`flex min-h-0 flex-col bg-[linear-gradient(180deg,rgba(9,9,11,0.98),rgba(14,10,16,0.98))] ${isReel ? "h-[calc(38dvh-58px)] lg:h-[92vh]" : "h-[calc(42dvh-58px)] lg:h-[88vh]"}`}>
+          <div className={`flex min-h-0 shrink-0 flex-col bg-[linear-gradient(180deg,rgba(9,9,11,0.98),rgba(14,10,16,0.98))] ${isReel ? "h-[calc(38dvh-58px)] lg:h-[92vh]" : "max-h-[42dvh] lg:h-[88vh] lg:max-h-none"}`}>
             <div className="flex items-center gap-3 border-b border-white/10 bg-zinc-950/95 p-3.5 sm:p-5">
               <button onClick={() => selectedPost.user?._id && openUserProfile(selectedPost.user._id)}>
                 <img src={avatarUrl(selectedPost.user || user)} alt="" className="h-11 w-11 rounded-full object-cover ring-1 ring-white/10" />
@@ -1654,20 +1755,60 @@ function PostModal({
                 </p>
               )}
 
-              <div className="mb-4 flex items-center justify-between rounded-[22px] border border-white/10 bg-black/30 px-3 py-2 text-xs font-black text-slate-300 shadow-inner shadow-white/5">
+              <div className="mb-4 flex flex-wrap items-center gap-2 rounded-[22px] border border-white/10 bg-black/30 px-3 py-2.5 text-xs font-black text-slate-300 shadow-inner shadow-white/5">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => likePost(selectedPost._id)}
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1.5 transition-all active:scale-90 ${
+                      liked ? "text-pink-400" : "text-gray-100 hover:text-pink-300"
+                    }`}
+                  >
+                    <HeartIcon filled={liked} />
+                    <span>{formatCount(selectedPost.likes?.length || 0)}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCommentsOpen((open) => !open)}
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1.5 transition-all active:scale-90 ${
+                      commentsOpen ? "text-cyan-200" : "text-gray-100 hover:text-white"
+                    }`}
+                  >
+                    <CommentIcon />
+                    <span>{formatCount(selectedPost.comments?.length || 0)}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSharePost(selectedPost)}
+                    className="shrink-0 rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1.5 text-gray-100 transition-all hover:bg-white/[0.07] active:scale-90"
+                    title="Share"
+                  >
+                    <ShareIcon />
+                  </button>
+                </div>
+
                 <button
-                  onClick={() => likePost(selectedPost._id)}
-                  className={`inline-flex items-center gap-2 rounded-full px-2 py-1 transition active:scale-95 ${liked ? "text-pink-200" : "text-slate-300 hover:text-white"}`}
+                  type="button"
+                  onClick={() => toggleSavePost(selectedPost._id)}
+                  className={`ml-auto shrink-0 rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1.5 transition-all duration-200 hover:bg-white/[0.07] active:scale-90 ${
+                    isSaved ? "text-yellow-400 scale-105" : "text-gray-100 hover:text-yellow-300"
+                  }`}
+                  title={isSaved ? "Saved" : "Save"}
                 >
-                  <span className="text-lg">{liked ? "❤️" : "🤍"}</span>
-                  {formatCount(selectedPost.likes?.length || 0)} felt
+                  <BookmarkIcon saved={isSaved} />
                 </button>
-                <button
-                  onClick={() => setCommentsOpen((open) => !open)}
-                  className={`inline-flex items-center gap-1 rounded-full px-2 py-1 transition active:scale-95 ${commentsOpen ? "text-pink-100" : "text-slate-300 hover:text-white"}`}
-                >
-                  ↩ {formatCount(selectedPost.comments?.length || 0)} replies
-                </button>
+              </div>
+
+              <div
+                className={`overflow-hidden transition-all duration-300 ease-out ${
+                  showSavedToast ? "mb-4 max-h-14 opacity-100" : "mb-0 max-h-0 opacity-0"
+                }`}
+              >
+                <p className="flex items-center gap-1.5 rounded-2xl border border-yellow-300/15 bg-yellow-400/10 px-3 py-2 text-[11px] font-bold text-yellow-300">
+                  <span>✓</span> Saved to your Vybe collection
+                </p>
               </div>
 
               {commentsOpen ? (
