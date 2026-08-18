@@ -21,7 +21,8 @@ function CommentsSheet({
   handleCommentLikeWithAnimation,
   heartCommentId,
 }) {
-  const dragState = useRef({ startY: 0, dragging: false });
+  const dragState = useRef({ startY: 0, dragging: false, currentY: 0 });
+  const sectionRef = useRef(null);
   const [dragY, setDragY] = useState(0);
   const [mounted, setMounted] = useState(false);
   const lastPostIdRef = useRef(null);
@@ -47,19 +48,36 @@ function CommentsSheet({
   const handleDragStart = (e) => {
     dragState.current.startY = e.touches[0].clientY;
     dragState.current.dragging = true;
+    dragState.current.currentY = 0;
+    if (sectionRef.current) {
+      sectionRef.current.style.transition = "none";
+    }
   };
 
   const handleDragMove = (e) => {
     if (!dragState.current.dragging) return;
     const delta = e.touches[0].clientY - dragState.current.startY;
-    if (delta > 0) setDragY(delta);
+    const clamped = delta > 0 ? delta : 0;
+    dragState.current.currentY = clamped;
+    if (sectionRef.current) {
+      sectionRef.current.style.transform = `translateY(${clamped}px)`;
+    }
   };
 
   const handleDragEnd = () => {
     if (!dragState.current.dragging) return;
     dragState.current.dragging = false;
-    if (dragY > 90) {
+    const finalY = dragState.current.currentY;
+    dragState.current.currentY = 0;
+
+    if (finalY > 90) {
       setCommentsSheetPost(null);
+      return;
+    }
+
+    if (sectionRef.current) {
+      sectionRef.current.style.transition = "transform 0.3s cubic-bezier(0.22,1,0.36,1)";
+      sectionRef.current.style.transform = "translateY(0px)";
     }
     setDragY(0);
   };
@@ -67,15 +85,14 @@ function CommentsSheet({
   return (
     <div onClick={() => setCommentsSheetPost(null)} className="fixed inset-0 z-[110] flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm sm:items-center sm:p-4">
       <section
+        ref={sectionRef}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-h-[86dvh] overflow-hidden rounded-t-[30px] border border-white/10 bg-zinc-950 shadow-2xl shadow-black/70 sm:max-w-xl sm:rounded-[32px]"
         style={{
           transform: `translateY(${mounted ? dragY : 24}px)`,
           opacity: mounted ? 1 : 0,
-          transition:
-            dragY === 0
-              ? "transform 0.28s cubic-bezier(0.22,1,0.36,1), opacity 0.28s ease"
-              : "none",
+          transition: "transform 0.3s cubic-bezier(0.22,1,0.36,1), opacity 0.3s ease",
+          willChange: "transform",
         }}
       >
         <header
