@@ -161,7 +161,7 @@ function ShareModal({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-[110] flex items-end justify-center bg-black/70 p-3 backdrop-blur-sm sm:items-center"
     >
       <div
         onClick={(e) => e.stopPropagation()}

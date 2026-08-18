@@ -7,7 +7,7 @@ function LikesModal({ post, onClose }) {
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3"
+      className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3"
     >
       <div
         onClick={(e) => e.stopPropagation()}

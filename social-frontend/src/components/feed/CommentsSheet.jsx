@@ -23,6 +23,21 @@ function CommentsSheet({
 }) {
   const dragState = useRef({ startY: 0, dragging: false });
   const [dragY, setDragY] = useState(0);
+  const [mounted, setMounted] = useState(false);
+  const lastPostIdRef = useRef(null);
+
+  React.useEffect(() => {
+    if (activeCommentsPost && activeCommentsPost._id !== lastPostIdRef.current) {
+      lastPostIdRef.current = activeCommentsPost._id;
+      setMounted(false);
+      setDragY(0);
+      const raf = requestAnimationFrame(() => setMounted(true));
+      return () => cancelAnimationFrame(raf);
+    }
+    if (!activeCommentsPost) {
+      lastPostIdRef.current = null;
+    }
+  }, [activeCommentsPost]);
 
   if (!activeCommentsPost) return null;
 
@@ -50,13 +65,17 @@ function CommentsSheet({
   };
 
   return (
-    <div onClick={() => setCommentsSheetPost(null)} className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+    <div onClick={() => setCommentsSheetPost(null)} className="fixed inset-0 z-[110] flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm sm:items-center sm:p-4">
       <section
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-h-[86dvh] overflow-hidden rounded-t-[30px] border border-white/10 bg-zinc-950 shadow-2xl shadow-black/70 animate-vybe-sheet sm:max-w-xl sm:rounded-[32px]"
+        className="w-full max-h-[86dvh] overflow-hidden rounded-t-[30px] border border-white/10 bg-zinc-950 shadow-2xl shadow-black/70 sm:max-w-xl sm:rounded-[32px]"
         style={{
-          transform: `translateY(${dragY}px)`,
-          transition: dragY === 0 ? "transform 0.25s ease" : "none",
+          transform: `translateY(${mounted ? dragY : 24}px)`,
+          opacity: mounted ? 1 : 0,
+          transition:
+            dragY === 0
+              ? "transform 0.28s cubic-bezier(0.22,1,0.36,1), opacity 0.28s ease"
+              : "none",
         }}
       >
         <header

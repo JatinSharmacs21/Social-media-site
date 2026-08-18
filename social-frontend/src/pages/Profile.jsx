@@ -3,7 +3,10 @@ import { useNavigate, useParams } from "react-router-dom";
 import API from "../services/api";
 import logger from "../utils/logger";
 import ShareModal from "../components/feed/ShareModal";
+import CommentsSheet from "../components/feed/CommentsSheet";
+import LikesModal from "../components/feed/LikesModal";
 import { HeartIcon, CommentIcon, ShareIcon, BookmarkIcon } from "../components/feed/FeedIcons";
+import { getReplyKey } from "../utils/postUtils";
 
 function Profile() {
   const { userId: profileIdentifier } = useParams();
@@ -34,6 +37,12 @@ function Profile() {
   const [savedPosts, setSavedPosts] = useState([]);
   const [sharePost, setSharePost] = useState(null);
   const [copiedShare, setCopiedShare] = useState(false);
+  const [commentsSheetPost, setCommentsSheetPost] = useState(null);
+  const [likesModalPost, setLikesModalPost] = useState(null);
+  const [sheetCommentText, setSheetCommentText] = useState({});
+  const [replyingTo, setReplyingTo] = useState({});
+  const [replyText, setReplyText] = useState({});
+  const [heartCommentId, setHeartCommentId] = useState(null);
   const [profilePicOpen, setProfilePicOpen] = useState(false);
   const [animateLike, setAnimateLike] = useState(false);
   const [commentText, setCommentText] = useState("");
@@ -286,6 +295,8 @@ function Profile() {
 
     setPosts((prev) => prev.map((post) => (post._id === updatedPost._id ? updatedPost : post)));
     setSelectedPost((prev) => (prev?._id === updatedPost._id ? updatedPost : prev));
+    setCommentsSheetPost((prev) => (prev?._id === updatedPost._id ? updatedPost : prev));
+    setLikesModalPost((prev) => (prev?._id === updatedPost._id ? updatedPost : prev));
   };
 
   const patchPostEverywhere = (postId, updater) => {
@@ -300,6 +311,20 @@ function Profile() {
     );
 
     setSelectedPost((prev) => {
+      if (!prev || prev._id !== postId) return prev;
+      const nextPost = updater(prev);
+      patchedPost = nextPost;
+      return nextPost;
+    });
+
+    setCommentsSheetPost((prev) => {
+      if (!prev || prev._id !== postId) return prev;
+      const nextPost = updater(prev);
+      patchedPost = nextPost;
+      return nextPost;
+    });
+
+    setLikesModalPost((prev) => {
       if (!prev || prev._id !== postId) return prev;
       const nextPost = updater(prev);
       patchedPost = nextPost;
@@ -527,6 +552,144 @@ function Profile() {
     }
   };
 
+  const addCommentToSheet = async (postId) => {
+    const text = (sheetCommentText[postId] || "").trim();
+    if (!text) return;
+
+    const previousPost = commentsSheetPost?._id === postId
+      ? commentsSheetPost
+      : posts.find((post) => post._id === postId);
+
+    const tempComment = {
+      _id: `temp-comment-${Date.now()}`,
+      text,
+      user: currentActor || { _id: currentUserId, name: "You" },
+      likes: [],
+      replies: [],
+      createdAt: new Date().toISOString(),
+      isTemp: true,
+    };
+
+    patchPostEverywhere(postId, (post) => ({
+      ...post,
+      comments: [...(post.comments || []), tempComment],
+    }));
+
+    setSheetCommentText((prev) => ({ ...prev, [postId]: "" }));
+
+    try {
+      const res = await API.post(`/api/posts/comment/${postId}`, { text }, authConfig);
+      updatePostInState(res.data);
+    } catch (err) {
+      logger.error(err.response?.data || err);
+      if (previousPost) updatePostInState(previousPost);
+      setSheetCommentText((prev) => ({ ...prev, [postId]: text }));
+    }
+  };
+
+  const likeComment = async (postId, commentId) => {
+    const previousPost = commentsSheetPost?._id === postId
+      ? commentsSheetPost
+      : posts.find((post) => post._id === postId);
+
+    patchPostEverywhere(postId, (post) => ({
+      ...post,
+      comments: (post.comments || []).map((comment) => {
+        if (comment._id !== commentId) return comment;
+
+        const alreadyLiked = (comment.likes || []).some((like) =>
+          typeof like === "string" ? like === currentUserId : like?._id === currentUserId
+        );
+
+        return {
+          ...comment,
+          likes: alreadyLiked
+            ? (comment.likes || []).filter((like) =>
+                typeof like === "string" ? like !== currentUserId : like?._id !== currentUserId
+              )
+            : [...(comment.likes || []), currentActor || { _id: currentUserId, name: "You" }],
+        };
+      }),
+    }));
+
+    try {
+      const res = await API.put(`/api/posts/comment/like/${postId}/${commentId}`, {}, authConfig);
+      updatePostInState(res.data);
+    } catch (err) {
+      logger.error(err.response?.data || err);
+      if (previousPost) updatePostInState(previousPost);
+    }
+  };
+
+  const handleCommentLikeWithAnimation = (postId, commentId) => {
+    likeComment(postId, commentId);
+    setHeartCommentId(commentId);
+    setTimeout(() => setHeartCommentId(null), 800);
+  };
+
+  const addReply = async (postId, commentId) => {
+    const key = getReplyKey(postId, commentId);
+    const text = (replyText[key] || "").trim();
+    if (!text) return;
+
+    const previousPost = commentsSheetPost?._id === postId
+      ? commentsSheetPost
+      : posts.find((post) => post._id === postId);
+
+    const tempReply = {
+      _id: `temp-reply-${Date.now()}`,
+      text,
+      user: currentActor || { _id: currentUserId, name: "You" },
+      likes: [],
+      createdAt: new Date().toISOString(),
+      isTemp: true,
+    };
+
+    patchPostEverywhere(postId, (post) => ({
+      ...post,
+      comments: (post.comments || []).map((comment) =>
+        comment._id === commentId
+          ? { ...comment, replies: [...(comment.replies || []), tempReply] }
+          : comment
+      ),
+    }));
+
+    setReplyText((prev) => ({ ...prev, [key]: "" }));
+    setReplyingTo((prev) => ({ ...prev, [key]: false }));
+
+    try {
+      const res = await API.post(`/api/posts/comment/reply/${postId}/${commentId}`, { text }, authConfig);
+      updatePostInState(res.data);
+    } catch (err) {
+      logger.error(err.response?.data || err);
+      if (previousPost) updatePostInState(previousPost);
+      setReplyText((prev) => ({ ...prev, [key]: text }));
+    }
+  };
+
+  const deleteReply = async (postId, commentId, replyId) => {
+    const previousPost = commentsSheetPost?._id === postId
+      ? commentsSheetPost
+      : posts.find((post) => post._id === postId);
+
+    patchPostEverywhere(postId, (post) => ({
+      ...post,
+      comments: (post.comments || []).map((comment) =>
+        comment._id === commentId
+          ? { ...comment, replies: (comment.replies || []).filter((reply) => reply._id !== replyId) }
+          : comment
+      ),
+    }));
+
+    try {
+      const res = await API.delete(`/api/posts/comment/reply/${postId}/${commentId}/${replyId}`, authConfig);
+      updatePostInState(res.data);
+    } catch (err) {
+      logger.error(err.response?.data || err);
+      if (previousPost) updatePostInState(previousPost);
+    }
+  };
+
   const isPostOwner = (post) => {
     const ownerId = post?.user?._id || post?.user || user?._id;
     return String(ownerId || "") === String(currentUserId || "");
@@ -626,6 +789,8 @@ function Profile() {
     setListModal(null);
     setListSearch("");
     setSelectedPost(null);
+    setCommentsSheetPost(null);
+    setLikesModalPost(null);
     const targetUser = [...(user?.followers || []), ...(user?.following || []), selectedPost?.user].find(
       (person) => person?._id === id
     );
@@ -1310,6 +1475,8 @@ function Profile() {
           savedPosts={savedPosts}
           toggleSavePost={toggleSavePost}
           setSharePost={setSharePost}
+          setCommentsSheetPost={setCommentsSheetPost}
+          setLikesModalPost={setLikesModalPost}
         />
       )}
 
@@ -1323,6 +1490,27 @@ function Profile() {
           onClose={() => setSharePost(null)}
         />
       )}
+
+      <CommentsSheet
+        activeCommentsPost={commentsSheetPost}
+        setCommentsSheetPost={setCommentsSheetPost}
+        currentUserId={currentUserId}
+        openUserProfile={openUserProfile}
+        deleteComment={deleteComment}
+        addComment={addCommentToSheet}
+        commentText={sheetCommentText}
+        setCommentText={setSheetCommentText}
+        replyingTo={replyingTo}
+        setReplyingTo={setReplyingTo}
+        replyText={replyText}
+        setReplyText={setReplyText}
+        addReply={addReply}
+        deleteReply={deleteReply}
+        handleCommentLikeWithAnimation={handleCommentLikeWithAnimation}
+        heartCommentId={heartCommentId}
+      />
+
+      <LikesModal post={likesModalPost} onClose={() => setLikesModalPost(null)} />
 
       {listModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
@@ -1428,10 +1616,6 @@ function PostModal({
   animateLike,
   handleDoubleLike,
   likePost,
-  commentText,
-  setCommentText,
-  addComment,
-  deleteComment,
   setSelectedPost,
   openUserProfile,
   currentActor,
@@ -1442,13 +1626,19 @@ function PostModal({
   savedPosts,
   toggleSavePost,
   setSharePost,
+  setCommentsSheetPost,
+  setLikesModalPost,
 }) {
   const [muted, setMuted] = useState(true);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
-  const [commentsOpen, setCommentsOpen] = useState(false);
   const tapTimer = useRef(null);
-  const commentInputRef = useRef(null);
+
+  const closePostModal = () => {
+    setSelectedPost(null);
+    setCommentsSheetPost(null);
+    setLikesModalPost(null);
+  };
 
   const mediaItems = selectedPost.media || [];
   const activeMedia = mediaItems[activeMediaIndex] || mediaItems[0] || null;
@@ -1479,12 +1669,11 @@ function PostModal({
     setActiveMediaIndex(0);
     setMuted(true);
     setActionMenuOpen(false);
-    setCommentsOpen(false);
   }, [selectedPost?._id]);
 
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (e.key === "Escape") setSelectedPost(null);
+      if (e.key === "Escape") closePostModal();
       if (e.key === "ArrowRight") goMedia("next");
       if (e.key === "ArrowLeft") goMedia("prev");
     };
@@ -1582,29 +1771,22 @@ function PostModal({
     );
   };
 
-  const submitComment = () => {
-    if (!commentText.trim()) return;
-    setCommentsOpen(true);
-    addComment();
-    window.setTimeout(() => commentInputRef.current?.focus(), 60);
-  };
-
   return (
     <div
       className="fixed inset-0 z-[100] flex items-end justify-center bg-black/92 backdrop-blur-md sm:items-center sm:p-4"
-      onClick={() => setSelectedPost(null)}
+      onClick={() => closePostModal()}
     >
       <div
-        className={`relative w-full overflow-hidden border border-white/10 bg-zinc-950 shadow-2xl ${
+        className={`relative w-full border border-white/10 bg-zinc-950 shadow-2xl ${
           isReel
-            ? "h-[96dvh] max-w-6xl rounded-t-[30px] sm:h-[92vh] sm:rounded-[34px]"
-            : "h-[94dvh] max-w-5xl rounded-t-[30px] sm:h-auto sm:max-h-[92vh] sm:rounded-[32px]"
+            ? "h-[96dvh] max-w-6xl overflow-hidden rounded-t-[30px] sm:h-[92vh] sm:rounded-[34px]"
+            : "max-h-[94dvh] max-w-5xl overflow-y-auto rounded-t-[30px] sm:max-h-[92vh] sm:rounded-[32px]"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 z-50 flex items-center justify-between border-b border-white/10 bg-zinc-950/95 px-3 py-2.5 backdrop-blur-xl lg:hidden">
           <button
-            onClick={() => setSelectedPost(null)}
+            onClick={() => closePostModal()}
             className="rounded-full border border-white/10 bg-white/[0.07] px-3 py-1.5 text-sm font-black text-gray-100 active:scale-95"
           >
             ← Back
@@ -1615,7 +1797,7 @@ function PostModal({
           <div className="flex items-center gap-2">
             {renderPostActionMenu(true)}
             <button
-              onClick={() => setSelectedPost(null)}
+              onClick={() => closePostModal()}
               className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.07] text-xl leading-none active:scale-95"
               aria-label="Close post"
             >
@@ -1627,7 +1809,7 @@ function PostModal({
         <div className="absolute right-4 top-4 z-50 hidden items-center gap-2 lg:flex">
           {renderPostActionMenu(false)}
           <button
-            onClick={() => setSelectedPost(null)}
+            onClick={() => closePostModal()}
             className="grid h-11 w-11 place-items-center rounded-full border border-white/10 bg-black/70 text-2xl leading-none transition hover:bg-white/10"
             aria-label="Close post"
           >
@@ -1635,14 +1817,14 @@ function PostModal({
           </button>
         </div>
 
-        <div className={`flex flex-col lg:grid ${isReel ? "lg:grid-cols-[minmax(320px,460px)_1fr]" : "lg:grid-cols-2"} h-[calc(96dvh-58px)] sm:h-full`}>
+        <div className={`flex flex-col lg:grid ${isReel ? "lg:grid-cols-[minmax(320px,460px)_1fr] h-[calc(96dvh-58px)] sm:h-full" : "lg:grid-cols-2"}`}>
           <div
             onClick={handleMediaClick}
             onDoubleClick={handleMediaDoubleClick}
             className={`relative flex cursor-pointer select-none items-center justify-center overflow-hidden bg-black ${
               isReel
                 ? "h-[58dvh] sm:h-[92vh] lg:h-[92vh]"
-                : "flex-1 min-h-[220px] sm:min-h-[420px] lg:h-auto lg:min-h-[620px] lg:max-h-[88vh]"
+                : "lg:h-auto lg:min-h-[620px] lg:max-h-[88vh]"
             }`}
           >
             {animateLike && (
@@ -1656,7 +1838,7 @@ function PostModal({
             {isImage ? (
               <>
                 <img src={mediaUrl} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-3xl opacity-25" />
-                <img src={mediaUrl} alt="" className="relative z-10 h-full w-full object-contain lg:max-h-[85vh]" />
+                <img src={mediaUrl} alt="" className="relative z-10 max-h-[55dvh] w-full object-contain sm:max-h-[62dvh] lg:h-full lg:max-h-[85vh]" />
               </>
             ) : isReel ? (
               <>
@@ -1726,7 +1908,7 @@ function PostModal({
             )}
           </div>
 
-          <div className={`flex min-h-0 shrink-0 flex-col bg-[linear-gradient(180deg,rgba(9,9,11,0.98),rgba(14,10,16,0.98))] ${isReel ? "h-[calc(38dvh-58px)] lg:h-[92vh]" : "max-h-[42dvh] lg:h-[88vh] lg:max-h-none"}`}>
+          <div className={`flex min-h-0 flex-col bg-[linear-gradient(180deg,rgba(9,9,11,0.98),rgba(14,10,16,0.98))] ${isReel ? "shrink-0 h-[calc(38dvh-58px)] lg:h-[92vh]" : "lg:h-[88vh]"}`}>
             <div className="flex items-center gap-3 border-b border-white/10 bg-zinc-950/95 p-3.5 sm:p-5">
               <button onClick={() => selectedPost.user?._id && openUserProfile(selectedPost.user._id)}>
                 <img src={avatarUrl(selectedPost.user || user)} alt="" className="h-11 w-11 rounded-full object-cover ring-1 ring-white/10" />
@@ -1765,15 +1947,23 @@ function PostModal({
                     }`}
                   >
                     <HeartIcon filled={liked} />
-                    <span>{formatCount(selectedPost.likes?.length || 0)}</span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (selectedPost.likes?.length) setLikesModalPost(selectedPost);
+                      }}
+                      className="hover:underline"
+                    >
+                      {formatCount(selectedPost.likes?.length || 0)}
+                    </span>
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setCommentsOpen((open) => !open)}
-                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1.5 transition-all active:scale-90 ${
-                      commentsOpen ? "text-cyan-200" : "text-gray-100 hover:text-white"
-                    }`}
+                    onClick={() => setCommentsSheetPost(selectedPost)}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1.5 text-gray-100 transition-all hover:text-white active:scale-90"
                   >
                     <CommentIcon />
                     <span>{formatCount(selectedPost.comments?.length || 0)}</span>
@@ -1811,114 +2001,16 @@ function PostModal({
                 </p>
               </div>
 
-              {commentsOpen ? (
-                <div className="rounded-[26px] border border-white/10 bg-white/[0.025] p-3 shadow-inner shadow-white/5">
-                  <div className="mb-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-pink-100/80">Replies</p>
-                      <p className="mt-0.5 text-xs font-semibold text-slate-500">
-                        {formatCount(selectedPost.comments?.length || 0)} people joined this vybe
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => commentInputRef.current?.focus()}
-                      className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 text-[11px] font-black text-white transition hover:bg-white/[0.08] active:scale-95"
-                    >
-                      Reply
-                    </button>
-                  </div>
-
-                  <div className="space-y-2.5">
-                    {selectedPost.comments?.length === 0 ? (
-                      <div className="rounded-[24px] border border-dashed border-white/10 bg-[radial-gradient(circle_at_top,rgba(236,72,153,0.10),rgba(255,255,255,0.025)_45%,transparent)] px-4 py-8 text-center">
-                        <p className="text-sm font-black text-white">No replies yet</p>
-                        <p className="mt-1 text-xs font-semibold text-gray-500">Be the first one to add a clean reply.</p>
-                      </div>
-                    ) : (
-                      selectedPost.comments?.map((comment) => {
-                        const canDelete =
-                          comment.user?._id === currentUserId || selectedPost.user?._id === currentUserId;
-
-                        return (
-                          <div
-                            key={comment._id}
-                            className={`rounded-[22px] border p-3.5 shadow-[0_10px_30px_rgba(0,0,0,0.18)] transition-all duration-300 ${
-                              comment.isTemp
-                                ? "border-pink-300/25 bg-pink-500/7 opacity-85"
-                                : "border-white/10 bg-white/[0.04] hover:border-white/15 hover:bg-white/[0.06]"
-                            }`}
-                          >
-                            <div className="flex items-start gap-3">
-                              <button onClick={() => comment.user?._id && openUserProfile(comment.user._id)}>
-                                <img src={avatarUrl(comment.user || currentActor)} alt="" className="h-9 w-9 rounded-full object-cover ring-1 ring-white/10" />
-                              </button>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center justify-between gap-3">
-                                  <button
-                                    onClick={() => comment.user?._id && openUserProfile(comment.user._id)}
-                                    className="truncate text-sm font-black hover:underline"
-                                  >
-                                    {comment.user?.name || "User"}
-                                  </button>
-                                  {canDelete && !comment.isTemp && (
-                                    <button
-                                      onClick={() => deleteComment(selectedPost._id, comment._id)}
-                                      className="rounded-full border border-red-400/15 bg-red-500/10 px-2 py-1 text-[10px] font-black text-red-200 transition hover:bg-red-500/20"
-                                    >
-                                      Delete
-                                    </button>
-                                  )}
-                                </div>
-                                <p className="text-[11px] font-semibold text-gray-500">
-                                  {comment.user?.username ? `@${comment.user.username}` : "@vybeo"}
-                                  {comment.createdAt ? ` • ${new Date(comment.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}` : ""}
-                                  {comment.isTemp ? " • sending" : ""}
-                                </p>
-                                <p className="mt-1.5 break-words text-sm leading-relaxed text-gray-300">{comment.text}</p>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setCommentsOpen(true)}
-                  className="w-full rounded-[26px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(236,72,153,0.08),rgba(255,255,255,0.025)_46%,transparent)] px-4 py-6 text-center transition hover:border-pink-300/20 hover:bg-white/[0.035] active:scale-[0.99]"
-                >
-                  <p className="text-sm font-black text-white">View replies</p>
-                  <p className="mt-1 text-xs font-semibold text-slate-500">
-                    {formatCount(selectedPost.comments?.length || 0)} replies • tap to open the conversation
-                  </p>
-                </button>
-              )}
-            </div>
-
-            <div className="border-t border-white/10 bg-zinc-950/95 p-3 sm:p-4">
-              <div className="flex gap-2 sm:gap-3">
-                <input
-                  ref={commentInputRef}
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && submitComment()}
-                  placeholder="Drop a reply..."
-                  className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.055] px-4 py-3 text-sm outline-none transition focus:border-pink-400/50 focus:bg-white/[0.075]"
-                />
-                <button
-                  onClick={submitComment}
-                  disabled={!commentText.trim()}
-                  className="rounded-2xl bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-4 py-3 text-sm font-black transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 sm:px-5"
-                >
-                  Send
-                </button>
-              </div>
-              <p className="mt-2 text-[11px] font-semibold text-gray-500">
-                {isReel ? "Tap clip for sound. Double tap to feel." : "Double tap media/thought or use the felt button."}
-              </p>
+              <button
+                type="button"
+                onClick={() => setCommentsSheetPost(selectedPost)}
+                className="w-full rounded-[26px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(236,72,153,0.08),rgba(255,255,255,0.025)_46%,transparent)] px-4 py-6 text-center transition hover:border-pink-300/20 hover:bg-white/[0.035] active:scale-[0.99]"
+              >
+                <p className="text-sm font-black text-white">View replies</p>
+                <p className="mt-1 text-xs font-semibold text-slate-500">
+                  {formatCount(selectedPost.comments?.length || 0)} replies • tap to open the conversation
+                </p>
+              </button>
             </div>
           </div>
         </div>
