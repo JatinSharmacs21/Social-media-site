@@ -885,7 +885,7 @@ function Navbar() {
   if (!token) {
     return (
       <>
-        <NotificationToast />
+        {NotificationToast()}
 
         <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-2xl bg-black/70 border-b border-white/10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
@@ -914,10 +914,10 @@ function Navbar() {
 
   return (
     <>
-      <NotificationToast />
-      <MobileVybeSheet />
-      <SpaceControlPanel />
-      <BlockedUsersModal />
+      {NotificationToast()}
+      {MobileVybeSheet()}
+      {SpaceControlPanel()}
+      {BlockedUsersModal()}
 
       <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-[76px] backdrop-blur-2xl bg-black/75 border-b border-white/10">
         <div className="h-full px-4 flex items-center justify-between gap-3 overflow-hidden">

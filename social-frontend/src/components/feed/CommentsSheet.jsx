@@ -96,7 +96,7 @@ function CommentsSheet({
         }}
       >
         <header
-          className="relative overflow-hidden border-b border-white/10 bg-zinc-950/95 p-3.5 backdrop-blur-2xl sm:p-4"
+          className="relative overflow-hidden border-b border-white/10 bg-zinc-950/95 px-3.5 pb-2.5 pt-2 backdrop-blur-2xl sm:px-4 sm:pb-3 sm:pt-2.5"
         >
           <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-pink-500/14 blur-3xl" />
           <div className="pointer-events-none absolute -left-16 -bottom-16 h-40 w-40 rounded-full bg-cyan-500/10 blur-3xl" />
@@ -105,22 +105,17 @@ function CommentsSheet({
             onTouchMove={handleDragMove}
             onTouchEnd={handleDragEnd}
             onTouchCancel={handleDragEnd}
-            className="relative -mt-2 mb-1 flex h-8 w-full cursor-grab items-center justify-center sm:hidden"
+            className="relative -mt-1 mb-1 flex h-6 w-full cursor-grab items-center justify-center sm:hidden"
             style={{ touchAction: "none" }}
           >
             <span className="h-1.5 w-12 rounded-full bg-white/20" />
           </div>
-          <div className="relative flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[10px] font-black tracking-[0.22em] text-pink-300">VYBE REPLIES</p>
-              <h3 className="mt-0.5 truncate text-lg font-black text-white">{comments.length} replies</h3>
-              {(activeCommentsPost.caption || activeCommentsPost.content) && (
-                <p className="mt-1 line-clamp-1 text-xs font-semibold text-gray-500">{activeCommentsPost.caption || activeCommentsPost.content}</p>
-              )}
-            </div>
-            <button type="button" onClick={() => setCommentsSheetPost(null)} className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[0.055] text-xl text-gray-300 transition hover:bg-white/[0.09] hover:text-white active:scale-95">
-              ×
-            </button>
+          <div className="relative min-w-0">
+            <p className="text-[10px] font-black tracking-[0.22em] text-pink-300">VYBE REPLIES</p>
+            <h3 className="mt-0.5 truncate text-base font-black text-white">{comments.length} replies</h3>
+            {(activeCommentsPost.caption || activeCommentsPost.content) && (
+              <p className="mt-1 line-clamp-1 text-xs font-semibold text-gray-500">{activeCommentsPost.caption || activeCommentsPost.content}</p>
+            )}
           </div>
         </header>
 

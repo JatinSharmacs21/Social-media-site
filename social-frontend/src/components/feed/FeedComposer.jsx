@@ -64,12 +64,12 @@ function FeedComposer({
             className={
               hasSelectedMedia
                 ? "fixed inset-0 z-50 flex flex-col bg-[#050508]"
-                : `relative overflow-visible w-full mb-3.5 sm:mb-6 transition-all duration-300 ${
+                : `relative overflow-visible w-full mb-3.5 sm:mb-6 rounded-[22px] sm:rounded-[28px] border transition-all duration-300 ease-out ${
                     composerOpen || caption.trim()
-                      ? `bg-zinc-950/90 border border-white/10 rounded-[22px] sm:rounded-[28px] p-2.5 sm:p-4 shadow-xl shadow-black/30 ${
-                          selectedMood !== "All" ? "shadow-pink-500/10" : ""
+                      ? `border-white/10 bg-zinc-950/90 p-2.5 sm:p-4 shadow-xl shadow-black/30 ${
+                          selectedMood !== "All" ? "shadow-pink-500/10" : "shadow-transparent"
                         }`
-                      : ""
+                      : "border-transparent bg-transparent p-0 shadow-none"
                   }`
             }
             style={hasSelectedMedia ? { height: "100dvh" } : undefined}
@@ -97,7 +97,7 @@ function FeedComposer({
             )}
 
             {(composerOpen || hasSelectedMedia || caption.trim()) && (
-              <>
+              <div className={hasSelectedMedia ? "flex min-h-0 flex-1 flex-col" : "animate-vybe-sheet"}>
             {hasSelectedMedia ? (
               <div className="shrink-0 flex items-center justify-between gap-2 px-3 sm:px-4 pt-3 pb-2.5 border-b border-white/10 bg-black/40">
                 <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
@@ -350,7 +350,7 @@ function FeedComposer({
               </button>
             </div>
             )}
-                        </>
+                        </div>
             )}
     </form>
   );
